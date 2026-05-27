@@ -7,9 +7,9 @@ function App() {
 
                 {/* Logo */}
                 <div className="logo">
-          <span className="logo-text">
-            tet<span className="logo-accent">H</span>er
-          </span>
+                  <span className="logo-text">
+                    tet<span className="logo-accent">H</span>er
+                  </span>
                 </div>
 
                 {/* Heading */}
@@ -19,7 +19,7 @@ function App() {
                 </div>
 
                 {/* Form */}
-                <div className="form-group">
+                <form className="form-group">
                     <input
                         type="email"
                         className="input-field"
@@ -31,7 +31,7 @@ function App() {
                         placeholder="Password"
                     />
                     <button className="btn-continue">Continue</button>
-                </div>
+                </form>
 
                 {/* Divider */}
                 <div className="divider">
