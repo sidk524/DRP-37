@@ -50,8 +50,24 @@ import kotlin.math.max
 
 @Composable
 fun LoginScreen() {
+    LoginScreen(
+        isLoading = false,
+        errorMessage = null,
+        onEmailLogin = { _, _ -> },
+        onGoogleLogin = {}
+    )
+}
+
+@Composable
+fun LoginScreen(
+    isLoading: Boolean,
+    errorMessage: String?,
+    onEmailLogin: (email: String, password: String) -> Unit,
+    onGoogleLogin: () -> Unit
+) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    val canSubmit = email.isNotBlank() && password.isNotBlank() && !isLoading
 
     Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
         BoxWithConstraints(
@@ -126,19 +142,21 @@ fun LoginScreen() {
                     Spacer(modifier = Modifier.height(layout.passwordToButtonGap))
 
                     Button(
-                        onClick = {},
-                        enabled = false,
+                        onClick = { onEmailLogin(email.trim(), password) },
+                        enabled = canSubmit,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(layout.controlHeight),
                         shape = RoundedCornerShape(layout.cornerRadius),
                         colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2B2B30),
+                            contentColor = Color.White,
                             disabledContainerColor = Color(0xFF1F1F22),
                             disabledContentColor = Color(0xFF5F5F65)
                         )
                     ) {
                         Text(
-                            text = "Log in",
+                            text = if (isLoading) "Logging in" else "Log in",
                             fontSize = layout.buttonTextSize.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.sp
@@ -172,7 +190,8 @@ fun LoginScreen() {
                     Spacer(modifier = Modifier.height(layout.dividerToGoogleGap))
 
                     Button(
-                        onClick = {},
+                        onClick = onGoogleLogin,
+                        enabled = !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(layout.controlHeight),
@@ -190,6 +209,18 @@ fun LoginScreen() {
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.sp,
                             maxLines = 1
+                        )
+                    }
+
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(layout.errorGap))
+                        Text(
+                            text = errorMessage,
+                            color = Color(0xFFFF6B6B),
+                            fontSize = layout.smallTextSize.sp,
+                            lineHeight = layout.errorLineHeight.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -418,6 +449,8 @@ private data class LoginLayoutMetrics(
     val buttonToDividerGap: Dp,
     val dividerToGoogleGap: Dp,
     val formToSignupGap: Dp,
+    val errorGap: Dp,
+    val errorLineHeight: Float,
     val termsBottomPadding: Dp
 ) {
     companion object {
@@ -452,6 +485,8 @@ private data class LoginLayoutMetrics(
                 buttonToDividerGap = (28f * compactScale).dp,
                 dividerToGoogleGap = (28f * compactScale).dp,
                 formToSignupGap = (38f * compactScale).dp,
+                errorGap = (12f * compactScale).dp,
+                errorLineHeight = 18f * compactScale,
                 termsBottomPadding = 0.dp
             )
         }
