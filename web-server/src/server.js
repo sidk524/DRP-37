@@ -19,10 +19,7 @@ app.get("/", (_req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.json({
-    status: "healthy",
-    uptime: process.uptime()
-  });
+  res.type("text").send("VERY HEALTHY. VERY AWESOME");
 });
 
 app.use((_req, res) => {
