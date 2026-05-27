@@ -1,371 +1,459 @@
 package com.drp37.blocker.ui.screens
 
-import android.widget.Toast
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.drp37.blocker.data.loadBlockList
 import com.drp37.blocker.data.loadLaunchableApps
-import com.drp37.blocker.data.saveBlockList
-import com.drp37.blocker.model.BlockList
-import com.drp37.blocker.ui.components.AppPickerDialog
-import com.drp37.blocker.ui.components.LockSessionDialog
+import com.drp37.blocker.model.InstalledApp
 import com.drp37.blocker.ui.theme.MyApplicationTheme
+import kotlin.math.max
 
 @Composable
 fun BlockerSetupScreen() {
     val context = LocalContext.current
     val installedApps = remember { loadLaunchableApps(context) }
-    val savedBlockList = remember { loadBlockList(context) }
     val selectedPackages = remember(installedApps) {
         mutableStateMapOf<String, Boolean>().apply {
-            installedApps.forEach { app -> put(app.packageName, app.packageName in savedBlockList.packages) }
+            installedApps.forEach { app -> put(app.packageName, false) }
         }
     }
-    val savedDuration = remember(savedBlockList.durationMinutes) { splitDuration(savedBlockList.durationMinutes) }
-    var daysInput by remember { mutableStateOf(savedDuration.days.toString()) }
-    var hoursInput by remember { mutableStateOf(savedDuration.hours.toString()) }
-    var minutesInput by remember { mutableStateOf(savedDuration.minutes.toString()) }
-    var showAppPicker by remember { mutableStateOf(false) }
-    var activeSessionMinutes by remember { mutableIntStateOf(0) }
+    var query by remember { mutableStateOf("") }
 
-    val durationMinutes = totalDurationMinutes(daysInput, hoursInput, minutesInput)
-    val selectedPackageSet = selectedPackages.filterValues { it }.keys.toSet()
-    val selectedLabels = installedApps.filter { it.packageName in selectedPackageSet }.map { it.label }
-    val canStart = selectedPackageSet.isNotEmpty() && durationMinutes != null
-
-    if (showAppPicker) {
-        AppPickerDialog(
-            installedApps = installedApps,
-            selectedPackages = selectedPackages,
-            onDismiss = { showAppPicker = false },
-            onSave = { showAppPicker = false }
-        )
+    val selectedCount = selectedPackages.count { it.value }
+    val visibleApps = remember(installedApps, query) {
+        filterApps(installedApps, query)
     }
 
-    if (activeSessionMinutes > 0) {
-        LockSessionDialog(
-            durationMinutes = activeSessionMinutes,
-            onStop = { activeSessionMinutes = 0 }
-        )
-    }
-
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "FocusBlock",
-                color = Color.Black,
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.sp
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "Select your block list, set a duration, then start the lock session.",
-                color = Color(0xFF666666),
-                fontSize = 16.sp,
-                lineHeight = 22.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-
-            Spacer(modifier = Modifier.height(36.dp))
-
-            SectionTitle("Selected block list")
-            Spacer(modifier = Modifier.height(12.dp))
-            BlockListCard(
-                selectedCount = selectedPackageSet.size,
-                selectedLabels = selectedLabels,
-                totalApps = installedApps.size,
-                onChooseApps = { showAppPicker = true }
-            )
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            SectionTitle("Duration")
-            Spacer(modifier = Modifier.height(12.dp))
-            DurationInputCard(
-                days = daysInput,
-                hours = hoursInput,
-                minutes = minutesInput,
-                durationMinutes = durationMinutes,
-                onDaysChange = { daysInput = it.filter(Char::isDigit).take(4) },
-                onHoursChange = { hoursInput = it.filter(Char::isDigit).take(3) },
-                onMinutesChange = { minutesInput = it.filter(Char::isDigit).take(3) }
-            )
-
-            Spacer(modifier = Modifier.height(34.dp))
-
-            Button(
-                onClick = {
-                    val minutes = durationMinutes ?: return@Button
-                    saveBlockList(
-                        context = context,
-                        blockList = BlockList(
-                            packages = selectedPackageSet,
-                            durationMinutes = minutes
-                        )
-                    )
-                    Toast.makeText(context, "Blocking started", Toast.LENGTH_SHORT).show()
-                    activeSessionMinutes = minutes
-                },
-                enabled = canStart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Black,
-                    contentColor = Color.White,
-                    disabledContainerColor = Color(0xFFE5E5E5),
-                    disabledContentColor = Color(0xFF888888)
-                )
-            ) {
-                Text("Start", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            val contentHeight = maxHeight * 0.90f
+            val contentWidth = (maxWidth * 0.84f).coerceAtMost(620.dp)
+            val layout = remember(contentWidth, contentHeight) {
+                BlockAppsLayoutMetrics(contentWidth, contentHeight)
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Column(
+                modifier = Modifier
+                    .width(contentWidth)
+                    .height(contentHeight),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TopBar(layout = layout)
 
-            Text(
-                text = sessionSummary(selectedPackageSet.size, durationMinutes),
-                color = Color(0xFF777777),
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
+                Spacer(modifier = Modifier.height(layout.topBarToTitleGap))
 
-@Composable
-private fun BlockListCard(
-    selectedCount: Int,
-    selectedLabels: List<String>,
-    totalApps: Int,
-    onChooseApps: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F8F8)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Main block list",
-                        color = Color.Black,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
+                Text(
+                    text = "Block Apps",
+                    color = Color.White,
+                    fontSize = layout.titleTextSize.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(layout.titleToCountGap))
+
+                Text(
+                    text = "$selectedCount apps selected",
+                    color = Color(0xFF92929A),
+                    fontSize = layout.bodyTextSize.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(layout.countToSearchGap))
+
+                SearchField(
+                    value = query,
+                    layout = layout,
+                    onValueChange = { query = it }
+                )
+
+                Spacer(modifier = Modifier.height(layout.searchToGridGap))
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(bottom = layout.gridBottomPadding),
+                    horizontalArrangement = Arrangement.spacedBy(layout.gridColumnGap),
+                    verticalArrangement = Arrangement.spacedBy(layout.gridRowGap)
+                ) {
+                    items(visibleApps, key = { it.packageName }) { app ->
+                        val selected = selectedPackages[app.packageName] == true
+                        AppGridItem(
+                            app = app,
+                            selected = selected,
+                            layout = layout,
+                            onClick = {
+                                selectedPackages[app.packageName] = !selected
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(layout.gridToButtonGap))
+
+                Button(
+                    onClick = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(layout.startButtonHeight),
+                    shape = RoundedCornerShape(layout.startButtonRadius),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0A84FF),
+                        contentColor = Color.White
                     )
+                ) {
                     Text(
-                        text = "$selectedCount apps selected",
-                        color = Color(0xFF666666),
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(top = 3.dp)
+                        text = "Start Session · $selectedCount apps",
+                        fontSize = layout.buttonTextSize.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.sp
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = if (selectedLabels.isEmpty()) {
-                    "No apps selected yet. $totalApps launchable apps available."
-                } else {
-                    selectedLabels.take(4).joinToString(", ") + if (selectedLabels.size > 4) " +${selectedLabels.size - 4} more" else ""
-                },
-                color = Color(0xFF666666),
-                fontSize = 14.sp,
-                lineHeight = 20.sp
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            OutlinedButton(
-                onClick = onChooseApps,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text("Choose apps", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DurationInputCard(
-    days: String,
-    hours: String,
-    minutes: String,
-    durationMinutes: Int?,
-    onDaysChange: (String) -> Unit,
-    onHoursChange: (String) -> Unit,
-    onMinutesChange: (String) -> Unit
+private fun TopBar(layout: BlockAppsLayoutMetrics) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.align(Alignment.CenterStart),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BackChevron(size = layout.topIconSize)
+            Text(
+                text = "Back",
+                color = Color(0xFF0A84FF),
+                fontSize = layout.navTextSize.sp,
+                letterSpacing = 0.sp
+            )
+        }
+
+        Text(
+            text = "5m",
+            color = Color(0xFF8E8E96),
+            fontSize = layout.navTextSize.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+private fun SearchField(
+    value: String,
+    layout: BlockAppsLayoutMetrics,
+    onValueChange: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(layout.searchHeight)
+            .clip(RoundedCornerShape(layout.searchRadius))
+            .background(Color(0xFF1F1F22))
+            .padding(horizontal = layout.searchHorizontalPadding),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SearchIcon(size = layout.searchIconSize)
+
+        Spacer(modifier = Modifier.width(layout.searchIconGap))
+
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            textStyle = TextStyle(
+                color = Color.White,
+                fontSize = layout.searchTextSize.sp
+            ),
+            decorationBox = { innerTextField ->
+                if (value.isEmpty()) {
+                    Text(
+                        text = "Search",
+                        color = Color(0xFF9B9BA3),
+                        fontSize = layout.searchTextSize.sp
+                    )
+                }
+                innerTextField()
+            }
+        )
+    }
+}
+
+@Composable
+private fun AppGridItem(
+    app: InstalledApp,
+    selected: Boolean,
+    layout: BlockAppsLayoutMetrics,
+    onClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF8F8F8), RoundedCornerShape(14.dp))
-            .padding(16.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            DurationField(
-                value = days,
-                label = "Days",
-                modifier = Modifier.weight(1f),
-                onValueChange = onDaysChange
+        Box(contentAlignment = Alignment.TopEnd) {
+            Image(
+                bitmap = app.icon.asImageBitmap(),
+                contentDescription = app.label,
+                modifier = Modifier
+                    .size(layout.appIconSize)
+                    .clip(RoundedCornerShape(layout.appIconRadius))
+                    .graphicsLayer { alpha = if (selected) 1f else 0.45f },
+                colorFilter = if (selected) null else grayscaleFilter()
             )
-            Spacer(modifier = Modifier.padding(horizontal = 5.dp))
-            DurationField(
-                value = hours,
-                label = "Hours",
-                modifier = Modifier.weight(1f),
-                onValueChange = onHoursChange
-            )
-            Spacer(modifier = Modifier.padding(horizontal = 5.dp))
-            DurationField(
-                value = minutes,
-                label = "Minutes",
-                modifier = Modifier.weight(1f),
-                onValueChange = onMinutesChange
-            )
+
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(layout.checkSize)
+                        .clip(CircleShape)
+                        .background(Color(0xFF0A84FF)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CheckMark(size = layout.checkIconSize)
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(layout.appLabelGap))
 
         Text(
-            text = durationMinutes?.let { "Session length: ${formatDuration(it)}" }
-                ?: "Enter a duration greater than zero",
-            color = if (durationMinutes == null) Color(0xFFB00020) else Color(0xFF666666),
-            fontSize = 14.sp
+            text = app.label,
+            color = if (selected) Color.White else Color(0xFF85858C),
+            fontSize = layout.appLabelTextSize.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private fun filterApps(apps: List<InstalledApp>, query: String): List<InstalledApp> {
+    val normalizedQuery = query.trim().lowercase()
+    if (normalizedQuery.isEmpty()) return apps
+
+    return apps
+        .map { app ->
+            val label = app.label.lowercase()
+            val packageName = app.packageName.lowercase()
+            val compactLabel = label.filterNot(Char::isWhitespace)
+            val compactQuery = normalizedQuery.filterNot(Char::isWhitespace)
+            val score = when {
+                label == normalizedQuery -> 0
+                label.startsWith(normalizedQuery) -> 1
+                compactLabel.startsWith(compactQuery) -> 2
+                label.contains(normalizedQuery) -> 3
+                compactLabel.contains(compactQuery) -> 4
+                packageName.contains(normalizedQuery) -> 5
+                else -> 100
+            }
+            app to score
+        }
+        .filter { (_, score) -> score < 100 }
+        .sortedWith(compareBy({ it.second }, { it.first.label.lowercase() }))
+        .map { it.first }
+}
+
+private fun grayscaleFilter(): ColorFilter {
+    val matrix = ColorMatrix(
+        floatArrayOf(
+            0.2126f, 0.7152f, 0.0722f, 0f, 0f,
+            0.2126f, 0.7152f, 0.0722f, 0f, 0f,
+            0.2126f, 0.7152f, 0.0722f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f
+        )
+    )
+    return ColorFilter.colorMatrix(matrix)
+}
+
 @Composable
-private fun DurationField(
-    value: String,
-    label: String,
-    modifier: Modifier,
-    onValueChange: (String) -> Unit
+private fun BackChevron(size: Dp) {
+    Canvas(modifier = Modifier.size(size)) {
+        val strokeWidth = size.toPx() * 0.13f
+        drawLine(
+            color = Color(0xFF0A84FF),
+            start = androidx.compose.ui.geometry.Offset(this.size.width * 0.65f, this.size.height * 0.18f),
+            end = androidx.compose.ui.geometry.Offset(this.size.width * 0.30f, this.size.height * 0.50f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = Color(0xFF0A84FF),
+            start = androidx.compose.ui.geometry.Offset(this.size.width * 0.30f, this.size.height * 0.50f),
+            end = androidx.compose.ui.geometry.Offset(this.size.width * 0.65f, this.size.height * 0.82f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+@Composable
+private fun SearchIcon(size: Dp) {
+    Canvas(modifier = Modifier.size(size)) {
+        val strokeWidth = size.toPx() * 0.12f
+        drawCircle(
+            color = Color(0xFF9B9BA3),
+            radius = this.size.minDimension * 0.28f,
+            center = androidx.compose.ui.geometry.Offset(this.size.width * 0.43f, this.size.height * 0.43f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+        )
+        drawLine(
+            color = Color(0xFF9B9BA3),
+            start = androidx.compose.ui.geometry.Offset(this.size.width * 0.63f, this.size.height * 0.63f),
+            end = androidx.compose.ui.geometry.Offset(this.size.width * 0.84f, this.size.height * 0.84f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+@Composable
+private fun CheckMark(size: Dp) {
+    Canvas(modifier = Modifier.size(size)) {
+        val strokeWidth = size.toPx() * 0.18f
+        drawLine(
+            color = Color.White,
+            start = androidx.compose.ui.geometry.Offset(this.size.width * 0.18f, this.size.height * 0.48f),
+            end = androidx.compose.ui.geometry.Offset(this.size.width * 0.42f, this.size.height * 0.72f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = Color.White,
+            start = androidx.compose.ui.geometry.Offset(this.size.width * 0.42f, this.size.height * 0.72f),
+            end = androidx.compose.ui.geometry.Offset(this.size.width * 0.84f, this.size.height * 0.28f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+private data class BlockAppsLayoutMetrics(
+    val titleTextSize: Float,
+    val bodyTextSize: Float,
+    val navTextSize: Float,
+    val buttonTextSize: Float,
+    val searchTextSize: Float,
+    val appLabelTextSize: Float,
+    val topIconSize: Dp,
+    val topBarToTitleGap: Dp,
+    val titleToCountGap: Dp,
+    val countToSearchGap: Dp,
+    val searchToGridGap: Dp,
+    val searchHeight: Dp,
+    val searchRadius: Dp,
+    val searchHorizontalPadding: Dp,
+    val searchIconSize: Dp,
+    val searchIconGap: Dp,
+    val appIconSize: Dp,
+    val appIconRadius: Dp,
+    val checkSize: Dp,
+    val checkIconSize: Dp,
+    val appLabelGap: Dp,
+    val gridColumnGap: Dp,
+    val gridRowGap: Dp,
+    val gridBottomPadding: Dp,
+    val gridToButtonGap: Dp,
+    val startButtonHeight: Dp,
+    val startButtonRadius: Dp
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier,
-        singleLine = true,
-        label = { Text(label) },
-        isError = false,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Color.Black,
-            focusedLabelColor = Color.Black,
-            cursorColor = Color.Black
-        )
-    )
-}
+    companion object {
+        operator fun invoke(contentWidth: Dp, contentHeight: Dp): BlockAppsLayoutMetrics {
+            val widthScale = contentWidth.value / 328f
+            val heightScale = contentHeight.value / 760f
+            val scale = max(0.64f, minOf(widthScale, heightScale, 1f))
 
-@Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        color = Color.Black,
-        fontSize = 20.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
-private data class DurationParts(
-    val days: Int,
-    val hours: Int,
-    val minutes: Int
-)
-
-private fun splitDuration(totalMinutes: Int): DurationParts {
-    val days = totalMinutes / (24 * 60)
-    val hours = (totalMinutes % (24 * 60)) / 60
-    val minutes = totalMinutes % 60
-    return DurationParts(days, hours, minutes)
-}
-
-private fun totalDurationMinutes(days: String, hours: String, minutes: String): Int? {
-    val total = (days.toIntOrNull() ?: 0) * 24 * 60 +
-        (hours.toIntOrNull() ?: 0) * 60 +
-        (minutes.toIntOrNull() ?: 0)
-    return total.takeIf { it > 0 }
-}
-
-private fun sessionSummary(selectedCount: Int, durationMinutes: Int?): String {
-    return if (durationMinutes == null) {
-        "$selectedCount apps selected - invalid duration"
-    } else {
-        "$selectedCount apps selected - ${formatDuration(durationMinutes)} session"
+            return BlockAppsLayoutMetrics(
+                titleTextSize = 40f * scale,
+                bodyTextSize = 22f * scale,
+                navTextSize = 20f * scale,
+                buttonTextSize = 22f * scale,
+                searchTextSize = 24f * scale,
+                appLabelTextSize = 15f * scale,
+                topIconSize = (30f * scale).dp,
+                topBarToTitleGap = (40f * scale).dp,
+                titleToCountGap = (10f * scale).dp,
+                countToSearchGap = (26f * scale).dp,
+                searchToGridGap = (30f * scale).dp,
+                searchHeight = (64f * scale).dp,
+                searchRadius = (18f * scale).dp,
+                searchHorizontalPadding = (18f * scale).dp,
+                searchIconSize = (26f * scale).dp,
+                searchIconGap = (10f * scale).dp,
+                appIconSize = (74f * scale).dp,
+                appIconRadius = (16f * scale).dp,
+                checkSize = (24f * scale).dp,
+                checkIconSize = (17f * scale).dp,
+                appLabelGap = (8f * scale).dp,
+                gridColumnGap = (24f * scale).dp,
+                gridRowGap = (28f * scale).dp,
+                gridBottomPadding = (10f * scale).dp,
+                gridToButtonGap = (18f * scale).dp,
+                startButtonHeight = (70f * scale).dp,
+                startButtonRadius = (16f * scale).dp
+            )
+        }
     }
-}
-
-private fun formatDuration(minutes: Int): String {
-    val days = minutes / (24 * 60)
-    val hours = (minutes % (24 * 60)) / 60
-    val mins = minutes % 60
-    val parts = buildList {
-        if (days > 0) add("${days}d")
-        if (hours > 0) add("${hours}h")
-        if (mins > 0 || isEmpty()) add("${mins}m")
-    }
-    return parts.joinToString(" ")
 }
 
 @Preview(showBackground = true)

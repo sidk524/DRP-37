@@ -67,7 +67,9 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var authMode by remember { mutableStateOf(AuthMode.Login) }
     val canSubmit = email.isNotBlank() && password.isNotBlank() && !isLoading
+    val isLogin = authMode == AuthMode.Login
 
     Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
         BoxWithConstraints(
@@ -98,7 +100,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(layout.logoToTitleGap))
 
                     Text(
-                        text = "Welcome back",
+                        text = if (isLogin) "Welcome back" else "Create an account",
                         color = Color.White,
                         fontSize = layout.titleTextSize.sp,
                         fontWeight = FontWeight.Bold,
@@ -109,7 +111,11 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(layout.titleToSubtitleGap))
 
                     Text(
-                        text = "Log in to continue your focus journey",
+                        text = if (isLogin) {
+                            "Log in to continue your focus journey"
+                        } else {
+                            "Enter your email to sign up for Tether"
+                        },
                         color = Color(0xFF8F8F95),
                         fontSize = layout.bodyTextSize.sp,
                         letterSpacing = 0.sp,
@@ -142,8 +148,12 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(layout.passwordToButtonGap))
 
                     Button(
-                        onClick = { onEmailLogin(email.trim(), password) },
-                        enabled = canSubmit,
+                        onClick = {
+                            if (isLogin) {
+                                onEmailLogin(email.trim(), password)
+                            }
+                        },
+                        enabled = isLogin && canSubmit,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(layout.controlHeight),
@@ -156,7 +166,11 @@ fun LoginScreen(
                         )
                     ) {
                         Text(
-                            text = if (isLoading) "Logging in" else "Log in",
+                            text = when {
+                                isLoading -> "Logging in"
+                                isLogin -> "Log in"
+                                else -> "Continue"
+                            },
                             fontSize = layout.buttonTextSize.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.sp
@@ -236,13 +250,19 @@ fun LoginScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Don't have an account?",
+                            text = if (isLogin) "Don't have an account?" else "Already have an account?",
                             color = Color(0xFF8F8F95),
                             fontSize = layout.bodyTextSize.sp
                         )
-                        TextButton(onClick = {}) {
+                        TextButton(
+                            onClick = {
+                                authMode = if (isLogin) AuthMode.SignUp else AuthMode.Login
+                                email = ""
+                                password = ""
+                            }
+                        ) {
                             Text(
-                                text = "Sign up",
+                                text = if (isLogin) "Sign up" else "Log in",
                                 color = Color(0xFF0A84FF),
                                 fontSize = layout.bodyTextSize.sp,
                                 fontWeight = FontWeight.Bold
@@ -491,6 +511,11 @@ private data class LoginLayoutMetrics(
             )
         }
     }
+}
+
+private enum class AuthMode {
+    Login,
+    SignUp
 }
 
 
