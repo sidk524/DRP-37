@@ -1,0 +1,26 @@
+{
+  "name": "drp-37-web-server",
+  "version": "1.0.0",
+  "description": "Basic Express web server for DRP-37.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node --check src/server.js"
+  },
+  "keywords": [
+    "express",
+    "node",
+    "aws"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
