@@ -92,7 +92,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAuthDeepLink(intent)
+    }
 
     private fun handleAuthDeepLink(intent: Intent?) {
         if (intent == null || !SupabaseAuthClient.isConfigured) return
