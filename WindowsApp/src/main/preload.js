@@ -9,3 +9,7 @@ contextBridge.exposeInMainWorld('tether', {
     // Example — receive updates from the main process
     onUsageUpdate: (callback) => ipcRenderer.on('usage-update', callback),
 })
+
+contextBridge.exposeInMainWorld("electronAPI", {
+    submitAuthForm: (payload) => ipcRenderer.invoke("auth:submit", payload),
+});

@@ -5,7 +5,7 @@ function Login() {
         <AuthLayout
             title="Login to account"
             subtitle="Enter your email to login to Tether"
-            formEndpoint="/login"
+            formEndpoint="login"
             subText="Don't have an account?"
             linkEndpoint="/"
             linkText="Register"

@@ -2,6 +2,22 @@ import '../styles/Login.css';
 import {Link} from "react-router-dom";
 
 function AuthLayout({ title, subtitle, formEndpoint,  subText, linkEndpoint, linkText}) {
+    async function handleSubmit(event) {
+        event.preventDefault();
+
+        const formData = new FormData(event.currentTarget);
+
+        const payload = {
+            email: formData.get("email"),
+            password: formData.get("password"),
+            formEndpoint,
+        };
+        console.log(payload);
+        const result = await window.electronAPI.submitAuthForm(payload);
+
+        console.log(result);
+    }
+
     return (
         <div className="app">
             <div className="auth-container">
@@ -20,13 +36,15 @@ function AuthLayout({ title, subtitle, formEndpoint,  subText, linkEndpoint, lin
                 </div>
 
                 {/* Form */}
-                <form className="form-group" action={formEndpoint}>
+                <form className="form-group" action={formEndpoint} onSubmit={handleSubmit}>
                     <input
+                        name="email"
                         type="email"
                         className="input-field"
                         placeholder="email@domain.com"
                     />
                     <input
+                        name="password"
                         type="password"
                         className="input-field"
                         placeholder="Password"
@@ -42,6 +60,7 @@ function AuthLayout({ title, subtitle, formEndpoint,  subText, linkEndpoint, lin
                 </div>
 
                 {/* Google Button */}
+                <form >
                 <button className="btn-google">
                     <svg className="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
                         <path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.85l6.09-6.09C34.46 3.05 29.5 1 24 1 14.82 1 7.07 6.48 3.64 14.18l7.08 5.5C12.4 13.02 17.73 9.5 24 9.5z"/>
@@ -51,6 +70,7 @@ function AuthLayout({ title, subtitle, formEndpoint,  subText, linkEndpoint, lin
                     </svg>
                     <span>Continue with Google</span>
                 </button>
+                </form>
 
                 {/* Login Link */}
                 <p className="login-text">
