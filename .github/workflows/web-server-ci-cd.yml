@@ -35,6 +35,9 @@ jobs:
       - name: Check server syntax
         run: npm run check
 
+      - name: Run tests
+        run: npm run test
+
   deploy:
     name: Deploy to EC2
     needs: test
