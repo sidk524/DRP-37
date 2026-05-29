@@ -100,7 +100,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(layout.logoToTitleGap))
 
                     Text(
-                        text = if (isLogin) "Welcome back" else "Create an account",
+                        text = if (isLogin) "Welcome back!!!" else "Create an account",
                         color = Color.White,
                         fontSize = layout.titleTextSize.sp,
                         fontWeight = FontWeight.Bold,
