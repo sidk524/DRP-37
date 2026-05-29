@@ -66,7 +66,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drp37.blocker.data.BlockSessionRepository
 import com.drp37.blocker.data.loadLaunchableApps
-import com.drp37.blocker.data.saveActiveBlockSession
 import com.drp37.blocker.model.InstalledApp
 import com.drp37.blocker.ui.theme.MyApplicationTheme
 import java.time.Duration
@@ -96,14 +95,6 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
         .filterValues { it }
         .keys
         .toSet()
-
-    LaunchedEffect(selectedPackageSet, sessionRunning) {
-        saveActiveBlockSession(
-            context = context,
-            packages = selectedPackageSet,
-            active = sessionRunning
-        )
-    }
 
     LaunchedEffect(installedApps) {
         val activeSession = BlockSessionRepository.loadActiveSession() ?: return@LaunchedEffect
@@ -186,11 +177,6 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                         activeSessionId?.let { sessionId ->
                             BlockSessionRepository.endSession(sessionId)
                         }
-                        saveActiveBlockSession(
-                            context = context,
-                            packages = selectedPackageSet,
-                            active = false
-                        )
                         activeSessionId = null
                         sessionRunning = false
                         onLogout()
