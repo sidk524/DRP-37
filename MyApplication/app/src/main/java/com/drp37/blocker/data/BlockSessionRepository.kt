@@ -72,43 +72,45 @@ object BlockSessionRepository {
         path: String,
         body: JSONObject? = null
     ): JSONObject? = withContext(Dispatchers.IO) {
-        val baseUrl = BuildConfig.WEB_SERVER_URL.trimEnd('/')
-        if (baseUrl.isBlank()) return@withContext null
+        runCatching {
+            val baseUrl = BuildConfig.WEB_SERVER_URL.trimEnd('/')
+            if (baseUrl.isBlank()) return@runCatching null
 
-        val accessToken = SupabaseAuthClient.client.auth.currentAccessTokenOrNull()
-            ?: return@withContext null
-        val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = 10_000
-            readTimeout = 10_000
-            setRequestProperty("Authorization", "Bearer $accessToken")
-            setRequestProperty("Accept", "application/json")
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
-        }
-
-        try {
-            if (body != null) {
-                OutputStreamWriter(connection.outputStream).use { writer ->
-                    writer.write(body.toString())
+            val accessToken = SupabaseAuthClient.client.auth.currentAccessTokenOrNull()
+                ?: return@runCatching null
+            val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = 10_000
+                readTimeout = 10_000
+                setRequestProperty("Authorization", "Bearer $accessToken")
+                setRequestProperty("Accept", "application/json")
+                if (body != null) {
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
                 }
             }
 
-            val responseCode = connection.responseCode
-            val stream = if (responseCode in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            } ?: return@withContext null
+            try {
+                if (body != null) {
+                    OutputStreamWriter(connection.outputStream).use { writer ->
+                        writer.write(body.toString())
+                    }
+                }
 
-            val responseText = stream.bufferedReader().use { it.readText() }
-            if (responseCode !in 200..299) return@withContext null
-            JSONObject(responseText)
-        } finally {
-            connection.disconnect()
-        }
+                val responseCode = connection.responseCode
+                val stream = if (responseCode in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                } ?: return@runCatching null
+
+                val responseText = stream.bufferedReader().use { it.readText() }
+                if (responseCode !in 200..299) return@runCatching null
+                JSONObject(responseText)
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrNull()
     }
 }
 

@@ -97,24 +97,26 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
         .toSet()
 
     LaunchedEffect(installedApps) {
-        val activeSession = BlockSessionRepository.loadActiveSession() ?: return@LaunchedEffect
-        val elapsedSeconds = Duration.between(
-            Instant.parse(activeSession.startedAt),
-            Instant.now()
-        ).seconds.toInt()
-        val restoredRemainingSeconds = activeSession.totalDurationSeconds - elapsedSeconds
+        runCatching {
+            val activeSession = BlockSessionRepository.loadActiveSession() ?: return@runCatching
+            val elapsedSeconds = Duration.between(
+                Instant.parse(activeSession.startedAt),
+                Instant.now()
+            ).seconds.toInt()
+            val restoredRemainingSeconds = activeSession.totalDurationSeconds - elapsedSeconds
 
-        if (restoredRemainingSeconds <= 0) {
-            BlockSessionRepository.endSession(activeSession.id)
-            return@LaunchedEffect
-        }
+            if (restoredRemainingSeconds <= 0) {
+                BlockSessionRepository.endSession(activeSession.id)
+                return@runCatching
+            }
 
-        selectedPackages.keys.forEach { packageName ->
-            selectedPackages[packageName] = packageName in activeSession.appsBlocked
+            selectedPackages.keys.forEach { packageName ->
+                selectedPackages[packageName] = packageName in activeSession.appsBlocked
+            }
+            activeSessionId = activeSession.id
+            remainingSeconds = restoredRemainingSeconds
+            sessionRunning = true
         }
-        activeSessionId = activeSession.id
-        remainingSeconds = restoredRemainingSeconds
-        sessionRunning = true
     }
 
     LaunchedEffect(sessionRunning) {
