@@ -22,7 +22,8 @@
     "express": "^4.21.2",
     "helmet": "^8.0.0",
     "jest": "^30.4.2",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "ws": "^8.18.0"
   },
   "engines": {
     "node": ">=20"

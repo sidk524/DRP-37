@@ -4,6 +4,7 @@ const app = require("./app");
 const express = require("express");
 const helmet = require("helmet");
 const { createClient } = require("@supabase/supabase-js");
+const ws = require("ws");
 
 const port = Number(process.env.PORT) || 3000;
 const host = process.env.HOST || "0.0.0.0";
@@ -11,22 +12,22 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
+const supabaseClientOptions = {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  },
+  realtime: {
+    transport: ws
+  }
+};
+
 const supabaseAuth = supabaseUrl && supabasePublishableKey
-  ? createClient(supabaseUrl, supabasePublishableKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
+  ? createClient(supabaseUrl, supabasePublishableKey, supabaseClientOptions)
   : null;
 
 const supabaseAdmin = supabaseUrl && supabaseSecretKey
-  ? createClient(supabaseUrl, supabaseSecretKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
+  ? createClient(supabaseUrl, supabaseSecretKey, supabaseClientOptions)
   : null;
 
 app.disable("x-powered-by");
