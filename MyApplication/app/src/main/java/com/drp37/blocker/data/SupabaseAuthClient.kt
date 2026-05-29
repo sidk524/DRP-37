@@ -12,16 +12,16 @@ object SupabaseAuthClient {
     private const val redirectHost = "auth-callback"
 
     val isConfigured: Boolean
-        get() = BuildConfig.SUPABASE_URL.isNotBlank() && BuildConfig.SUPABASE_ANON_KEY.isNotBlank()
+        get() = BuildConfig.SUPABASE_URL.isNotBlank() && BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()
 
     val client by lazy {
         check(isConfigured) {
-            "Add SUPABASE_URL and SUPABASE_ANON_KEY to MyApplication/local.properties"
+            "Add SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to MyApplication/local.properties"
         }
 
         createSupabaseClient(
             supabaseUrl = BuildConfig.SUPABASE_URL,
-            supabaseKey = BuildConfig.SUPABASE_ANON_KEY
+            supabaseKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
         ) {
             install(Auth) {
                 scheme = redirectScheme
@@ -39,5 +39,9 @@ object SupabaseAuthClient {
 
     suspend fun signInWithGoogle() {
         client.auth.signInWith(Google)
+    }
+
+    suspend fun signOut() {
+        client.auth.signOut()
     }
 }

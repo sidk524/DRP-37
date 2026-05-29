@@ -47,14 +47,28 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (isAuthenticated) {
-                    BlockerSetupScreen()
+                    BlockerSetupScreen(
+                        onLogout = {
+                            lifecycleScope.launch {
+                                runCatching {
+                                    SupabaseAuthClient.signOut()
+                                }.onSuccess {
+                                    isAuthenticated = false
+                                    isLoading = false
+                                    errorMessage = null
+                                }.onFailure { error ->
+                                    errorMessage = error.message ?: "Logout failed."
+                                }
+                            }
+                        }
+                    )
                 } else {
                     LoginScreen(
                         isLoading = isLoading,
                         errorMessage = errorMessage,
                         onEmailLogin = { email, password ->
                             if (!SupabaseAuthClient.isConfigured) {
-                                errorMessage = "Add Supabase URL and anon key first."
+                                errorMessage = "Add Supabase URL and publishable key first."
                                 return@LoginScreen
                             }
 
@@ -71,7 +85,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onGoogleLogin = {
                             if (!SupabaseAuthClient.isConfigured) {
-                                errorMessage = "Add Supabase URL and anon key first."
+                                errorMessage = "Add Supabase URL and publishable key first."
                                 return@LoginScreen
                             }
 

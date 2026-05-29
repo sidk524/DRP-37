@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">FocusBlock</string>
+    <string name="app_block_accessibility_description">Detects when selected apps open during an active focus session and returns you to Tether.</string>
 </resources>
