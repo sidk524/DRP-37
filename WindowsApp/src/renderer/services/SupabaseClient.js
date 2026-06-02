@@ -52,3 +52,27 @@ export async function getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser();
     return user;
 }
+
+export async function checkOnboardingComplete(userId) {
+    const { data, error } = await supabase
+        .from('onboarding')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (error) throw error;
+    return !!data;
+}
+
+export async function saveOnboarding(userId, responses) {
+    const { data, error } = await supabase
+        .from('onboarding')
+        .upsert({
+            user_id: userId,
+            do_more_of: responses.doMoreOf,
+            scrolling_worst: responses.scrollingWorst,
+            future_message: responses.futureMessage,
+            strictness: responses.strictness,
+        }, { onConflict: 'user_id' });
+    if (error) throw error;
+    return data;
+}
