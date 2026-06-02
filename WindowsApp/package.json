@@ -14,7 +14,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "electron .",
-
     "dist": "npm run build && electron-builder",
     "pack": "npm run build && electron-builder --dir"
   },
@@ -28,30 +27,27 @@
     "wait-on": "^9.0.10"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "get-windows": "^9.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.1"
   },
-
   "build": {
     "appId": "com.tether.app",
     "productName": "Tether",
-
     "directories": {
       "output": "release"
     },
-
     "files": [
       "dist/**/*",
       "src/main/**/*",
       "package.json"
     ],
-
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico"
     },
-
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
@@ -59,7 +55,6 @@
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico"
     },
-
     "publish": [
       {
         "provider": "github",

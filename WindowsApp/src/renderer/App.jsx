@@ -1,12 +1,14 @@
 import { Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
+import AuthGate from "./components/AuthGate";
+import Friction from "./pages/Friction";
 
 function App() {
     return (
         <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
+            {/* Loaded directly into the overlay window, independent of auth */}
+            <Route path="/friction" element={<Friction />} />
+            {/* Main window: session decides Login vs BlockerSetup */}
+            <Route path="*" element={<AuthGate />} />
         </Routes>
     );
 }

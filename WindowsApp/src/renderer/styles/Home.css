@@ -208,6 +208,36 @@
     text-decoration: underline;
 }
 
+/* Toggle rendered as a button but styled like the link */
+.login-link-btn {
+    background: none;
+    border: none;
+    font-family: var(--font), serif;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+/* ── Auth error / loading ───────────────────────────────────── */
+.auth-error {
+    color: #ff6b6b;
+    font-size: 0.875rem;
+    text-align: center;
+    line-height: 1.4;
+    margin: 2px 0;
+}
+
+.auth-loading {
+    color: var(--text-subtle);
+    font-size: 0.95rem;
+}
+
+.btn-continue:disabled,
+.btn-google:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
 /* ── Footer ─────────────────────────────────────────────────── */
 .footer-text {
     font-size: 0.78rem;

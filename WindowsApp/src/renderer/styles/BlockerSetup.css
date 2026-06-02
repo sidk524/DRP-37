@@ -1,0 +1,152 @@
+/* ── Post-auth Block Apps setup ──────────────────────────────── */
+.setup {
+    --bg: #0d0d0f;
+    --surface: #1f1f22;
+    --surface-on: #0a84ff;
+    --border: #2a2d35;
+    --text: #ffffff;
+    --subtle: #8f8f95;
+
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    justify-content: center;
+    padding: 40px 24px;
+}
+
+.setup-inner {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+}
+
+.setup-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+}
+
+.setup-account {
+    font-size: 0.9rem;
+    color: var(--subtle);
+}
+
+.setup-signout {
+    background: none;
+    border: none;
+    color: #0a84ff;
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.setup-title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.setup-count {
+    color: var(--subtle);
+    font-size: 1rem;
+    margin-top: 6px;
+    margin-bottom: 24px;
+}
+
+.setup-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.setup-app {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--subtle);
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.setup-app:hover {
+    border-color: #3a3d45;
+}
+
+.setup-app.on {
+    color: var(--text);
+    border-color: #0a84ff;
+    background: #16222e;
+}
+
+.setup-app-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #4a4d55;
+    flex-shrink: 0;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.setup-app.on .setup-app-dot {
+    background: #0a84ff;
+    border-color: #0a84ff;
+}
+
+.setup-durations {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.setup-duration {
+    flex: 1;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--subtle);
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.setup-duration.on {
+    color: var(--text);
+    border-color: #0a84ff;
+    background: #16222e;
+}
+
+.setup-start {
+    margin-top: 28px;
+    padding: 18px;
+    background: #0a84ff;
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+}
+
+.setup-start:hover {
+    filter: brightness(1.08);
+}
+
+.setup-start:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
