@@ -103,10 +103,58 @@
     border-color: #0a84ff;
 }
 
+.setup-section-label {
+    margin-top: 26px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--subtle);
+}
+
+/* ── Mode selector ───────────────────────────────────────────── */
+.setup-modes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.setup-mode {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--subtle);
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.setup-mode.on {
+    color: var(--text);
+    border-color: #0a84ff;
+    background: #16222e;
+}
+
+.setup-mode-label {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.setup-mode-hint {
+    font-size: 0.78rem;
+    color: var(--subtle);
+}
+
 .setup-durations {
     display: flex;
     gap: 10px;
-    margin-top: 24px;
+    margin-top: 12px;
 }
 
 .setup-duration {
@@ -149,4 +197,69 @@
 .setup-start:disabled {
     opacity: 0.45;
     cursor: default;
+}
+
+/* ── Active session view ─────────────────────────────────────── */
+.session-active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-top: 60px;
+    gap: 14px;
+}
+
+.session-badge {
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0a84ff;
+    font-weight: 600;
+}
+
+.session-timer {
+    font-size: 4rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.session-meta {
+    color: var(--subtle);
+    font-size: 1rem;
+}
+
+.session-apps {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.session-app-tag {
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.85rem;
+    color: var(--text);
+}
+
+.setup-stop {
+    margin-top: 24px;
+    padding: 14px 28px;
+    background: transparent;
+    border: 1px solid #3a3d45;
+    border-radius: 12px;
+    color: var(--subtle);
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.setup-stop:hover {
+    color: var(--text);
+    border-color: #5a5d65;
 }

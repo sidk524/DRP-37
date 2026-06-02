@@ -1,53 +1,132 @@
 import "../styles/BlockerSetup.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signOut } from "../services/SupabaseClient";
 
-// Post-auth landing — the Electron equivalent of Android's BlockerSetupScreen
-// ("Block Apps": pick apps + duration -> Start Session). This is a v1 shell;
-// the full 3-step setup flow builds on top of it.
+// Post-auth landing — the Electron equivalent of Android's BlockerSetupScreen.
+// Pick apps + mode + duration, then "Start Session" drives the live blocker.
+// `tokens` are the lowercase substrings matched against the foreground process
+// name. "Notepad (test)" is an easy way to verify blocking on Windows.
 const CANDIDATE_APPS = [
-    "Instagram",
-    "TikTok",
-    "YouTube",
-    "X (Twitter)",
-    "Reddit",
-    "Facebook",
+    { name: "Instagram", tokens: ["instagram"] },
+    { name: "TikTok", tokens: ["tiktok"] },
+    { name: "YouTube", tokens: ["youtube"] },
+    { name: "X (Twitter)", tokens: ["twitter", "tweetdeck"] },
+    { name: "Reddit", tokens: ["reddit"] },
+    { name: "Facebook", tokens: ["facebook"] },
+    { name: "Notepad (test)", tokens: ["notepad"] },
+];
+
+const MODES = [
+    { id: "breathing", label: "Breathing", hint: "Pause, then through" },
+    { id: "reflect", label: "Reflect", hint: "Purpose + your note" },
+    { id: "hard", label: "Hard block", hint: "No way through" },
 ];
 
 const DURATIONS = [15, 30, 60, 120];
 
+function formatRemaining(ms) {
+    if (ms == null) return "";
+    const total = Math.max(0, Math.round(ms / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function BlockerSetup({ session }) {
     const [selected, setSelected] = useState(() => new Set());
+    const [mode, setMode] = useState("breathing");
     const [duration, setDuration] = useState(30);
+    const [active, setActive] = useState(null); // active session view from main
+    const [now, setNow] = useState(Date.now());
 
     const email = session?.user?.email || "your account";
 
-    function toggle(app) {
+    // Track the live session state from the main process.
+    useEffect(() => {
+        let unsub = () => {};
+        if (window.tether?.getSession) {
+            window.tether.getSession().then((s) => setActive(s?.active ? s : null));
+            unsub = window.tether.onSessionUpdate((s) => setActive(s?.active ? s : null));
+        }
+        return unsub;
+    }, []);
+
+    // Tick once a second to update the countdown while a session is active.
+    useEffect(() => {
+        if (!active) return;
+        const id = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(id);
+    }, [active]);
+
+    function toggle(name) {
         setSelected((prev) => {
             const next = new Set(prev);
-            next.has(app) ? next.delete(app) : next.add(app);
+            next.has(name) ? next.delete(name) : next.add(name);
             return next;
         });
+    }
+
+    async function handleStart() {
+        const chosen = CANDIDATE_APPS.filter((a) => selected.has(a.name));
+        const apps = chosen.flatMap((a) => a.tokens);
+        const appLabels = chosen.map((a) => a.name);
+        const res = await window.tether?.startSession({
+            apps,
+            appLabels,
+            mode,
+            durationMinutes: duration,
+        });
+        if (res && !res.ok) alert(res.error);
+    }
+
+    async function handleStopSession() {
+        await window.tether?.stopSession();
     }
 
     async function handleSignOut() {
         await signOut(); // AuthGate reacts and returns to the login screen
     }
 
-    function handleStart() {
-        // TODO: push selection to the main-process blocker (and Supabase) to
-        // start a session. For now, log it.
-        console.log("Start session:", { apps: [...selected], duration });
+    // ── Active session view ──
+    if (active) {
+        const remaining = active.endsAt ? active.endsAt - now : null;
+        const modeLabel = MODES.find((m) => m.id === active.mode)?.label || active.mode;
+        return (
+            <div className="setup">
+                <div className="setup-inner">
+                    <div className="setup-topbar">
+                        <span className="setup-account">{email}</span>
+                        <button className="setup-signout" onClick={handleSignOut}>Sign out</button>
+                    </div>
+
+                    <div className="session-active">
+                        <span className="session-badge">Session active</span>
+                        <div className="session-timer">{formatRemaining(remaining)}</div>
+                        <p className="session-meta">
+                            {modeLabel} · blocking {active.appLabels?.length || 0} app
+                            {(active.appLabels?.length || 0) === 1 ? "" : "s"}
+                        </p>
+                        <div className="session-apps">
+                            {(active.appLabels || []).map((a) => (
+                                <span key={a} className="session-app-tag">{a}</span>
+                            ))}
+                        </div>
+                        <button className="setup-stop" onClick={handleStopSession}>
+                            End session early
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
+    // ── Setup view ──
     return (
         <div className="setup">
             <div className="setup-inner">
                 <div className="setup-topbar">
                     <span className="setup-account">{email}</span>
-                    <button className="setup-signout" onClick={handleSignOut}>
-                        Sign out
-                    </button>
+                    <button className="setup-signout" onClick={handleSignOut}>Sign out</button>
                 </div>
 
                 <h1 className="setup-title">Block Apps</h1>
@@ -55,20 +134,35 @@ function BlockerSetup({ session }) {
 
                 <div className="setup-grid">
                     {CANDIDATE_APPS.map((app) => {
-                        const isOn = selected.has(app);
+                        const isOn = selected.has(app.name);
                         return (
                             <button
-                                key={app}
+                                key={app.name}
                                 className={`setup-app ${isOn ? "on" : ""}`}
-                                onClick={() => toggle(app)}
+                                onClick={() => toggle(app.name)}
                             >
                                 <span className="setup-app-dot" />
-                                {app}
+                                {app.name}
                             </button>
                         );
                     })}
                 </div>
 
+                <p className="setup-section-label">Mode</p>
+                <div className="setup-modes">
+                    {MODES.map((m) => (
+                        <button
+                            key={m.id}
+                            className={`setup-mode ${mode === m.id ? "on" : ""}`}
+                            onClick={() => setMode(m.id)}
+                        >
+                            <span className="setup-mode-label">{m.label}</span>
+                            <span className="setup-mode-hint">{m.hint}</span>
+                        </button>
+                    ))}
+                </div>
+
+                <p className="setup-section-label">Duration</p>
                 <div className="setup-durations">
                     {DURATIONS.map((d) => (
                         <button
