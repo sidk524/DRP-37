@@ -83,7 +83,7 @@ function Friction() {
                     <div className="hard-block">
                         <div className="hard-lock">🔒</div>
                         <h1 className="hard-title">{info.app} is blocked</h1>
-                        <p className="friction-hint">You set this to hard block. There&apos;s no way through right now.</p>
+                        <p className="friction-hint">You set this to hard block, so it was closed. There&apos;s no way through until your session ends.</p>
                         <button className="friction-continue" onClick={notNow}>
                             Go back
                         </button>

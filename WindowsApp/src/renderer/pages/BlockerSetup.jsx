@@ -7,13 +7,13 @@ import { signOut } from "../services/SupabaseClient";
 // `tokens` are the lowercase substrings matched against the foreground process
 // name. "Notepad (test)" is an easy way to verify blocking on Windows.
 const CANDIDATE_APPS = [
-    { name: "Instagram", tokens: ["instagram"] },
-    { name: "TikTok", tokens: ["tiktok"] },
-    { name: "YouTube", tokens: ["youtube"] },
-    { name: "X (Twitter)", tokens: ["twitter", "tweetdeck"] },
-    { name: "Reddit", tokens: ["reddit"] },
-    { name: "Facebook", tokens: ["facebook"] },
-    { name: "Notepad (test)", tokens: ["notepad"] },
+    { name: "Instagram", tokens: ["instagram"], domains: ["instagram.com", "www.instagram.com"] },
+    { name: "TikTok", tokens: ["tiktok"], domains: ["tiktok.com"] },
+    { name: "YouTube", tokens: ["youtube"], domains: ["youtube.com", "www.youtube.com"] },
+    { name: "X (Twitter)", tokens: ["twitter", "tweetdeck"], domains: ["twitter.com", "x.com"] },
+    { name: "Reddit", tokens: ["reddit"], domains: ["reddit.com"] },
+    { name: "Facebook", tokens: ["facebook"], domains: ["facebook.com"] },
+    { name: "Notepad (test)", tokens: ["notepad"], domains: [] },
 ];
 
 const MODES = [
@@ -70,17 +70,26 @@ function BlockerSetup({ session }) {
         const chosen = CANDIDATE_APPS.filter((a) => selected.has(a.name));
         const apps = chosen.flatMap((a) => a.tokens);
         const appLabels = chosen.map((a) => a.name);
+        const domains = chosen.flatMap((a) => a.domains || []);
         const res = await window.tether?.startSession({
             apps,
             appLabels,
+            domains,
             mode,
             durationMinutes: duration,
         });
-        if (res && !res.ok) alert(res.error);
+        if (res && !res.ok) {
+            alert(res.error);
+        } else if (res?.warning) {
+            // Session started, but website blocking couldn't be applied
+            // (usually: Tether isn't running as administrator).
+            alert(`Session started, but websites weren't blocked:\n${res.warning}`);
+        }
     }
 
     async function handleStopSession() {
-        await window.tether?.stopSession();
+        const res = await window.tether?.stopSession();
+        if (res && !res.ok) alert(res.error); // e.g. a hard session refusing to stop
     }
 
     async function handleSignOut() {
@@ -111,9 +120,15 @@ function BlockerSetup({ session }) {
                                 <span key={a} className="session-app-tag">{a}</span>
                             ))}
                         </div>
-                        <button className="setup-stop" onClick={handleStopSession}>
-                            End session early
-                        </button>
+                        {active.mode === "hard" ? (
+                            <p className="session-locked">
+                                🔒 Hard session — can't be ended early. Hold tight until the timer runs out.
+                            </p>
+                        ) : (
+                            <button className="setup-stop" onClick={handleStopSession}>
+                                End session early
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

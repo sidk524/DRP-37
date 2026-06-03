@@ -263,3 +263,12 @@
     color: var(--text);
     border-color: #5a5d65;
 }
+
+.session-locked {
+    margin-top: 24px;
+    max-width: 340px;
+    text-align: center;
+    color: var(--subtle);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}

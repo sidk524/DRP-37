@@ -8,7 +8,8 @@ contextBridge.exposeInMainWorld('tether', {
     oauthLogin: (url) => ipcRenderer.invoke('oauth:login', url),
 
     // ── Session control (BlockerSetup) ──
-    // config: { apps: string[] (match tokens), appLabels: string[], mode, durationMinutes }
+    // config: { apps: string[] (match tokens), appLabels: string[],
+    //           domains: string[] (hard-mode website block), mode, durationMinutes }
     startSession: (config) => ipcRenderer.invoke('session:start', config),
     stopSession: () => ipcRenderer.invoke('session:stop'),
     getSession: () => ipcRenderer.invoke('session:get'),

@@ -3,6 +3,17 @@ const path = require("path");
 const { registerAuthHandlers } = require("./handlers/authHandler");
 const blockerService = require("./blocker/blockerService");
 
+const isDev = process.env.NODE_ENV === "development";
+
+// Website blocking edits the system hosts file, which needs administrator
+// rights. The PACKAGED app requests elevation automatically via its manifest
+// (build.win.requestedExecutionLevel = requireAdministrator), so shipped users
+// get a UAC prompt on launch and it just works. In dev (`npm run dev`) the app
+// runs un-elevated — process-killing still works; to also test website blocking
+// locally, start it from an Administrator terminal. (We deliberately don't
+// auto-relaunch elevated in dev: it kills the non-elevated instance before the
+// Electron window can open, which breaks the dev workflow.)
+
 // Google OAuth for a desktop app: instead of redirecting the main window away
 // (which lands on the configured Supabase Site URL and shows the web server's
 // JSON), open the consent screen in a popup and intercept the redirect. The
@@ -97,7 +108,7 @@ function createWindow() {
         console.error("[window] render process gone:", details.reason, details.exitCode);
     });
 
-    if (process.env.NODE_ENV === "development") {
+    if (isDev) {
         win.loadURL("http://localhost:5173");
         win.webContents.openDevTools({ mode: "right" });
     } else {

@@ -5,11 +5,26 @@
 // duration. While active, the foreground app is polled once a second; a match
 // shows the friction overlay in the session's mode. The session auto-ends when
 // its duration elapses.
+//
+// Modes differ in how a match is handled:
+//   breathing / reflect — dismissible friction overlay (a nudge)
+//   hard                — ABSOLUTE block: the offending process is terminated,
+//                         then an informational overlay is shown. Relaunching
+//                         just gets it killed again for the rest of the session.
 
 const { ipcMain, globalShortcut, BrowserWindow } = require("electron");
+const { exec } = require("child_process");
 const config = require("./config");
 const { getForegroundApp } = require("./foregroundDetector");
 const overlay = require("./overlayWindow");
+const hosts = require("./hostsBlocker");
+
+// Processes we must never terminate, even if a blocklist token would match —
+// killing these can crash the desktop session. A safety net around hard mode.
+const PROTECTED_PROCESSES = [
+    "system", "smss", "csrss", "wininit", "winlogon", "services", "lsass",
+    "svchost", "explorer", "dwm", "taskmgr", "fontdrvhost", "ctfmon",
+];
 
 let timer = null;
 let expiryTimer = null;
@@ -21,6 +36,7 @@ let session = {
     active: false,
     blocklist: [],
     appLabels: [],
+    domains: [],
     mode: "breathing",
     endsAt: null,
 };
@@ -50,6 +66,31 @@ function prettyName(name) {
     return n.charAt(0).toUpperCase() + n.slice(1);
 }
 
+function isProtected(name) {
+    const n = normalize(name);
+    return PROTECTED_PROCESSES.includes(n);
+}
+
+// Hard-mode enforcement: forcibly terminate the offending process by PID.
+// `/T` also kills child processes; `/F` forces it. Best-effort — some elevated
+// processes can't be killed without admin, which we log rather than throw.
+function terminateProcess(pid, name) {
+    if (!Number.isInteger(pid) || pid <= 0) return;
+    if (isProtected(name)) {
+        console.warn(`[blocker] refusing to terminate protected process: ${name}`);
+        return;
+    }
+    exec(`taskkill /PID ${pid} /T /F`, (err, _stdout, stderr) => {
+        if (err) {
+            console.warn(
+                `[blocker] could not terminate ${name} (pid ${pid}): ${(stderr || err.message).trim()}`
+            );
+        } else {
+            console.log(`[blocker] hard-block terminated ${name} (pid ${pid})`);
+        }
+    });
+}
+
 async function tick() {
     if (!session.active) return;
 
@@ -68,6 +109,15 @@ async function tick() {
     if (!isBlocked(fg.name)) return;
 
     const key = normalize(fg.name);
+
+    // Hard mode is an absolute block: kill the process (no grace, no way
+    // through), then show the overlay to explain why it just closed.
+    if (session.mode === "hard") {
+        terminateProcess(fg.processId, fg.name);
+        overlay.showFriction(buildPayload(prettyName(fg.name), key, fg.title));
+        return;
+    }
+
     if (inGrace(key)) return;
 
     overlay.showFriction(buildPayload(prettyName(fg.name), key, fg.title));
@@ -108,20 +158,37 @@ function broadcast() {
     }
 }
 
-function startSession({ apps = [], appLabels = [], mode = "breathing", durationMinutes = 30 } = {}) {
+function startSession({ apps = [], appLabels = [], domains = [], mode = "breathing", durationMinutes = 30 } = {}) {
     const blocklist = apps.map((a) => String(a).toLowerCase()).filter(Boolean);
     if (blocklist.length === 0) {
         return { ok: false, error: "Pick at least one app to block." };
     }
+
+    const resolvedMode = ["breathing", "reflect", "hard"].includes(mode) ? mode : "breathing";
 
     graceUntil.clear();
     session = {
         active: true,
         blocklist,
         appLabels,
-        mode: ["breathing", "reflect", "hard"].includes(mode) ? mode : "breathing",
+        domains,
+        mode: resolvedMode,
         endsAt: Date.now() + Math.max(1, durationMinutes) * 60 * 1000,
     };
+
+    // Hard mode also blocks the websites at the network level (hosts file), so
+    // it works for browser tabs, not just native apps. Non-fatal if it can't:
+    // process-killing still applies and we warn the user (e.g. needs admin).
+    let warning = null;
+    if (resolvedMode === "hard" && domains.length > 0) {
+        const res = hosts.blockDomains(domains);
+        if (!res.ok) {
+            warning = res.error;
+            console.warn(`[blocker] website blocking failed: ${res.error}`);
+        } else {
+            console.log(`[blocker] blocked ${res.blocked.length} hostnames via hosts file`);
+        }
+    }
 
     if (expiryTimer) clearTimeout(expiryTimer);
     expiryTimer = setTimeout(() => stopSession(), session.endsAt - Date.now());
@@ -130,15 +197,16 @@ function startSession({ apps = [], appLabels = [], mode = "breathing", durationM
         `[blocker] session started · ${session.mode} · ${durationMinutes}m · [${blocklist.join(", ")}]`
     );
     broadcast();
-    return { ok: true, session: sessionView() };
+    return { ok: true, session: sessionView(), warning };
 }
 
 function stopSession() {
     if (expiryTimer) clearTimeout(expiryTimer);
     expiryTimer = null;
-    session = { active: false, blocklist: [], appLabels: [], mode: "breathing", endsAt: null };
+    session = { active: false, blocklist: [], appLabels: [], domains: [], mode: "breathing", endsAt: null };
     graceUntil.clear();
     overlay.hideFriction();
+    hosts.unblockDomains(); // always lift any website block we put in place
     console.log("[blocker] session stopped");
     broadcast();
     return { ok: true, session: sessionView() };
@@ -147,8 +215,16 @@ function stopSession() {
 function registerIpc() {
     // Session control (invoke -> returns ack).
     ipcMain.handle("session:start", (_e, cfg) => startSession(cfg));
-    ipcMain.handle("session:stop", () => stopSession());
     ipcMain.handle("session:get", () => sessionView());
+
+    // Manual stop. Hard sessions are a commitment — they can't be ended early;
+    // only the expiry timer (or app quit) ends them. Breathing/reflect can stop.
+    ipcMain.handle("session:stop", () => {
+        if (session.active && session.mode === "hard") {
+            return { ok: false, error: "Hard sessions can't be ended early." };
+        }
+        return stopSession();
+    });
 
     // User chose to proceed to the app.
     ipcMain.on("friction:continue", (_e, { key } = {}) => {
@@ -168,6 +244,10 @@ function registerIpc() {
 function start() {
     overlay.preload();
     registerIpc();
+
+    // Clear any leftover website block from a previous session that didn't shut
+    // down cleanly (e.g. a crash), so the user is never stuck blocked at launch.
+    hosts.unblockDomains();
     timer = setInterval(() => {
         tick().catch((err) => console.warn("[blocker] tick error:", err.message));
     }, config.pollIntervalMs);
@@ -193,6 +273,7 @@ function stop() {
     expiryTimer = null;
     globalShortcut.unregisterAll();
     overlay.destroy();
+    hosts.unblockDomains(); // never leave the hosts file blocked after we exit
 }
 
 module.exports = { start, stop };

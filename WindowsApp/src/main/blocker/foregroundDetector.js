@@ -26,7 +26,8 @@ async function ensureLoaded() {
     }
 }
 
-// Returns { name, title, path } for the focused window, or null if unavailable.
+// Returns { name, title, path, processId } for the focused window, or null if
+// unavailable. processId lets the blocker terminate the process in hard mode.
 async function getForegroundApp() {
     await ensureLoaded();
     if (!activeWindow) return null;
@@ -37,6 +38,7 @@ async function getForegroundApp() {
             name: win.owner?.name || "",
             title: win.title || "",
             path: win.owner?.path || "",
+            processId: win.owner?.processId || null,
         };
     } catch {
         return null;
