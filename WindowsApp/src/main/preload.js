@@ -2,6 +2,11 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 // Expose safe APIs to the React renderer
 contextBridge.exposeInMainWorld('tether', {
+    // ── Auth ──
+    // Open a Google OAuth consent popup; resolves to { access_token,
+    // refresh_token } on success, or null if the user cancels.
+    oauthLogin: (url) => ipcRenderer.invoke('oauth:login', url),
+
     // ── Session control (BlockerSetup) ──
     // config: { apps: string[] (match tokens), appLabels: string[], mode, durationMinutes }
     startSession: (config) => ipcRenderer.invoke('session:start', config),

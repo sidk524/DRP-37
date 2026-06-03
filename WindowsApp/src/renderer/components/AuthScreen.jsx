@@ -14,6 +14,7 @@ function AuthScreen() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [info, setInfo] = useState("");
     const [loading, setLoading] = useState(false);
 
     const isLogin = mode === "login";
@@ -22,6 +23,7 @@ function AuthScreen() {
     async function handleSubmit(event) {
         event.preventDefault();
         setError("");
+        setInfo("");
         if (!canSubmit) {
             setError("Email and password are required.");
             return;
@@ -31,10 +33,17 @@ function AuthScreen() {
         try {
             if (isLogin) {
                 await signInWithEmail(email.trim(), password);
+                // No navigation: AuthGate reacts to the session change.
             } else {
-                await signUpWithEmail(email.trim(), password);
+                const data = await signUpWithEmail(email.trim(), password);
+                // With email confirmation on, sign-up returns no session until
+                // the link is clicked — tell the user instead of doing nothing.
+                if (!data?.session) {
+                    setMode("login");
+                    setPassword("");
+                    setInfo("Account created. Check your email to confirm, then log in.");
+                }
             }
-            // No navigation: AuthGate reacts to the session change.
         } catch (err) {
             setError(err.message || "Something went wrong. Please try again.");
         } finally {
@@ -44,6 +53,7 @@ function AuthScreen() {
 
     async function handleGoogle() {
         setError("");
+        setInfo("");
         setLoading(true);
         try {
             await signInWithGoogle();
@@ -58,6 +68,7 @@ function AuthScreen() {
         setEmail("");
         setPassword("");
         setError("");
+        setInfo("");
     }
 
     return (
@@ -99,6 +110,7 @@ function AuthScreen() {
                         onChange={(e) => setPassword(e.target.value)}
                     />
                     {error && <p className="auth-error">{error}</p>}
+                    {info && <p className="auth-info">{info}</p>}
                     <button className="btn-continue" disabled={!canSubmit}>
                         {loading ? "Please wait…" : isLogin ? "Log in" : "Continue"}
                     </button>

@@ -30,12 +30,32 @@ export async function signInWithEmail(email, password) {
 }
 
 export async function signInWithGoogle() {
+    // Desktop OAuth: get the provider consent URL without redirecting this
+    // window, open it in a popup (handled in the main process), and exchange
+    // the returned tokens for a session. Avoids bouncing the app to the
+    // Supabase Site URL. Requires the Electron bridge.
+    if (!window.tether?.oauthLogin) {
+        throw new Error('Google sign-in is only available in the desktop app.');
+    }
+
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.origin },
+        options: { skipBrowserRedirect: true },
     });
     if (error) throw error;
-    return data;
+    if (!data?.url) throw new Error('Could not start Google sign-in.');
+
+    const tokens = await window.tether.oauthLogin(data.url);
+    if (!tokens?.access_token) {
+        throw new Error('Google sign-in was cancelled.');
+    }
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+    });
+    if (sessionError) throw sessionError;
+    return sessionData; // onAuthStateChange fires -> AuthGate advances
 }
 
 export async function getSession() {

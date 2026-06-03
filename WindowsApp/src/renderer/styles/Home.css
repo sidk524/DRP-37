@@ -227,6 +227,14 @@
     margin: 2px 0;
 }
 
+.auth-info {
+    color: #6bd49b;
+    font-size: 0.875rem;
+    text-align: center;
+    line-height: 1.4;
+    margin: 2px 0;
+}
+
 .auth-loading {
     color: var(--text-subtle);
     font-size: 0.95rem;
