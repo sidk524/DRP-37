@@ -38,8 +38,12 @@ let session = {
     appLabels: [],
     domains: [],
     mode: "breathing",
+    startedAt: null,
     endsAt: null,
+    durationMinutes: 0,
 };
+
+let lastStop = null;
 
 function normalize(name) {
     return (name || "").toLowerCase().replace(/\.exe$/, "");
@@ -96,7 +100,7 @@ async function tick() {
 
     // End the session once its duration has elapsed.
     if (session.endsAt && Date.now() >= session.endsAt) {
-        stopSession();
+        stopSession("expired");
         return;
     }
 
@@ -146,8 +150,11 @@ function sessionView() {
         active: session.active,
         mode: session.mode,
         appLabels: session.appLabels,
+        startedAt: session.startedAt,
         endsAt: session.endsAt,
+        durationMinutes: session.durationMinutes,
         remainingMs: session.endsAt ? Math.max(0, session.endsAt - Date.now()) : null,
+        lastStop,
     };
 }
 
@@ -167,13 +174,18 @@ function startSession({ apps = [], appLabels = [], domains = [], mode = "breathi
     const resolvedMode = ["breathing", "reflect", "hard"].includes(mode) ? mode : "breathing";
 
     graceUntil.clear();
+    lastStop = null;
+    const now = Date.now();
+    const safeDurationMinutes = Math.max(1, durationMinutes);
     session = {
         active: true,
         blocklist,
         appLabels,
         domains,
         mode: resolvedMode,
-        endsAt: Date.now() + Math.max(1, durationMinutes) * 60 * 1000,
+        startedAt: now,
+        endsAt: now + safeDurationMinutes * 60 * 1000,
+        durationMinutes: safeDurationMinutes,
     };
 
     // Hard mode also blocks the websites at the network level (hosts file), so
@@ -191,7 +203,7 @@ function startSession({ apps = [], appLabels = [], domains = [], mode = "breathi
     }
 
     if (expiryTimer) clearTimeout(expiryTimer);
-    expiryTimer = setTimeout(() => stopSession(), session.endsAt - Date.now());
+    expiryTimer = setTimeout(() => stopSession("expired"), session.endsAt - Date.now());
 
     console.log(
         `[blocker] session started · ${session.mode} · ${durationMinutes}m · [${blocklist.join(", ")}]`
@@ -200,14 +212,39 @@ function startSession({ apps = [], appLabels = [], domains = [], mode = "breathi
     return { ok: true, session: sessionView(), warning };
 }
 
-function stopSession() {
+function stopSession(reason = "manual") {
+    const endedAt = Date.now();
+    const startedAt = session.startedAt || endedAt;
+    const plannedMs = Math.max(0, (session.durationMinutes || 0) * 60 * 1000);
+    const elapsedMs = Math.max(0, endedAt - startedAt);
+    const actualMs = plannedMs > 0 ? Math.min(elapsedMs, plannedMs) : elapsedMs;
+    const blockedAppsCount = session.appLabels.length;
+
+    lastStop = {
+        reason,
+        mode: session.mode,
+        plannedMs,
+        actualMs,
+        blockedAppsCount,
+        endedAt,
+    };
+
     if (expiryTimer) clearTimeout(expiryTimer);
     expiryTimer = null;
-    session = { active: false, blocklist: [], appLabels: [], domains: [], mode: "breathing", endsAt: null };
+    session = {
+        active: false,
+        blocklist: [],
+        appLabels: [],
+        domains: [],
+        mode: "breathing",
+        startedAt: null,
+        endsAt: null,
+        durationMinutes: 0,
+    };
     graceUntil.clear();
     overlay.hideFriction();
     hosts.unblockDomains(); // always lift any website block we put in place
-    console.log("[blocker] session stopped");
+    console.log(`[blocker] session stopped (${reason})`);
     broadcast();
     return { ok: true, session: sessionView() };
 }
@@ -223,7 +260,7 @@ function registerIpc() {
         if (session.active && session.mode === "hard") {
             return { ok: false, error: "Hard sessions can't be ended early." };
         }
-        return stopSession();
+        return stopSession("manual");
     });
 
     // User chose to proceed to the app.

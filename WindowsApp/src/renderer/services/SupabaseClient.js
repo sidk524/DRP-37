@@ -96,3 +96,51 @@ export async function saveOnboarding(userId, responses) {
     if (error) throw error;
     return data;
 }
+
+const MODE_POINTS_MULTIPLIER = {
+    breathing: 1,
+    reflect: 1.5,
+    hard: 2.5,
+};
+
+const EXTRA_APP_MULTIPLIER = 0.25;
+
+function calculateFocusPoints(mode, actualMs, blockedAppsCount = 1) {
+    const minutes = Math.max(0, actualMs) / 60000;
+    const multiplier = MODE_POINTS_MULTIPLIER[mode] || MODE_POINTS_MULTIPLIER.breathing;
+    const appsCount = Math.max(1, Math.round(blockedAppsCount) || 1);
+    const appsMultiplier = 1 + (appsCount - 1) * EXTRA_APP_MULTIPLIER;
+    return Math.max(0, Math.round(minutes * multiplier * appsMultiplier));
+}
+
+export async function saveSessionPoints({ userId, mode, actualMs = 0, plannedMs = 0, blockedAppsCount = 1, endedAt }) {
+    const points = calculateFocusPoints(mode, actualMs, blockedAppsCount);
+    const safeBlockedAppsCount = Math.max(1, Math.round(blockedAppsCount) || 1);
+
+    const { data, error } = await supabase
+        .from("focus_session_points")
+        .insert({
+            user_id: userId,
+            mode,
+            actual_ms: Math.max(0, Math.round(actualMs)),
+            planned_ms: Math.max(0, Math.round(plannedMs)),
+            blocked_apps_count: safeBlockedAppsCount,
+            points,
+            ended_at: endedAt || new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+export async function getUserTotalPoints(userId) {
+    const { data, error } = await supabase
+        .from("focus_session_points")
+        .select("points")
+        .eq("user_id", userId);
+
+    if (error) throw error;
+    return (data || []).reduce((sum, row) => sum + (row.points || 0), 0);
+}

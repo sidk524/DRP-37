@@ -1,6 +1,6 @@
 import "../styles/BlockerSetup.css";
-import { useEffect, useState } from "react";
-import { signOut } from "../services/SupabaseClient";
+import { useEffect, useRef, useState } from "react";
+import { getUserTotalPoints, saveSessionPoints, signOut } from "../services/SupabaseClient";
 
 // Post-auth landing — the Electron equivalent of Android's BlockerSetupScreen.
 // Pick apps + mode + duration, then "Start Session" drives the live blocker.
@@ -22,7 +22,7 @@ const MODES = [
     { id: "hard", label: "Hard block", hint: "No way through" },
 ];
 
-const DURATIONS = [15, 30, 60, 120];
+const DURATIONS = [1, 15, 30, 60, 120];
 
 function formatRemaining(ms) {
     if (ms == null) return "";
@@ -38,18 +38,59 @@ function BlockerSetup({ session }) {
     const [duration, setDuration] = useState(30);
     const [active, setActive] = useState(null); // active session view from main
     const [now, setNow] = useState(Date.now());
+    const [points, setPoints] = useState(0);
+    const wasActiveRef = useRef(false);
+    const lastAwardedEndedAtRef = useRef(null);
 
     const email = session?.user?.email || "your account";
+
+    async function refreshPoints() {
+        try {
+            const totalPoints = await getUserTotalPoints(session.user.id);
+            setPoints(totalPoints);
+        } catch (error) {
+            console.error("Failed to load focus points:", error);
+        }
+    }
+
+    useEffect(() => {
+        refreshPoints();
+    }, [session.user.id]);
 
     // Track the live session state from the main process.
     useEffect(() => {
         let unsub = () => {};
         if (window.tether?.getSession) {
             window.tether.getSession().then((s) => setActive(s?.active ? s : null));
-            unsub = window.tether.onSessionUpdate((s) => setActive(s?.active ? s : null));
+            unsub = window.tether.onSessionUpdate(async (s) => {
+                const wasActive = wasActiveRef.current;
+                const isActive = !!s?.active;
+                const endedByExpiry = s?.lastStop?.reason === "expired";
+                const endedAt = s?.lastStop?.endedAt;
+
+                if (wasActive && !isActive && endedByExpiry && endedAt && endedAt !== lastAwardedEndedAtRef.current) {
+                    try {
+                        await saveSessionPoints({
+                            userId: session.user.id,
+                            mode: s.lastStop.mode,
+                            actualMs: s.lastStop.actualMs,
+                            plannedMs: s.lastStop.plannedMs,
+                            blockedAppsCount: s.lastStop.blockedAppsCount,
+                            endedAt: new Date(endedAt).toISOString(),
+                        });
+                        await refreshPoints();
+                        lastAwardedEndedAtRef.current = endedAt;
+                    } catch (error) {
+                        console.error("Failed to save focus points:", error);
+                    }
+                }
+
+                wasActiveRef.current = isActive;
+                setActive(isActive ? s : null);
+            });
         }
         return unsub;
-    }, []);
+    }, [session.user.id]);
 
     // Tick once a second to update the countdown while a session is active.
     useEffect(() => {
@@ -104,7 +145,7 @@ function BlockerSetup({ session }) {
             <div className="setup">
                 <div className="setup-inner">
                     <div className="setup-topbar">
-                        <span className="setup-account">{email}</span>
+                        <span className="setup-account">{email} · {points} pts</span>
                         <button className="setup-signout" onClick={handleSignOut}>Sign out</button>
                     </div>
 
@@ -140,7 +181,7 @@ function BlockerSetup({ session }) {
         <div className="setup">
             <div className="setup-inner">
                 <div className="setup-topbar">
-                    <span className="setup-account">{email}</span>
+                    <span className="setup-account">{email} · {points} pts</span>
                     <button className="setup-signout" onClick={handleSignOut}>Sign out</button>
                 </div>
 
