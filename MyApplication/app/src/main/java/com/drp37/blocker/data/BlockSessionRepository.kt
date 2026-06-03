@@ -4,10 +4,10 @@ import com.drp37.blocker.BuildConfig
 import io.github.jan.supabase.auth.auth
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,7 +25,7 @@ object BlockSessionRepository {
         val response = request(
             method = "GET",
             path = "/api/session/current"
-        ) ?: return null
+        )
 
         val session = response.optJSONObject("session") ?: return null
         return session.toBlockSessionRecord()
@@ -33,22 +33,21 @@ object BlockSessionRepository {
 
     suspend fun createSession(
         appsBlocked: Set<String>,
-        totalDurationSeconds: Int,
-        startedAt: Instant = Instant.now()
-    ): BlockSessionRecord? {
+        totalDurationSeconds: Int
+    ): BlockSessionRecord {
         val body = JSONObject()
             .put("active", true)
             .put("appsBlocked", JSONArray(appsBlocked.sorted()))
             .put("totalDurationSeconds", totalDurationSeconds)
-            .put("startedAt", startedAt.toString())
 
         val response = request(
             method = "PUT",
             path = "/api/session/current",
             body = body
-        ) ?: return null
+        )
 
-        val session = response.optJSONObject("session") ?: return null
+        val session = response.optJSONObject("session")
+            ?: throw IOException("Server did not return a block session.")
         return session.toBlockSessionRecord()
     }
 
@@ -71,46 +70,49 @@ object BlockSessionRepository {
         method: String,
         path: String,
         body: JSONObject? = null
-    ): JSONObject? = withContext(Dispatchers.IO) {
-        runCatching {
-            val baseUrl = BuildConfig.WEB_SERVER_URL.trimEnd('/')
-            if (baseUrl.isBlank()) return@runCatching null
+    ): JSONObject = withContext(Dispatchers.IO) {
+        val baseUrl = BuildConfig.WEB_SERVER_URL.trimEnd('/')
+        if (baseUrl.isBlank()) throw IOException("WEB_SERVER_URL is not configured.")
 
-            val accessToken = SupabaseAuthClient.client.auth.currentAccessTokenOrNull()
-                ?: return@runCatching null
-            val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
-                requestMethod = method
-                connectTimeout = 10_000
-                readTimeout = 10_000
-                setRequestProperty("Authorization", "Bearer $accessToken")
-                setRequestProperty("Accept", "application/json")
-                if (body != null) {
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json")
+        val accessToken = SupabaseAuthClient.client.auth.currentAccessTokenOrNull()
+            ?: throw IOException("No active Supabase session.")
+        val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
+            requestMethod = method
+            connectTimeout = 10_000
+            readTimeout = 10_000
+            setRequestProperty("Authorization", "Bearer $accessToken")
+            setRequestProperty("Accept", "application/json")
+            if (body != null) {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+            }
+        }
+
+        try {
+            if (body != null) {
+                OutputStreamWriter(connection.outputStream).use { writer ->
+                    writer.write(body.toString())
                 }
             }
 
-            try {
-                if (body != null) {
-                    OutputStreamWriter(connection.outputStream).use { writer ->
-                        writer.write(body.toString())
-                    }
-                }
+            val responseCode = connection.responseCode
+            val stream = if (responseCode in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream
+            } ?: throw IOException("Server returned HTTP $responseCode.")
 
-                val responseCode = connection.responseCode
-                val stream = if (responseCode in 200..299) {
-                    connection.inputStream
-                } else {
-                    connection.errorStream
-                } ?: return@runCatching null
-
-                val responseText = stream.bufferedReader().use { it.readText() }
-                if (responseCode !in 200..299) return@runCatching null
-                JSONObject(responseText)
-            } finally {
-                connection.disconnect()
+            val responseText = stream.bufferedReader().use { it.readText() }
+            if (responseCode !in 200..299) {
+                val errorMessage = runCatching {
+                    JSONObject(responseText).optString("error")
+                }.getOrNull().orEmpty()
+                throw IOException(errorMessage.ifBlank { "Server returned HTTP $responseCode." })
             }
-        }.getOrNull()
+            JSONObject(responseText)
+        } finally {
+            connection.disconnect()
+        }
     }
 }
 

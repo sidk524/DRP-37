@@ -26,6 +26,7 @@ const supabaseAdmin = supabaseUrl && supabaseSecretKey
     : null;
 
 const app = express();
+const SESSION_FIELDS = "id,user_id,apps_blocked,total_duration_seconds,started_at,ended_at";
 
 app.disable("x-powered-by");
 app.use(helmet());
@@ -51,29 +52,66 @@ const requireSupabase = (_req, res, next) => {
 };
 
 const requireUser = async (req, res, next) => {
-    const authHeader = req.get("authorization") || "";
-    const [scheme, token] = authHeader.split(" ");
+    try {
+        const authHeader = req.get("authorization") || "";
+        const [scheme, token] = authHeader.split(" ");
 
-    if (scheme !== "Bearer" || !token) {
-        res.status(401).json({ error: "Missing bearer token" });
-        return;
+        if (scheme !== "Bearer" || !token) {
+            res.status(401).json({ error: "Missing bearer token" });
+            return;
+        }
+
+        const { data, error } = await supabaseAuth.auth.getUser(token);
+        if (error || !data.user) {
+            res.status(401).json({ error: "Invalid bearer token" });
+            return;
+        }
+
+        req.user = data.user;
+        next();
+    } catch (error) {
+        next(error);
+    }
+};
+
+const isExpired = (session, now = new Date()) => {
+    const startedAt = new Date(session.started_at);
+    const expiresAt = new Date(startedAt.getTime() + session.total_duration_seconds * 1000);
+    return Number.isNaN(expiresAt.getTime()) || expiresAt <= now;
+};
+
+const closeSession = async (userId, sessionId = null) => {
+    let query = supabaseAdmin
+        .from("block_sessions")
+        .update({ ended_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .is("ended_at", null);
+
+    if (sessionId) {
+        query = query.eq("id", sessionId);
     }
 
-    const { data, error } = await supabaseAuth.auth.getUser(token);
-    if (error || !data.user) {
-        res.status(401).json({ error: "Invalid bearer token" });
-        return;
-    }
+    return query.select(SESSION_FIELDS);
+};
 
-    req.user = data.user;
-    next();
+const createSession = async (userId, appsBlocked, totalDurationSeconds) => {
+    return supabaseAdmin
+        .from("block_sessions")
+        .insert({
+            user_id: userId,
+            apps_blocked: appsBlocked,
+            total_duration_seconds: totalDurationSeconds,
+            started_at: new Date().toISOString()
+        })
+        .select(SESSION_FIELDS)
+        .single();
 };
 
 app.get("/api/session/current", requireSupabase, requireUser, async (req, res, next) => {
     try {
         const { data, error } = await supabaseAdmin
             .from("block_sessions")
-            .select("id,user_id,apps_blocked,total_duration_seconds,started_at,ended_at")
+            .select(SESSION_FIELDS)
             .eq("user_id", req.user.id)
             .is("ended_at", null)
             .order("started_at", { ascending: false })
@@ -81,6 +119,13 @@ app.get("/api/session/current", requireSupabase, requireUser, async (req, res, n
             .maybeSingle();
 
         if (error) throw error;
+
+        if (data && isExpired(data)) {
+            const { error: closeExpiredError } = await closeSession(req.user.id, data.id);
+            if (closeExpiredError) throw closeExpiredError;
+            res.json({ session: null });
+            return;
+        }
 
         res.json({ session: data });
     } catch (error) {
@@ -94,7 +139,6 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
             active,
             appsBlocked,
             totalDurationSeconds,
-            startedAt,
             sessionId
         } = req.body || {};
 
@@ -109,24 +153,21 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
                 return;
             }
 
-            const { error: closeExistingError } = await supabaseAdmin
-                .from("block_sessions")
-                .update({ ended_at: new Date().toISOString() })
-                .eq("user_id", req.user.id)
-                .is("ended_at", null);
+            if (appsBlocked.some((packageName) => typeof packageName !== "string" || !packageName.trim())) {
+                res.status(400).json({ error: "appsBlocked must contain package names" });
+                return;
+            }
+
+            const { error: closeExistingError } = await closeSession(req.user.id);
 
             if (closeExistingError) throw closeExistingError;
 
-            const { data, error } = await supabaseAdmin
-                .from("block_sessions")
-                .insert({
-                    user_id: req.user.id,
-                    apps_blocked: appsBlocked,
-                    total_duration_seconds: totalDurationSeconds,
-                    started_at: startedAt || new Date().toISOString()
-                })
-                .select("id,user_id,apps_blocked,total_duration_seconds,started_at,ended_at")
-                .single();
+            let { data, error } = await createSession(req.user.id, appsBlocked, totalDurationSeconds);
+            if (error && error.code === "23505") {
+                const { error: retryCloseError } = await closeSession(req.user.id);
+                if (retryCloseError) throw retryCloseError;
+                ({ data, error } = await createSession(req.user.id, appsBlocked, totalDurationSeconds));
+            }
 
             if (error) throw error;
 
@@ -135,18 +176,7 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
         }
 
         if (active === false) {
-            let query = supabaseAdmin
-                .from("block_sessions")
-                .update({ ended_at: new Date().toISOString() })
-                .eq("user_id", req.user.id)
-                .is("ended_at", null);
-
-            if (sessionId) {
-                query = query.eq("id", sessionId);
-            }
-
-            const { data, error } = await query
-                .select("id,user_id,apps_blocked,total_duration_seconds,started_at,ended_at");
+            const { data, error } = await closeSession(req.user.id, sessionId);
 
             if (error) throw error;
 
@@ -166,7 +196,10 @@ app.use((_req, res) => {
 
 app.use((err, _req, res, _next) => {
     console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+    const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600
+        ? err.status
+        : 500;
+    res.status(status).json({ error: status === 500 ? "Internal server error" : err.message });
 });
 
 module.exports = app;

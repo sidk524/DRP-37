@@ -90,6 +90,8 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
     var sessionRunning by remember { mutableStateOf(false) }
     var remainingSeconds by remember { mutableStateOf(0) }
     var activeSessionId by remember { mutableStateOf<String?>(null) }
+    var isStartingSession by remember { mutableStateOf(false) }
+    var sessionError by remember { mutableStateOf<String?>(null) }
     var screen by remember { mutableStateOf(BlockerFlowScreen.Duration) }
     val selectedPackageSet = selectedPackages
         .filterValues { it }
@@ -132,7 +134,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
             seconds = 0
             sessionRunning = false
             activeSessionId?.let { sessionId ->
-                BlockSessionRepository.endSession(sessionId)
+                runCatching { BlockSessionRepository.endSession(sessionId) }
             }
             activeSessionId = null
         }
@@ -154,14 +156,16 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                 minutes = minutes,
                 seconds = seconds,
                 sessionRunning = sessionRunning,
+                isStartingSession = isStartingSession,
                 remainingSeconds = remainingSeconds,
+                errorMessage = sessionError,
                 onHoursChange = { hours = it },
                 onMinutesChange = { minutes = it },
                 onSecondsChange = { seconds = it },
                 onStartSession = {
                     val totalDurationSeconds = (hours * 3600 + minutes * 60 + seconds).takeIf { it > 0 } ?: 5
-                    remainingSeconds = totalDurationSeconds
-                    sessionRunning = true
+                    isStartingSession = true
+                    sessionError = null
                     coroutineScope.launch {
                         runCatching {
                             BlockSessionRepository.createSession(
@@ -169,7 +173,17 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                                 totalDurationSeconds = totalDurationSeconds
                             )
                         }.onSuccess { session ->
-                            activeSessionId = session?.id
+                            val elapsedSeconds = Duration.between(
+                                Instant.parse(session.startedAt),
+                                Instant.now()
+                            ).seconds.toInt()
+                            activeSessionId = session.id
+                            remainingSeconds = max(1, session.totalDurationSeconds - elapsedSeconds)
+                            sessionRunning = true
+                        }.onFailure { error ->
+                            sessionError = error.message ?: "Could not start block session."
+                        }.also {
+                            isStartingSession = false
                         }
                     }
                 },
@@ -177,10 +191,11 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                 onLogout = {
                     coroutineScope.launch {
                         activeSessionId?.let { sessionId ->
-                            BlockSessionRepository.endSession(sessionId)
+                            runCatching { BlockSessionRepository.endSession(sessionId) }
                         }
                         activeSessionId = null
                         sessionRunning = false
+                        isStartingSession = false
                         onLogout()
                     }
                 }
@@ -348,7 +363,9 @@ private fun DurationLockScreen(
     minutes: Int,
     seconds: Int,
     sessionRunning: Boolean,
+    isStartingSession: Boolean,
     remainingSeconds: Int,
+    errorMessage: String?,
     onHoursChange: (Int) -> Unit,
     onMinutesChange: (Int) -> Unit,
     onSecondsChange: (Int) -> Unit,
@@ -413,7 +430,11 @@ private fun DurationLockScreen(
                 Spacer(modifier = Modifier.height(layout.titleToSubtitleGap))
 
                 Text(
-                    text = if (sessionRunning) "Session in progress" else "Set a session duration",
+                    text = when {
+                        sessionRunning -> "Session in progress"
+                        isStartingSession -> "Starting session"
+                        else -> "Set a session duration"
+                    },
                     color = Color(0xFF8E8E96),
                     fontSize = layout.subtitleTextSize.sp,
                     modifier = Modifier.fillMaxWidth()
@@ -449,13 +470,27 @@ private fun DurationLockScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        text = errorMessage,
+                        color = Color(0xFFFF453A),
+                        fontSize = layout.errorTextSize.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(layout.errorToButtonGap))
+                }
+
                 Button(
                     onClick = {
-                        if (!sessionRunning) {
+                        if (!sessionRunning && !isStartingSession) {
                             onStartSession()
                         }
                     },
-                    enabled = !sessionRunning,
+                    enabled = !sessionRunning && !isStartingSession,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(layout.lockButtonHeight),
@@ -468,7 +503,11 @@ private fun DurationLockScreen(
                     )
                 ) {
                     Text(
-                        text = if (sessionRunning) "Session Running" else "Lock-In!",
+                        text = when {
+                            sessionRunning -> "Session Running"
+                            isStartingSession -> "Starting..."
+                            else -> "Lock-In!"
+                        },
                         fontSize = layout.buttonTextSize.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.sp
@@ -1060,6 +1099,7 @@ private data class DurationLockLayoutMetrics(
     val subtitleTextSize: Float,
     val buttonTextSize: Float,
     val logoutTextSize: Float,
+    val errorTextSize: Float,
     val backIconSize: Dp,
     val topToTitleGap: Dp,
     val titleToSubtitleGap: Dp,
@@ -1105,6 +1145,7 @@ private data class DurationLockLayoutMetrics(
     val readyPillVerticalPadding: Dp,
     val readyDotSize: Dp,
     val readyDotGap: Dp,
+    val errorToButtonGap: Dp,
     val lockButtonHeight: Dp,
     val lockButtonRadius: Dp
 ) {
@@ -1124,6 +1165,7 @@ private data class DurationLockLayoutMetrics(
                 subtitleTextSize = 22f * scale,
                 buttonTextSize = 22f * scale,
                 logoutTextSize = 17f * scale,
+                errorTextSize = 13f * scale,
                 backIconSize = (28f * scale).dp,
                 topToTitleGap = (54f * scale).dp,
                 titleToSubtitleGap = (18f * scale).dp,
@@ -1169,6 +1211,7 @@ private data class DurationLockLayoutMetrics(
                 readyPillVerticalPadding = (8f * scale).dp,
                 readyDotSize = (8f * scale).dp,
                 readyDotGap = (10f * scale).dp,
+                errorToButtonGap = (10f * scale).dp,
                 lockButtonHeight = (70f * scale).dp,
                 lockButtonRadius = (16f * scale).dp
             )
