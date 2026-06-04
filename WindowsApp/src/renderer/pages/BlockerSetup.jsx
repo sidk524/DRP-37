@@ -1,11 +1,8 @@
 import "../styles/BlockerSetup.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import DurationScrollPicker from "../components/DurationScrollPicker";
 import { getUserTotalPoints, saveSessionPoints, signOut } from "../services/SupabaseClient";
 
-// Post-auth landing — the Electron equivalent of Android's BlockerSetupScreen.
-// Pick apps + mode + duration, then "Start Session" drives the live blocker.
-// `tokens` are the lowercase substrings matched against the foreground process
-// name. "Notepad (test)" is an easy way to verify blocking on Windows.
 const CANDIDATE_APPS = [
     { name: "Instagram", tokens: ["instagram"], domains: ["instagram.com", "www.instagram.com"] },
     { name: "TikTok", tokens: ["tiktok"], domains: ["tiktok.com"] },
@@ -22,7 +19,12 @@ const MODES = [
     { id: "hard", label: "Hard block", hint: "No way through" },
 ];
 
-const DURATIONS = [1, 15, 30, 60, 120];
+export function strictnessToMode(strictness) {
+    if (strictness === "gentle") return "breathing";
+    if (strictness === "moderate") return "reflect";
+    if (strictness === "strict") return "hard";
+    return "breathing";
+}
 
 function formatRemaining(ms) {
     if (ms == null) return "";
@@ -32,17 +34,54 @@ function formatRemaining(ms) {
     return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function BlockerSetup({ session }) {
+function filterApps(apps, query) {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return apps;
+
+    return apps
+        .map((app) => {
+            const label = app.name.toLowerCase();
+            const compactLabel = label.replace(/\s/g, "");
+            const compactQuery = normalizedQuery.replace(/\s/g, "");
+            const score =
+                label === normalizedQuery
+                    ? 0
+                    : label.startsWith(normalizedQuery)
+                      ? 1
+                      : compactLabel.startsWith(compactQuery)
+                        ? 2
+                        : label.includes(normalizedQuery)
+                          ? 3
+                          : compactLabel.includes(compactQuery)
+                            ? 4
+                            : 100;
+            return { app, score };
+        })
+        .filter(({ score }) => score < 100)
+        .sort((a, b) => a.score - b.score || a.app.name.localeCompare(b.app.name))
+        .map(({ app }) => app);
+}
+
+function BlockerSetup({ session, defaultMode = "breathing" }) {
+    const [view, setView] = useState("session");
     const [selected, setSelected] = useState(() => new Set());
-    const [mode, setMode] = useState("breathing");
+    const [query, setQuery] = useState("");
+    const [mode, setMode] = useState(defaultMode);
     const [duration, setDuration] = useState(30);
-    const [active, setActive] = useState(null); // active session view from main
+    const [active, setActive] = useState(null);
     const [now, setNow] = useState(Date.now());
     const [points, setPoints] = useState(0);
     const wasActiveRef = useRef(false);
     const lastAwardedEndedAtRef = useRef(null);
 
     const email = session?.user?.email || "your account";
+    const visibleApps = useMemo(() => filterApps(CANDIDATE_APPS, query), [query]);
+    const selectedCount = selected.size;
+    const canLockIn = selectedCount > 0;
+
+    useEffect(() => {
+        setMode(defaultMode);
+    }, [defaultMode]);
 
     async function refreshPoints() {
         try {
@@ -57,7 +96,6 @@ function BlockerSetup({ session }) {
         refreshPoints();
     }, [session.user.id]);
 
-    // Track the live session state from the main process.
     useEffect(() => {
         let unsub = () => {};
         if (window.tether?.getSession) {
@@ -92,7 +130,6 @@ function BlockerSetup({ session }) {
         return unsub;
     }, [session.user.id]);
 
-    // Tick once a second to update the countdown while a session is active.
     useEffect(() => {
         if (!active) return;
         const id = setInterval(() => setNow(Date.now()), 1000);
@@ -107,7 +144,7 @@ function BlockerSetup({ session }) {
         });
     }
 
-    async function handleStart() {
+    async function handleLockIn() {
         const chosen = CANDIDATE_APPS.filter((a) => selected.has(a.name));
         const apps = chosen.flatMap((a) => a.tokens);
         const appLabels = chosen.map((a) => a.name);
@@ -122,31 +159,30 @@ function BlockerSetup({ session }) {
         if (res && !res.ok) {
             alert(res.error);
         } else if (res?.warning) {
-            // Session started, but website blocking couldn't be applied
-            // (usually: Tether isn't running as administrator).
             alert(`Session started, but websites weren't blocked:\n${res.warning}`);
         }
     }
 
     async function handleStopSession() {
         const res = await window.tether?.stopSession();
-        if (res && !res.ok) alert(res.error); // e.g. a hard session refusing to stop
+        if (res && !res.ok) alert(res.error);
     }
 
     async function handleSignOut() {
-        await signOut(); // AuthGate reacts and returns to the login screen
+        await signOut();
     }
 
-    // ── Active session view ──
     if (active) {
         const remaining = active.endsAt ? active.endsAt - now : null;
         const modeLabel = MODES.find((m) => m.id === active.mode)?.label || active.mode;
         return (
-            <div className="setup">
-                <div className="setup-inner">
-                    <div className="setup-topbar">
-                        <span className="setup-account">{email} · {points} pts</span>
-                        <button className="setup-signout" onClick={handleSignOut}>Sign out</button>
+            <div className="session-shell">
+                <div className="session-inner">
+                    <div className="session-header">
+                        <span className="session-account">{email} · {points} pts</span>
+                        <button type="button" className="session-signout" onClick={handleSignOut}>
+                            Sign out
+                        </button>
                     </div>
 
                     <div className="session-active">
@@ -163,10 +199,10 @@ function BlockerSetup({ session }) {
                         </div>
                         {active.mode === "hard" ? (
                             <p className="session-locked">
-                                🔒 Hard session — can't be ended early. Hold tight until the timer runs out.
+                                Hard session — can&apos;t be ended early. Hold tight until the timer runs out.
                             </p>
                         ) : (
-                            <button className="setup-stop" onClick={handleStopSession}>
+                            <button type="button" className="session-stop" onClick={handleStopSession}>
                                 End session early
                             </button>
                         )}
@@ -176,67 +212,122 @@ function BlockerSetup({ session }) {
         );
     }
 
-    // ── Setup view ──
+    if (view === "apps") {
+        return (
+            <div className="blocker">
+                <div className="blocker-frame">
+                    <div className="blocker-topbar">
+                        <button type="button" className="blocker-back" onClick={() => setView("session")}>
+                            <span className="blocker-back-chevron" aria-hidden />
+                            Back
+                        </button>
+                    </div>
+
+                    <h1 className="blocker-title">Block Apps</h1>
+                    <p className="blocker-count">{selectedCount} apps selected</p>
+
+                    <label className="blocker-search">
+                        <span className="blocker-search-icon" aria-hidden />
+                        <input
+                            type="search"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Search"
+                            spellCheck={false}
+                        />
+                    </label>
+
+                    <div className="blocker-grid">
+                        {visibleApps.map((app) => {
+                            const isOn = selected.has(app.name);
+                            return (
+                                <button
+                                    key={app.name}
+                                    type="button"
+                                    className={`blocker-app ${isOn ? "on" : ""}`}
+                                    onClick={() => toggle(app.name)}
+                                >
+                                    <span className="blocker-app-icon-wrap">
+                                        <span className="blocker-app-icon">{app.name.charAt(0)}</span>
+                                        {isOn && (
+                                            <span className="blocker-app-check" aria-hidden>
+                                                <svg viewBox="0 0 24 24" width="14" height="14">
+                                                    <path
+                                                        d="M6 12.5 L10 16.5 L18 8"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2.5"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    />
+                                                </svg>
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span className="blocker-app-label">{app.name}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="setup">
-            <div className="setup-inner">
-                <div className="setup-topbar">
-                    <span className="setup-account">{email} · {points} pts</span>
-                    <button className="setup-signout" onClick={handleSignOut}>Sign out</button>
+        <div className="session-shell">
+            <div className="session-inner">
+                <div className="session-header">
+                    <span className="session-account">{email} · {points} pts</span>
+                    <button type="button" className="session-signout" onClick={handleSignOut}>
+                        Sign out
+                    </button>
                 </div>
 
-                <h1 className="setup-title">Block Apps</h1>
-                <p className="setup-count">{selected.size} apps selected</p>
+                <h1 className="session-heading">Start session</h1>
+                <p className="session-subheading">Set your focus time, pick apps, then lock in.</p>
 
-                <div className="setup-grid">
-                    {CANDIDATE_APPS.map((app) => {
-                        const isOn = selected.has(app.name);
-                        return (
-                            <button
-                                key={app.name}
-                                className={`setup-app ${isOn ? "on" : ""}`}
-                                onClick={() => toggle(app.name)}
-                            >
-                                <span className="setup-app-dot" />
-                                {app.name}
-                            </button>
-                        );
-                    })}
-                </div>
+                <p className="session-section-label">Duration</p>
+                <DurationScrollPicker
+                    durationMinutes={duration}
+                    onDurationChange={setDuration}
+                />
 
-                <p className="setup-section-label">Mode</p>
-                <div className="setup-modes">
+                <p className="session-section-label">Mode</p>
+                <div className="session-modes">
                     {MODES.map((m) => (
                         <button
                             key={m.id}
-                            className={`setup-mode ${mode === m.id ? "on" : ""}`}
+                            type="button"
+                            className={`session-mode ${mode === m.id ? "on" : ""}`}
                             onClick={() => setMode(m.id)}
                         >
-                            <span className="setup-mode-label">{m.label}</span>
-                            <span className="setup-mode-hint">{m.hint}</span>
+                            <span className="session-mode-label">{m.label}</span>
+                            <span className="session-mode-hint">{m.hint}</span>
                         </button>
                     ))}
                 </div>
 
-                <p className="setup-section-label">Duration</p>
-                <div className="setup-durations">
-                    {DURATIONS.map((d) => (
-                        <button
-                            key={d}
-                            className={`setup-duration ${duration === d ? "on" : ""}`}
-                            onClick={() => setDuration(d)}
-                        >
-                            {d >= 60 ? `${d / 60}h` : `${d}m`}
-                        </button>
-                    ))}
-                </div>
+                <p className="session-section-label">Apps</p>
+                <button type="button" className="session-select-apps" onClick={() => setView("apps")}>
+                    <span className="session-select-apps-text">
+                        <span className="session-select-apps-title">Select apps to block</span>
+                        <span className="session-select-apps-sub">
+                            {selectedCount === 0
+                                ? "No apps selected yet"
+                                : `${selectedCount} app${selectedCount === 1 ? "" : "s"} selected`}
+                        </span>
+                    </span>
+                    <span className="session-select-apps-chevron" aria-hidden>›</span>
+                </button>
 
                 <button
-                    className="setup-start"
-                    disabled={selected.size === 0}
-                    onClick={handleStart}
+                    type="button"
+                    className="session-lockin"
+                    disabled={!canLockIn}
+                    onClick={handleLockIn}
                 >
-                    Start Session · {selected.size} apps
+                    {canLockIn ? `Lock in · ${selectedCount} apps` : "Select apps to lock in"}
                 </button>
             </div>
         </div>

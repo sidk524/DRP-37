@@ -1,10 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-// Expose safe APIs to the React renderer
+const isOverlay = process.argv.includes('--tether-overlay')
+
 contextBridge.exposeInMainWorld('tether', {
+    isOverlay,
     // ── Auth ──
     // Open a Google OAuth consent popup; resolves to { access_token,
     // refresh_token } on success, or null if the user cancels.
+    getOAuthRedirectUrl: () => ipcRenderer.invoke('oauth:redirect-url'),
     oauthLogin: (url) => ipcRenderer.invoke('oauth:login', url),
 
     // ── Session control (BlockerSetup) ──

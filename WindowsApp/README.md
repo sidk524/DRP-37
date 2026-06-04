@@ -1,5 +1,18 @@
 # Supabase configuration
 This project uses Supabase for authentication and as a database.
+
+## Google sign-in (desktop)
+
+Sign in with Google opens the system browser. After consent, Supabase redirects to a local callback URL; Tether receives the auth code on `127.0.0.1` and completes the session.
+
+In **Supabase Dashboard → Authentication → URL Configuration**, add this redirect URL:
+
+```text
+http://127.0.0.1:17892/auth/callback
+```
+
+No database or table changes are required for Google login.
+
 The required database schema is as follows:
 
 Table Name: `onboarding`

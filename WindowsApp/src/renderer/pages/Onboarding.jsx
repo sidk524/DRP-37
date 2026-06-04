@@ -2,31 +2,75 @@ import { useState } from "react";
 import { saveOnboarding } from "../services/SupabaseClient";
 import "../styles/Onboarding.css";
 
-const DO_MORE_OPTIONS = [
-    "Exercise",
-    "Reading",
-    "Creative work",
-    "Learning",
-    "Socialising",
-    "Meditation",
-    "Side projects",
-    "Sleep",
-];
-
-const SCROLLING_WORST_OPTIONS = [
-    "First thing in the morning",
-    "Late at night",
-    "During work / study",
-    "When I'm bored",
-    "When I'm stressed",
-    "On public transport",
+const STEPS = [
+    {
+        id: "goals",
+        section: "Goals",
+        question: "What do you wish you did more of?",
+        multiKey: "doMoreOf",
+        options: [
+            { label: "Read more", icon: "📖" },
+            { label: "Exercise", icon: "🏃" },
+            { label: "Call family", icon: "📞" },
+            { label: "Creative work", icon: "🎨" },
+        ],
+        nextLabel: "Continue",
+    },
+    {
+        id: "worst",
+        section: "Worst times",
+        question: "When is scrolling worst for you?",
+        multiKey: "scrollingWorst",
+        options: [
+            { label: "Late night", icon: "🌙" },
+            { label: "First thing morning", icon: "☀️" },
+            { label: "Meals", icon: "🍽️" },
+            { label: "Work hours", icon: "💼" },
+        ],
+        nextLabel: "Continue",
+    },
+    {
+        id: "letter",
+        section: "Letter to self",
+        question: null,
+        helper:
+            "Write a message to your future self. This shows when you're about to open a blocked app.",
+        nextLabel: "Save & continue",
+    },
+    {
+        id: "strictness",
+        section: "Strictness",
+        question: "How strict should we be?",
+        nextLabel: "Done",
+    },
 ];
 
 const STRICTNESS_LEVELS = [
-    { value: "gentle", label: "Gentle", desc: "Soft reminders, easy to dismiss" },
-    { value: "moderate", label: "Moderate", desc: "Noticeable nudges, some friction" },
-    { value: "strict", label: "Strict", desc: "Hard blocks, difficult to bypass" },
+    {
+        value: "gentle",
+        label: "Gentle nudges",
+        icon: "🌱",
+        tint: "gentle",
+        description: "Gentle: a short breathing pause, then you can continue.",
+    },
+    {
+        value: "moderate",
+        label: "Firm friction",
+        icon: "🔒",
+        tint: "firm",
+        description: "Firm: 10s pause + intention check. You can still get through.",
+    },
+    {
+        value: "strict",
+        label: "Hard block",
+        icon: "🧱",
+        tint: "hard",
+        description: "Hard: blocked apps close. No way through until your session ends.",
+    },
 ];
+
+const LETTER_PLACEHOLDER =
+    "You said you wanted to read before bed. Put the phone down. You'll feel better.";
 
 function Onboarding({ session, onComplete }) {
     const [step, setStep] = useState(0);
@@ -39,7 +83,8 @@ function Onboarding({ session, onComplete }) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
-    const totalSteps = 4;
+    const current = STEPS[step];
+    const selectedStrictness = STRICTNESS_LEVELS.find((l) => l.value === responses.strictness);
 
     function toggleArrayItem(key, item) {
         setResponses((prev) => {
@@ -61,7 +106,7 @@ function Onboarding({ session, onComplete }) {
     }
 
     async function handleNext() {
-        if (step < totalSteps - 1) {
+        if (step < STEPS.length - 1) {
             setStep(step + 1);
             return;
         }
@@ -69,7 +114,7 @@ function Onboarding({ session, onComplete }) {
         setError("");
         try {
             await saveOnboarding(session.user.id, responses);
-            onComplete();
+            onComplete(responses.strictness);
         } catch (err) {
             setError(err.message || "Failed to save. Please try again.");
         } finally {
@@ -82,120 +127,109 @@ function Onboarding({ session, onComplete }) {
     }
 
     return (
-        <div className="app">
-            <div className="onboarding-container">
-                {/* Progress */}
-                <div className="onboarding-progress">
-                    {Array.from({ length: totalSteps }).map((_, i) => (
-                        <span
-                            key={i}
-                            className={`progress-dot ${i <= step ? "active" : ""}`}
-                        />
-                    ))}
-                </div>
-
-                {/* Step 0: What do you want to do more of? */}
-                {step === 0 && (
-                    <div className="onboarding-step">
-                        <h1 className="onboarding-title">What do you want to do more of?</h1>
-                        <p className="onboarding-subtitle">Select all that apply</p>
-                        <div className="chip-grid">
-                            {DO_MORE_OPTIONS.map((opt) => (
-                                <button
-                                    key={opt}
-                                    type="button"
-                                    className={`chip ${responses.doMoreOf.includes(opt) ? "selected" : ""}`}
-                                    onClick={() => toggleArrayItem("doMoreOf", opt)}
-                                >
-                                    {opt}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+        <div className="app onboarding-app">
+            <div className="onboarding-shell">
+                {step > 0 && (
+                    <button type="button" className="onboarding-back" onClick={handleBack}>
+                        ← Back
+                    </button>
                 )}
 
-                {/* Step 1: When is scrolling worst? */}
-                {step === 1 && (
-                    <div className="onboarding-step">
-                        <h1 className="onboarding-title">When is scrolling worst?</h1>
-                        <p className="onboarding-subtitle">Select all that apply</p>
-                        <div className="chip-grid">
-                            {SCROLLING_WORST_OPTIONS.map((opt) => (
-                                <button
-                                    key={opt}
-                                    type="button"
-                                    className={`chip ${responses.scrollingWorst.includes(opt) ? "selected" : ""}`}
-                                    onClick={() => toggleArrayItem("scrollingWorst", opt)}
-                                >
-                                    {opt}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                <div className="onboarding-card">
+                    <p className="onboarding-section">{current.section}</p>
 
-                {/* Step 2: Write a message to your future self */}
-                {step === 2 && (
-                    <div className="onboarding-step">
-                        <h1 className="onboarding-title">Write a message to your future self</h1>
-                        <p className="onboarding-subtitle">
-                            This will be shown when you're tempted to scroll
-                        </p>
-                        <textarea
-                            className="onboarding-textarea"
-                            placeholder="Hey future me, remember why you started…"
-                            value={responses.futureMessage}
-                            onChange={(e) =>
-                                setResponses((prev) => ({ ...prev, futureMessage: e.target.value }))
-                            }
-                            rows={5}
-                        />
-                    </div>
-                )}
-
-                {/* Step 3: How strict should we be? */}
-                {step === 3 && (
-                    <div className="onboarding-step">
-                        <h1 className="onboarding-title">How strict should we be?</h1>
-                        <p className="onboarding-subtitle">You can change this later</p>
-                        <div className="strictness-options">
-                            {STRICTNESS_LEVELS.map((lvl) => (
-                                <button
-                                    key={lvl.value}
-                                    type="button"
-                                    className={`strictness-card ${responses.strictness === lvl.value ? "selected" : ""}`}
-                                    onClick={() =>
-                                        setResponses((prev) => ({ ...prev, strictness: lvl.value }))
-                                    }
-                                >
-                                    <span className="strictness-label">{lvl.label}</span>
-                                    <span className="strictness-desc">{lvl.desc}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {error && <p className="auth-error">{error}</p>}
-
-                {/* Navigation */}
-                <div className="onboarding-nav">
-                    {step > 0 && (
-                        <button type="button" className="btn-back" onClick={handleBack}>
-                            Back
-                        </button>
+                    {current.question && (
+                        <h1 className="onboarding-question">{current.question}</h1>
                     )}
+
+                    {current.helper && (
+                        <p className="onboarding-helper">{current.helper}</p>
+                    )}
+
+                    {current.multiKey && (
+                        <div className="onboarding-options">
+                            {current.options.map((opt) => {
+                                const selected = responses[current.multiKey].includes(opt.label);
+                                return (
+                                    <button
+                                        key={opt.label}
+                                        type="button"
+                                        className={`onboarding-option ${selected ? "selected" : ""}`}
+                                        onClick={() => toggleArrayItem(current.multiKey, opt.label)}
+                                    >
+                                        <span className="onboarding-option-icon" aria-hidden>
+                                            {opt.icon}
+                                        </span>
+                                        <span className="onboarding-option-label">{opt.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {current.id === "letter" && (
+                        <div className="onboarding-letter">
+                            <div className="letter-preview">
+                                <p>
+                                    {responses.futureMessage.trim()
+                                        ? `“${responses.futureMessage.trim()}”`
+                                        : `“${LETTER_PLACEHOLDER}”`}
+                                </p>
+                            </div>
+                            <textarea
+                                className="onboarding-textarea"
+                                placeholder={LETTER_PLACEHOLDER}
+                                value={responses.futureMessage}
+                                onChange={(e) =>
+                                    setResponses((prev) => ({
+                                        ...prev,
+                                        futureMessage: e.target.value,
+                                    }))
+                                }
+                                rows={4}
+                            />
+                        </div>
+                    )}
+
+                    {current.id === "strictness" && (
+                        <>
+                            <div className="strictness-options">
+                                {STRICTNESS_LEVELS.map((lvl) => (
+                                    <button
+                                        key={lvl.value}
+                                        type="button"
+                                        className={`strictness-card strictness-${lvl.tint} ${
+                                            responses.strictness === lvl.value ? "selected" : ""
+                                        }`}
+                                        onClick={() =>
+                                            setResponses((prev) => ({
+                                                ...prev,
+                                                strictness: lvl.value,
+                                            }))
+                                        }
+                                    >
+                                        <span className="strictness-icon" aria-hidden>
+                                            {lvl.icon}
+                                        </span>
+                                        <span className="strictness-label">{lvl.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            {selectedStrictness && (
+                                <p className="strictness-footnote">{selectedStrictness.description}</p>
+                            )}
+                        </>
+                    )}
+
+                    {error && <p className="auth-error onboarding-error">{error}</p>}
+
                     <button
                         type="button"
-                        className="btn-continue"
+                        className="btn-continue onboarding-cta"
                         disabled={!canAdvance() || saving}
                         onClick={handleNext}
                     >
-                        {saving
-                            ? "Saving…"
-                            : step === totalSteps - 1
-                                ? "Get started"
-                                : "Next"}
+                        {saving ? "Saving…" : current.nextLabel}
                     </button>
                 </div>
             </div>

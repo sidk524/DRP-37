@@ -15,7 +15,8 @@ const DEFAULT_INFO = {
 const INTENTIONS = ["Check a message", "Post something", "Just looking"];
 
 function Friction() {
-    const [info, setInfo] = useState(DEFAULT_INFO);
+    const isOverlay = window.tether?.isOverlay;
+    const [info, setInfo] = useState(isOverlay ? null : DEFAULT_INFO);
     // breathing-mode sub-phase: "breathing" -> "intention"
     const [phase, setPhase] = useState("breathing");
     const [elapsed, setElapsed] = useState(0);
@@ -71,6 +72,10 @@ function Friction() {
 
     function notNow() {
         window.tether?.notNow(info.key, mode);
+    }
+
+    if (!info) {
+        return <div className="friction" />;
     }
 
     return (

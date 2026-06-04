@@ -23,8 +23,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -55,16 +53,15 @@ import com.drp37.blocker.data.loadLaunchableApps
 import com.drp37.blocker.model.InstalledApp
 import com.drp37.blocker.ui.theme.MyApplicationTheme
 import kotlin.math.max
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 
 @Composable
-fun BlockerSetupScreen() {
+fun BlockAppsScreen(
+    selectedPackages: SnapshotStateMap<String, Boolean>,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val installedApps = remember { loadLaunchableApps(context) }
-    val selectedPackages = remember(installedApps) {
-        mutableStateMapOf<String, Boolean>().apply {
-            installedApps.forEach { app -> put(app.packageName, false) }
-        }
-    }
     var query by remember { mutableStateOf("") }
 
     val selectedCount = selectedPackages.count { it.value }
@@ -89,7 +86,7 @@ fun BlockerSetupScreen() {
                     .height(contentHeight),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                TopBar(layout = layout)
+                TopBar(layout = layout, onBack = onBack)
 
                 Spacer(modifier = Modifier.height(layout.topBarToTitleGap))
 
@@ -143,53 +140,28 @@ fun BlockerSetupScreen() {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(layout.gridToButtonGap))
-
-                Button(
-                    onClick = {},
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(layout.startButtonHeight),
-                    shape = RoundedCornerShape(layout.startButtonRadius),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF0A84FF),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = "Start Session · $selectedCount apps",
-                        fontSize = layout.buttonTextSize.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.sp
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun TopBar(layout: BlockAppsLayoutMetrics) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.align(Alignment.CenterStart),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BackChevron(size = layout.topIconSize)
-            Text(
-                text = "Back",
-                color = Color(0xFF0A84FF),
-                fontSize = layout.navTextSize.sp,
-                letterSpacing = 0.sp
-            )
-        }
-
+private fun TopBar(
+    layout: BlockAppsLayoutMetrics,
+    onBack: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onBack),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BackChevron(size = layout.topIconSize)
         Text(
-            text = "5m",
-            color = Color(0xFF8E8E96),
+            text = "Back",
+            color = Color(0xFF0A84FF),
             fontSize = layout.navTextSize.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.align(Alignment.Center)
+            letterSpacing = 0.sp,
         )
     }
 }
@@ -458,8 +430,14 @@ private data class BlockAppsLayoutMetrics(
 
 @Preview(showBackground = true)
 @Composable
-fun BlockerSetupPreview() {
+fun BlockAppsPreview() {
     MyApplicationTheme {
-        BlockerSetupScreen()
+        val selected = remember {
+            mutableStateMapOf<String, Boolean>()
+        }
+        BlockAppsScreen(
+            selectedPackages = selected,
+            onBack = {},
+        )
     }
 }

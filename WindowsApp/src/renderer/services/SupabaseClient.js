@@ -1,15 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabasePublishableKey) {
     throw new Error(
-        'Missing Supabase credentials. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env file'
+        'Missing Supabase credentials. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to .env file'
     );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+    auth: {
+        flowType: 'pkce',
+        detectSessionInUrl: false,
+    },
+});
 
 export async function signUpWithEmail(email, password) {
     const { data, error } = await supabase.auth.signUp({
@@ -30,32 +35,41 @@ export async function signInWithEmail(email, password) {
 }
 
 export async function signInWithGoogle() {
-    // Desktop OAuth: get the provider consent URL without redirecting this
-    // window, open it in a popup (handled in the main process), and exchange
-    // the returned tokens for a session. Avoids bouncing the app to the
-    // Supabase Site URL. Requires the Electron bridge.
-    if (!window.tether?.oauthLogin) {
+    if (!window.tether?.oauthLogin || !window.tether?.getOAuthRedirectUrl) {
         throw new Error('Google sign-in is only available in the desktop app.');
     }
 
+    const redirectTo = await window.tether.getOAuthRedirectUrl();
+
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { skipBrowserRedirect: true },
+        options: {
+            skipBrowserRedirect: true,
+            redirectTo,
+        },
     });
     if (error) throw error;
     if (!data?.url) throw new Error('Could not start Google sign-in.');
 
-    const tokens = await window.tether.oauthLogin(data.url);
-    if (!tokens?.access_token) {
-        throw new Error('Google sign-in was cancelled.');
+    const callback = await window.tether.oauthLogin(data.url);
+
+    if (callback?.code) {
+        const { data: sessionData, error: sessionError } =
+            await supabase.auth.exchangeCodeForSession(callback.code);
+        if (sessionError) throw sessionError;
+        return sessionData;
     }
 
-    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-    });
-    if (sessionError) throw sessionError;
-    return sessionData; // onAuthStateChange fires -> AuthGate advances
+    if (callback?.access_token) {
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+            access_token: callback.access_token,
+            refresh_token: callback.refresh_token,
+        });
+        if (sessionError) throw sessionError;
+        return sessionData;
+    }
+
+    throw new Error('Google sign-in was cancelled.');
 }
 
 export async function getSession() {

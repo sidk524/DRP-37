@@ -26,6 +26,7 @@ function buildOverlay() {
         backgroundColor: "#111111",
         webPreferences: {
             preload: path.join(__dirname, "..", "preload.js"),
+            additionalArguments: ["--tether-overlay"],
             contextIsolation: true,
             nodeIntegration: false,
         },
@@ -36,11 +37,9 @@ function buildOverlay() {
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
     if (process.env.NODE_ENV === "development") {
-        win.loadURL("http://localhost:5173/#/friction");
+        win.loadURL("http://localhost:5173");
     } else {
-        win.loadFile(path.join(__dirname, "../../../dist/index.html"), {
-            hash: "/friction",
-        });
+        win.loadFile(path.join(__dirname, "../../../dist/index.html"));
     }
 
     win.webContents.on("did-finish-load", () => {

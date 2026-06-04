@@ -9,6 +9,7 @@ data class InstalledApp(
 )
 
 data class BlockList(
-    val packages: Set<String>,
-    val durationMinutes: Int
+    val packages: Set<String> = emptySet(),
+    val durationMinutes: Int = 30,
+    val mode: String = "breathing",
 )

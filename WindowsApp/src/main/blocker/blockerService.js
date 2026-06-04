@@ -279,7 +279,6 @@ function registerIpc() {
 }
 
 function start() {
-    overlay.preload();
     registerIpc();
 
     // Clear any leftover website block from a previous session that didn't shut
