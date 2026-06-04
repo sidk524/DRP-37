@@ -25,3 +25,9 @@ Google and email login are wired from the login screen. When Supabase reports an
 Active app blocking uses the Tether accessibility service. Before starting a block session, enable Tether in Android Accessibility settings. If the service is not enabled, the app opens Accessibility settings instead of recording a session.
 
 During an active session, opening a selected app sends the device back to the home screen.
+
+## Cross-platform Sync
+
+Android sends selected package names to `WEB_SERVER_URL` through `PUT /api/session/current`. The web server expands known packages into shared targets, including website domains used by the Windows app.
+
+When Android restores an active session with `GET /api/session/current`, it uses the returned `apps_blocked` package list for local accessibility blocking. Unknown package names remain Android-only until a matching registry entry is added on the server.

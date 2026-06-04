@@ -25,6 +25,48 @@ The server listens on `http://localhost:3000` by default.
 
 - `GET /` returns basic server status.
 - `GET /health` returns a health check response for load balancers or uptime checks.
+- `GET /api/session/current` returns the authenticated user's active block session, or `null`.
+- `PUT /api/session/current` starts or ends the authenticated user's active block session.
+
+## Block Session Sync
+
+Clients send the platform-native targets they know about:
+
+```json
+{
+  "active": true,
+  "appsBlocked": ["com.instagram.android"],
+  "domainsBlocked": ["instagram.com"],
+  "totalDurationSeconds": 1500
+}
+```
+
+The server expands known targets through `src/blockTargetRegistry.js` and stores the full cross-platform payload in `block_sessions`:
+
+| Column | Purpose |
+| --- | --- |
+| `canonical_targets` | Shared target IDs such as `instagram` or `youtube` |
+| `apps_blocked` | Android package names used by the accessibility service |
+| `domains_blocked` | Website hostnames used by the Windows hosts blocker |
+| `process_tokens` | Optional Windows foreground process match tokens |
+
+Unknown Android packages are stored only in `apps_blocked`. Unknown website domains are stored only in `domains_blocked`.
+
+## Adding Registry Entries
+
+Add entries in `src/blockTargetRegistry.js` with any fields that exist for that service:
+
+```js
+registerTarget({
+    id: "example",
+    packages: ["com.example.android"],
+    domains: ["example.com", "www.example.com"],
+    processTokens: ["example"],
+    aliases: ["example app"]
+});
+```
+
+If a service has no Android package or no website, omit that field. The server will only expand to the platforms it knows.
 
 ## Deployment Notes
 

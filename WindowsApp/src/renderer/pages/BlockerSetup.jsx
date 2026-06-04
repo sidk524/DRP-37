@@ -2,6 +2,11 @@ import "../styles/BlockerSetup.css";
 import { useEffect, useRef, useState } from "react";
 import DurationScrollPicker from "../components/DurationScrollPicker";
 import LockGraphic from "../components/LockGraphic";
+import {
+    createSession,
+    endSession,
+    loadActiveSession,
+} from "../services/BlockSessionRepository";
 import { getUserTotalPoints, saveSessionPoints, signOut } from "../services/SupabaseClient";
 
 export function strictnessToMode(strictness) {
@@ -27,6 +32,34 @@ function formatDurationPill(hours, minutes) {
     return "5m";
 }
 
+function displayDomains(domains = []) {
+    return Array.from(
+        new Set(
+            domains
+                .map(normalizeWebsite)
+                .filter(Boolean)
+        )
+    ).sort();
+}
+
+function sessionLabels(serverSession) {
+    if (serverSession?.canonical_targets?.length) return serverSession.canonical_targets;
+    if (serverSession?.domains_blocked?.length) return displayDomains(serverSession.domains_blocked);
+    return [];
+}
+
+function sessionDurationMinutes(serverSession) {
+    return Math.max(1, Math.ceil((serverSession?.total_duration_seconds || 60) / 60));
+}
+
+function sessionStartedAt(serverSession) {
+    return Date.parse(serverSession?.started_at || "") || Date.now();
+}
+
+function sessionEndsAt(serverSession) {
+    return sessionStartedAt(serverSession) + (serverSession?.total_duration_seconds || 60) * 1000;
+}
+
 function BlockerSetup({ session, defaultMode = "breathing" }) {
     const [view, setView] = useState("duration");
     const [websites, setWebsites] = useState([]);
@@ -39,8 +72,11 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
     const [active, setActive] = useState(null);
     const [now, setNow] = useState(Date.now());
     const [points, setPoints] = useState(0);
+    const [sessionError, setSessionError] = useState("");
+    const [remoteSessionId, setRemoteSessionId] = useState(null);
     const wasActiveRef = useRef(false);
     const lastAwardedEndedAtRef = useRef(null);
+    const restoredSessionRef = useRef(false);
 
     const sessionRunning = !!active;
     const selectedCount = websites.length;
@@ -60,9 +96,53 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
         }
     }
 
+    async function startLocalSession(serverSession) {
+        const endsAt = sessionEndsAt(serverSession);
+        if (endsAt <= Date.now()) return null;
+
+        const selectedDomains = displayDomains(serverSession.domains_blocked);
+        setWebsites(selectedDomains);
+        setRemoteSessionId(serverSession.id);
+
+        const res = await window.tether?.startSession({
+            sessionId: serverSession.id,
+            apps: [],
+            appLabels: sessionLabels(serverSession),
+            domains: serverSession.domains_blocked || [],
+            processTokens: serverSession.process_tokens || [],
+            mode,
+            durationMinutes: sessionDurationMinutes(serverSession),
+            startedAt: sessionStartedAt(serverSession),
+            endsAt,
+        });
+
+        if (res && !res.ok) {
+            throw new Error(res.error);
+        }
+        if (res?.warning) {
+            setSessionError(`Session restored, but websites weren't blocked: ${res.warning}`);
+        }
+        return res?.session || null;
+    }
+
     useEffect(() => {
         refreshPoints();
     }, [session.user.id]);
+
+    useEffect(() => {
+        if (restoredSessionRef.current) return;
+        restoredSessionRef.current = true;
+
+        loadActiveSession()
+            .then(async (serverSession) => {
+                if (!serverSession) return;
+                const restored = await startLocalSession(serverSession);
+                if (restored) setActive(restored);
+            })
+            .catch((error) => {
+                setSessionError(error.message || "Could not restore active session.");
+            });
+    }, [session.user.id, mode]);
 
     useEffect(() => {
         let unsub = () => {};
@@ -74,20 +154,26 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
                 const endedByExpiry = s?.lastStop?.reason === "expired";
                 const endedAt = s?.lastStop?.endedAt;
 
-                if (wasActive && !isActive && endedByExpiry && endedAt && endedAt !== lastAwardedEndedAtRef.current) {
+                if (wasActive && !isActive && endedAt && endedAt !== lastAwardedEndedAtRef.current) {
                     try {
-                        await saveSessionPoints({
-                            userId: session.user.id,
-                            mode: s.lastStop.mode,
-                            actualMs: s.lastStop.actualMs,
-                            plannedMs: s.lastStop.plannedMs,
-                            blockedAppsCount: s.lastStop.blockedAppsCount,
-                            endedAt: new Date(endedAt).toISOString(),
-                        });
-                        await refreshPoints();
+                        if (endedByExpiry) {
+                            await saveSessionPoints({
+                                userId: session.user.id,
+                                mode: s.lastStop.mode,
+                                actualMs: s.lastStop.actualMs,
+                                plannedMs: s.lastStop.plannedMs,
+                                blockedAppsCount: s.lastStop.blockedAppsCount,
+                                endedAt: new Date(endedAt).toISOString(),
+                            });
+                            await refreshPoints();
+                        }
+                        if (remoteSessionId) {
+                            await endSession(remoteSessionId);
+                            setRemoteSessionId(null);
+                        }
                         lastAwardedEndedAtRef.current = endedAt;
                     } catch (error) {
-                        console.error("Failed to save focus points:", error);
+                        console.error("Failed to close focus session:", error);
                     }
                 }
 
@@ -96,7 +182,7 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
             });
         }
         return unsub;
-    }, [session.user.id]);
+    }, [remoteSessionId, session.user.id]);
 
     useEffect(() => {
         if (!active?.endsAt) return;
@@ -135,27 +221,37 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
 
     async function handleLockIn() {
         if (selectedCount === 0) return;
-        const domains = websites.flatMap((domain) => [domain, `www.${domain}`]);
-        const res = await window.tether?.startSession({
-            apps: [],
-            appLabels: websites,
-            domains,
-            mode,
-            durationMinutes,
-        });
-        if (res && !res.ok) {
-            alert(res.error);
-        } else if (res?.warning) {
-            alert(`Session started, but websites weren't blocked:\n${res.warning}`);
+        setSessionError("");
+        try {
+            const serverSession = await createSession({
+                domainsBlocked: websites,
+                totalDurationSeconds: totalSeconds,
+            });
+            const localSession = await startLocalSession(serverSession);
+            if (localSession) setActive(localSession);
+        } catch (error) {
+            setSessionError(error.message || "Could not start block session.");
         }
     }
 
     async function handleStopSession() {
         const res = await window.tether?.stopSession();
-        if (res && !res.ok) alert(res.error);
+        if (res && !res.ok) {
+            setSessionError(res.error);
+            return;
+        }
+        if (remoteSessionId) {
+            await endSession(remoteSessionId);
+            setRemoteSessionId(null);
+        }
     }
 
     async function handleSignOut() {
+        if (remoteSessionId) {
+            await endSession(remoteSessionId);
+            setRemoteSessionId(null);
+        }
+        await window.tether?.stopSession();
         await signOut();
     }
 
@@ -299,6 +395,10 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
                         End session early
                     </button>
                 ) : null}
+
+                {sessionError && (
+                    <p className="tether-error tether-session-error">{sessionError}</p>
+                )}
 
                 <button
                     type="button"

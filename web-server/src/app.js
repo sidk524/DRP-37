@@ -2,6 +2,7 @@ const express = require("express");
 const helmet = require("helmet");
 const { createClient } = require("@supabase/supabase-js");
 const ws = require("ws");
+const { expandBlockTargets } = require("./expandBlockTargets");
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -26,7 +27,7 @@ const supabaseAdmin = supabaseUrl && supabaseSecretKey
     : null;
 
 const app = express();
-const SESSION_FIELDS = "id,user_id,apps_blocked,total_duration_seconds,started_at,ended_at";
+const SESSION_FIELDS = "id,user_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
 
 app.disable("x-powered-by");
 app.use(helmet());
@@ -94,17 +95,31 @@ const closeSession = async (userId, sessionId = null) => {
     return query.select(SESSION_FIELDS);
 };
 
-const createSession = async (userId, appsBlocked, totalDurationSeconds) => {
+const createSession = async (userId, expandedTargets, totalDurationSeconds) => {
     return supabaseAdmin
         .from("block_sessions")
         .insert({
             user_id: userId,
-            apps_blocked: appsBlocked,
+            canonical_targets: expandedTargets.canonicalTargets,
+            apps_blocked: expandedTargets.appsBlocked,
+            domains_blocked: expandedTargets.domainsBlocked,
+            process_tokens: expandedTargets.processTokens,
             total_duration_seconds: totalDurationSeconds,
             started_at: new Date().toISOString()
         })
         .select(SESSION_FIELDS)
         .single();
+};
+
+const validateStringArray = (value, fieldName) => {
+    if (value == null) return [];
+    if (!Array.isArray(value)) {
+        return { error: `${fieldName} must be an array` };
+    }
+    if (value.some((item) => typeof item !== "string" || !item.trim())) {
+        return { error: `${fieldName} must contain non-empty strings` };
+    }
+    return value;
 };
 
 app.get("/api/session/current", requireSupabase, requireUser, async (req, res, next) => {
@@ -138,13 +153,28 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
         const {
             active,
             appsBlocked,
+            domainsBlocked,
+            targets,
             totalDurationSeconds,
             sessionId
         } = req.body || {};
 
         if (active === true) {
-            if (!Array.isArray(appsBlocked)) {
-                res.status(400).json({ error: "appsBlocked must be an array" });
+            const safeAppsBlocked = validateStringArray(appsBlocked, "appsBlocked");
+            if (safeAppsBlocked.error) {
+                res.status(400).json({ error: safeAppsBlocked.error });
+                return;
+            }
+
+            const safeDomainsBlocked = validateStringArray(domainsBlocked, "domainsBlocked");
+            if (safeDomainsBlocked.error) {
+                res.status(400).json({ error: safeDomainsBlocked.error });
+                return;
+            }
+
+            const safeTargets = validateStringArray(targets, "targets");
+            if (safeTargets.error) {
+                res.status(400).json({ error: safeTargets.error });
                 return;
             }
 
@@ -153,8 +183,18 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
                 return;
             }
 
-            if (appsBlocked.some((packageName) => typeof packageName !== "string" || !packageName.trim())) {
-                res.status(400).json({ error: "appsBlocked must contain package names" });
+            const expandedTargets = expandBlockTargets({
+                appsBlocked: safeAppsBlocked,
+                domainsBlocked: safeDomainsBlocked,
+                targets: safeTargets
+            });
+
+            if (
+                expandedTargets.appsBlocked.length === 0
+                && expandedTargets.domainsBlocked.length === 0
+                && expandedTargets.processTokens.length === 0
+            ) {
+                res.status(400).json({ error: "At least one target is required" });
                 return;
             }
 
@@ -162,11 +202,11 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
 
             if (closeExistingError) throw closeExistingError;
 
-            let { data, error } = await createSession(req.user.id, appsBlocked, totalDurationSeconds);
+            let { data, error } = await createSession(req.user.id, expandedTargets, totalDurationSeconds);
             if (error && error.code === "23505") {
                 const { error: retryCloseError } = await closeSession(req.user.id);
                 if (retryCloseError) throw retryCloseError;
-                ({ data, error } = await createSession(req.user.id, appsBlocked, totalDurationSeconds));
+                ({ data, error } = await createSession(req.user.id, expandedTargets, totalDurationSeconds));
             }
 
             if (error) throw error;

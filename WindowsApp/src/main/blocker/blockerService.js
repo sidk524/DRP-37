@@ -34,9 +34,11 @@ const graceUntil = new Map(); // appKey -> timestamp(ms) until which we won't re
 // the foreground process name.
 let session = {
     active: false,
+    sessionId: null,
     blocklist: [],
     appLabels: [],
     domains: [],
+    processTokens: [],
     mode: "breathing",
     startedAt: null,
     endsAt: null,
@@ -148,8 +150,11 @@ function startGrace(key) {
 function sessionView() {
     return {
         active: session.active,
+        sessionId: session.sessionId,
         mode: session.mode,
         appLabels: session.appLabels,
+        domains: session.domains,
+        processTokens: session.processTokens,
         startedAt: session.startedAt,
         endsAt: session.endsAt,
         durationMinutes: session.durationMinutes,
@@ -165,10 +170,24 @@ function broadcast() {
     }
 }
 
-function startSession({ apps = [], appLabels = [], domains = [], mode = "breathing", durationMinutes = 30 } = {}) {
-    const blocklist = apps.map((a) => String(a).toLowerCase()).filter(Boolean);
-    if (blocklist.length === 0) {
-        return { ok: false, error: "Pick at least one app to block." };
+function startSession({
+    sessionId = null,
+    apps = [],
+    appLabels = [],
+    domains = [],
+    processTokens = [],
+    mode = "breathing",
+    durationMinutes = 30,
+    startedAt = null,
+    endsAt = null,
+} = {}) {
+    const normalizedDomains = domains.map((domain) => String(domain).toLowerCase()).filter(Boolean);
+    const normalizedProcessTokens = processTokens.map((token) => String(token).toLowerCase()).filter(Boolean);
+    const blocklist = [...apps, ...normalizedProcessTokens]
+        .map((a) => String(a).toLowerCase())
+        .filter(Boolean);
+    if (blocklist.length === 0 && normalizedDomains.length === 0) {
+        return { ok: false, error: "Pick at least one website or app to block." };
     }
 
     const resolvedMode = ["breathing", "reflect", "hard"].includes(mode) ? mode : "breathing";
@@ -177,14 +196,18 @@ function startSession({ apps = [], appLabels = [], domains = [], mode = "breathi
     lastStop = null;
     const now = Date.now();
     const safeDurationMinutes = Math.max(1, durationMinutes);
+    const safeStartedAt = Number.isFinite(startedAt) ? startedAt : now;
+    const safeEndsAt = Number.isFinite(endsAt) ? endsAt : safeStartedAt + safeDurationMinutes * 60 * 1000;
     session = {
         active: true,
+        sessionId,
         blocklist,
         appLabels,
-        domains,
+        domains: normalizedDomains,
+        processTokens: normalizedProcessTokens,
         mode: resolvedMode,
-        startedAt: now,
-        endsAt: now + safeDurationMinutes * 60 * 1000,
+        startedAt: safeStartedAt,
+        endsAt: safeEndsAt,
         durationMinutes: safeDurationMinutes,
     };
 
@@ -192,8 +215,8 @@ function startSession({ apps = [], appLabels = [], domains = [], mode = "breathi
     // it works for browser tabs, not just native apps. Non-fatal if it can't:
     // process-killing still applies and we warn the user (e.g. needs admin).
     let warning = null;
-    if (resolvedMode === "hard" && domains.length > 0) {
-        const res = hosts.blockDomains(domains);
+    if (normalizedDomains.length > 0) {
+        const res = hosts.blockDomains(normalizedDomains);
         if (!res.ok) {
             warning = res.error;
             console.warn(`[blocker] website blocking failed: ${res.error}`);
@@ -203,10 +226,10 @@ function startSession({ apps = [], appLabels = [], domains = [], mode = "breathi
     }
 
     if (expiryTimer) clearTimeout(expiryTimer);
-    expiryTimer = setTimeout(() => stopSession("expired"), session.endsAt - Date.now());
+    expiryTimer = setTimeout(() => stopSession("expired"), Math.max(0, session.endsAt - Date.now()));
 
     console.log(
-        `[blocker] session started · ${session.mode} · ${durationMinutes}m · [${blocklist.join(", ")}]`
+        `[blocker] session started · ${session.mode} · ${durationMinutes}m · [${[...blocklist, ...normalizedDomains].join(", ")}]`
     );
     broadcast();
     return { ok: true, session: sessionView(), warning };
@@ -233,9 +256,11 @@ function stopSession(reason = "manual") {
     expiryTimer = null;
     session = {
         active: false,
+        sessionId: null,
         blocklist: [],
         appLabels: [],
         domains: [],
+        processTokens: [],
         mode: "breathing",
         startedAt: null,
         endsAt: null,

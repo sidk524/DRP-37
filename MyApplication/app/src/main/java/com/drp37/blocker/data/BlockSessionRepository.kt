@@ -14,7 +14,10 @@ import kotlinx.coroutines.withContext
 data class BlockSessionRecord(
     val id: String,
     val userId: String,
+    val canonicalTargets: List<String>,
     val appsBlocked: List<String>,
+    val domainsBlocked: List<String>,
+    val processTokens: List<String>,
     val totalDurationSeconds: Int,
     val startedAt: String,
     val endedAt: String? = null
@@ -120,7 +123,10 @@ private fun JSONObject.toBlockSessionRecord(): BlockSessionRecord {
     return BlockSessionRecord(
         id = getString("id"),
         userId = getString("user_id"),
-        appsBlocked = getJSONArray("apps_blocked").toStringList(),
+        canonicalTargets = optJSONArray("canonical_targets")?.toStringList().orEmpty(),
+        appsBlocked = optJSONArray("apps_blocked")?.toStringList().orEmpty(),
+        domainsBlocked = optJSONArray("domains_blocked")?.toStringList().orEmpty(),
+        processTokens = optJSONArray("process_tokens")?.toStringList().orEmpty(),
         totalDurationSeconds = getInt("total_duration_seconds"),
         startedAt = getString("started_at"),
         endedAt = optString("ended_at").takeUnless { it.isBlank() || it == "null" }

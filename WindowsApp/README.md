@@ -1,6 +1,18 @@
 # Supabase configuration
 This project uses Supabase for authentication and as a database.
 
+## Environment
+
+Add these values to `WindowsApp/.env`:
+
+```properties
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+VITE_WEB_SERVER_URL=http://localhost:3000
+```
+
+`VITE_WEB_SERVER_URL` is required for cross-platform block-session sync. The Windows app sends selected websites to the web server, receives expanded domains/process tokens, and restores active sessions from `GET /api/session/current`.
+
 ## Google sign-in (desktop)
 
 Sign in with Google opens the system browser. After consent, Supabase redirects to a local callback URL; Tether receives the auth code on `127.0.0.1` and completes the session.

@@ -1,6 +1,6 @@
 const request = require("supertest");
 
-const SESSION_FIELDS = "id,user_id,apps_blocked,total_duration_seconds,started_at,ended_at";
+const SESSION_FIELDS = "id,user_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
 
 const makeQuery = (terminalMethod, terminalResult) => {
     const query = {};
@@ -68,7 +68,10 @@ describe("block session API", () => {
         const createdSession = {
             id: "session-1",
             user_id: "user-1",
+            canonical_targets: [],
             apps_blocked: ["com.example.app"],
+            domains_blocked: [],
+            process_tokens: [],
             total_duration_seconds: 60,
             started_at: "2026-06-03T12:00:00.000Z",
             ended_at: null
@@ -87,7 +90,10 @@ describe("block session API", () => {
         expect(response.body).toEqual({ session: createdSession });
         expect(insertQuery.insert).toHaveBeenCalledWith({
             user_id: "user-1",
+            canonical_targets: [],
             apps_blocked: ["com.example.app"],
+            domains_blocked: [],
+            process_tokens: [],
             total_duration_seconds: 60,
             started_at: "2026-06-03T12:00:00.000Z"
         });
@@ -98,7 +104,10 @@ describe("block session API", () => {
         const expiredSession = {
             id: "session-1",
             user_id: "user-1",
+            canonical_targets: [],
             apps_blocked: ["com.example.app"],
+            domains_blocked: [],
+            process_tokens: [],
             total_duration_seconds: 60,
             started_at: "2026-06-03T11:58:00.000Z",
             ended_at: null
@@ -127,7 +136,42 @@ describe("block session API", () => {
         });
 
         expect(response.status).toBe(400);
-        expect(response.body).toEqual({ error: "appsBlocked must contain package names" });
+        expect(response.body).toEqual({ error: "appsBlocked must contain non-empty strings" });
+    });
+
+    it("records expanded cross-platform targets", async () => {
+        const closeQuery = makeQuery("select", { data: [], error: null });
+        const createdSession = {
+            id: "session-1",
+            user_id: "user-1",
+            canonical_targets: ["instagram"],
+            apps_blocked: ["com.instagram.android"],
+            domains_blocked: ["instagram.com", "www.instagram.com"],
+            process_tokens: ["instagram"],
+            total_duration_seconds: 60,
+            started_at: "2026-06-03T12:00:00.000Z",
+            ended_at: null
+        };
+        const insertQuery = makeQuery("single", { data: createdSession, error: null });
+        const { app } = loadApp({ adminQueries: [closeQuery, insertQuery] });
+
+        const response = await authorized(app).send({
+            active: true,
+            domainsBlocked: ["instagram.com"],
+            totalDurationSeconds: 60
+        });
+
+        expect(response.status).toBe(201);
+        expect(response.body).toEqual({ session: createdSession });
+        expect(insertQuery.insert).toHaveBeenCalledWith({
+            user_id: "user-1",
+            canonical_targets: ["instagram"],
+            apps_blocked: ["com.instagram.android"],
+            domains_blocked: ["instagram.com", "www.instagram.com"],
+            process_tokens: ["instagram"],
+            total_duration_seconds: 60,
+            started_at: expect.any(String)
+        });
     });
 
     it("selects the expected session fields", async () => {
@@ -136,7 +180,10 @@ describe("block session API", () => {
             data: {
                 id: "session-1",
                 user_id: "user-1",
+                canonical_targets: [],
                 apps_blocked: [],
+                domains_blocked: ["example.com"],
+                process_tokens: [],
                 total_duration_seconds: 5,
                 started_at: "2026-06-03T12:00:00.000Z",
                 ended_at: null
@@ -147,7 +194,7 @@ describe("block session API", () => {
 
         await authorized(app).send({
             active: true,
-            appsBlocked: [],
+            domainsBlocked: ["example.com"],
             totalDurationSeconds: 5
         });
 
