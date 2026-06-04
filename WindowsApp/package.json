@@ -1,0 +1,70 @@
+{
+  "name": "tether",
+  "version": "1.0.0",
+  "description": "Simple electron and react js windows app",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "src/main/index.js",
+  "engines": {
+    "node": ">=20 <23"
+  },
+  "scripts": {
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "electron .",
+    "dist": "npm run build && electron-builder",
+    "pack": "npm run build && electron-builder --dir"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^42.3.0",
+    "electron-builder": "^26.8.1",
+    "vite": "^8.0.14",
+    "wait-on": "^9.0.10"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "get-windows": "^9.2.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.15.1"
+  },
+  "build": {
+    "appId": "com.tether.app",
+    "productName": "Tether",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/main/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "BartlomiejDlugosz",
+        "repo": "DRP-37"
+      }
+    ]
+  }
+}

@@ -1,0 +1,267 @@
+/* ── Reset & Root ───────────────────────────────────────────── */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg:           #111111;
+    --surface:      #2a2a2a;
+    --surface-btn:  #323232;
+    --border:       #3a3a3a;
+    --text-primary: #ffffff;
+    --text-subtle:  #888888;
+    --accent:       #4a9eff;
+    --radius:       14px;
+    --font:         'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── App Shell ──────────────────────────────────────────────── */
+.app {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: var(--bg);
+    font-family: var(--font), serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Auth Card ──────────────────────────────────────────────── */
+.auth-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+    padding: 40px 32px 32px;
+    gap: 24px;
+}
+
+/* ── Logo ───────────────────────────────────────────────────── */
+.logo {
+    margin-bottom: 8px;
+}
+
+.logo-text {
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--text-primary);
+    letter-spacing: 0.05em;
+    font-family: var(--font), serif;
+}
+
+.logo-accent {
+    font-weight: 700;
+    position: relative;
+    display: inline-block;
+}
+
+/* The crossbar effect on the H */
+.logo-accent::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 110%;
+    height: 2px;
+    background: var(--text-primary);
+    opacity: 0.5;
+}
+
+/* ── Heading Group ──────────────────────────────────────────── */
+.heading-group {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    font-size: 0.95rem;
+    color: var(--text-subtle);
+    font-weight: 400;
+}
+
+/* ── Form Group ─────────────────────────────────────────────── */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+/* ── Input Fields ───────────────────────────────────────────── */
+.input-field {
+    width: 100%;
+    padding: 18px 20px;
+    background: var(--surface);
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: var(--font), serif;
+    outline: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.input-field::placeholder {
+    color: var(--text-subtle);
+}
+
+.input-field:focus {
+    border-color: var(--accent);
+    background: #2f2f2f;
+}
+
+/* ── Continue Button ────────────────────────────────────────── */
+.btn-continue {
+    width: 100%;
+    padding: 18px;
+    background: var(--surface-btn);
+    border: none;
+    border-radius: var(--radius);
+    color: var(--text-subtle);
+    font-size: 1rem;
+    font-family: var(--font), serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    margin-top: 4px;
+}
+
+.btn-continue:hover {
+    background: #3d3d3d;
+    color: var(--text-primary);
+}
+
+/* ── Divider ────────────────────────────────────────────────── */
+.divider {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 12px;
+}
+
+.divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.divider-text {
+    color: var(--text-subtle);
+    font-size: 0.875rem;
+}
+
+/* ── Google Button ──────────────────────────────────────────── */
+.btn-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: var(--font), serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-google:hover {
+    background: #2f2f2f;
+}
+
+.google-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+/* ── Login Text ─────────────────────────────────────────────── */
+.login-text {
+    font-size: 0.95rem;
+    color: var(--text-subtle);
+}
+
+.login-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.login-link:hover {
+    text-decoration: underline;
+}
+
+/* Toggle rendered as a button but styled like the link */
+.login-link-btn {
+    background: none;
+    border: none;
+    font-family: var(--font), serif;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+/* ── Auth error / loading ───────────────────────────────────── */
+.auth-error {
+    color: #ff6b6b;
+    font-size: 0.875rem;
+    text-align: center;
+    line-height: 1.4;
+    margin: 2px 0;
+}
+
+.auth-info {
+    color: #6bd49b;
+    font-size: 0.875rem;
+    text-align: center;
+    line-height: 1.4;
+    margin: 2px 0;
+}
+
+.auth-loading {
+    color: var(--text-subtle);
+    font-size: 0.95rem;
+}
+
+.btn-continue:disabled,
+.btn-google:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.footer-text {
+    font-size: 0.78rem;
+    color: var(--text-subtle);
+    text-align: center;
+    line-height: 1.6;
+    margin-top: auto;
+    padding-top: 16px;
+}
+
+.footer-link {
+    color: var(--text-subtle);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.footer-link:hover {
+    color: var(--text-primary);
+}
