@@ -8,10 +8,14 @@ Add these values to `WindowsApp/.env`:
 ```properties
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
-VITE_WEB_SERVER_URL=http://localhost:3000
+VITE_WEB_SERVER_URL=http://13.60.4.193:3000
 ```
 
 `VITE_WEB_SERVER_URL` is required for cross-platform block-session sync. The Windows app sends selected websites to the web server, receives expanded domains/process tokens, and restores active sessions from `GET /api/session/current`.
+
+In Electron, API calls go through the main process (no browser CORS). During `npm run dev`, Vite also proxies `/api` to `VITE_WEB_SERVER_URL` as a fallback. After changing `.env`, restart with `npm run dev`.
+
+Deploy the latest `web-server` to EC2 (push to `main` or run the CI/CD workflow) so `OPTIONS` preflight and CORS headers match the repo. Until then, the desktop app still works via the main-process proxy; a direct browser client to the same host would not.
 
 ## Google sign-in (desktop)
 

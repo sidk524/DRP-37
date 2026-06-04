@@ -31,6 +31,20 @@ const SESSION_FIELDS = "id,user_id,canonical_targets,apps_blocked,domains_blocke
 
 app.disable("x-powered-by");
 app.use(helmet());
+app.use((req, res, next) => {
+    const origin = req.get("origin");
+    if (origin) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET,PUT,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,Accept");
+    if (req.method === "OPTIONS") {
+        res.sendStatus(204);
+        return;
+    }
+    next();
+});
 app.use(express.json());
 
 app.get("/", (_req, res) => {

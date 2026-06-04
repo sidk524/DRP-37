@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('tether', {
     startSession: (config) => ipcRenderer.invoke('session:start', config),
     stopSession: () => ipcRenderer.invoke('session:stop'),
     getSession: () => ipcRenderer.invoke('session:get'),
+    webServerRequest: (payload) => ipcRenderer.invoke('webserver:request', payload),
     // Subscribe to session state changes; returns an unsubscribe function.
     onSessionUpdate: (callback) => {
         const listener = (_event, data) => callback(data);

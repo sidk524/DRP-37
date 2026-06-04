@@ -1,6 +1,7 @@
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const { registerAuthHandlers } = require("./handlers/authHandler");
+const { registerWebServerHandlers } = require("./handlers/webServerHandler");
 const { registerOAuthIpc } = require("./auth/registerOAuthIpc");
 const blockerService = require("./blocker/blockerService");
 
@@ -69,6 +70,7 @@ function createWindow() {
 }
 
 registerAuthHandlers();
+registerWebServerHandlers();
 registerOAuthIpc();
 
 if (gotSingleInstanceLock) {
