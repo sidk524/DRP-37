@@ -3,22 +3,27 @@ import "../styles/DurationScrollPicker.css";
 
 const ROW_HEIGHT = 56;
 
-function DurationWheel({ value, min, max, onChange }) {
+function DurationWheel({ value, min, max, onChange, locked }) {
     const items = useMemo(
         () => Array.from({ length: max - min + 1 }, (_, index) => min + index),
         [min, max],
     );
+    const columnRef = useRef(null);
     const listRef = useRef(null);
-    const scrollEndTimer = useRef(null);
+    const syncingRef = useRef(false);
 
     const scrollToValue = useCallback(
         (nextValue, behavior = "auto") => {
             const list = listRef.current;
             if (!list) return;
             const index = Math.min(Math.max(nextValue - min, 0), items.length - 1);
+            syncingRef.current = true;
             list.scrollTo({
                 top: index * ROW_HEIGHT,
                 behavior,
+            });
+            requestAnimationFrame(() => {
+                syncingRef.current = false;
             });
         },
         [items.length, min],
@@ -28,25 +33,44 @@ function DurationWheel({ value, min, max, onChange }) {
         scrollToValue(value);
     }, [value, scrollToValue]);
 
-    function handleScroll() {
-        const list = listRef.current;
-        if (!list) return;
+    useEffect(() => {
+        const column = columnRef.current;
+        if (!column || locked) return;
 
-        if (scrollEndTimer.current) {
-            clearTimeout(scrollEndTimer.current);
-        }
+        function handleWheel(event) {
+            event.preventDefault();
+            event.stopPropagation();
 
-        scrollEndTimer.current = setTimeout(() => {
-            const index = Math.round(list.scrollTop / ROW_HEIGHT);
-            const next = min + Math.min(Math.max(index, 0), items.length - 1);
+            const direction = Math.sign(event.deltaY);
+            if (direction === 0) return;
+
+            const next = Math.min(max, Math.max(min, value + direction));
             if (next !== value) {
                 onChange(next);
             }
-        }, 80);
+        }
+
+        column.addEventListener("wheel", handleWheel, { passive: false });
+        return () => column.removeEventListener("wheel", handleWheel);
+    }, [locked, max, min, onChange, value]);
+
+    function handleScroll() {
+        if (locked || syncingRef.current) return;
+        const list = listRef.current;
+        if (!list) return;
+
+        const index = Math.round(list.scrollTop / ROW_HEIGHT);
+        const next = min + Math.min(Math.max(index, 0), items.length - 1);
+        if (next !== value) {
+            onChange(next);
+        }
     }
 
     return (
-        <div className="duration-wheel-column">
+        <div
+            ref={columnRef}
+            className={`duration-wheel-column ${locked ? "locked" : ""}`}
+        >
             <div
                 className="duration-wheel-list"
                 ref={listRef}
@@ -65,17 +89,15 @@ function DurationWheel({ value, min, max, onChange }) {
     );
 }
 
-function DurationScrollPicker({ durationMinutes, onDurationChange }) {
-    const totalSeconds = Math.max(5, Math.max(1, durationMinutes) * 60);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    function publish(nextHours, nextMinutes, nextSeconds) {
-        const combined = Math.max(5, nextHours * 3600 + nextMinutes * 60 + nextSeconds);
-        onDurationChange(Math.max(1, Math.ceil(combined / 60)));
-    }
-
+function DurationScrollPicker({
+    hours,
+    minutes,
+    seconds,
+    onHoursChange,
+    onMinutesChange,
+    onSecondsChange,
+    locked = false,
+}) {
     return (
         <div className="duration-picker">
             <div className="duration-picker-frame">
@@ -85,19 +107,22 @@ function DurationScrollPicker({ durationMinutes, onDurationChange }) {
                         value={hours}
                         min={0}
                         max={23}
-                        onChange={(next) => publish(next, minutes, seconds)}
+                        locked={locked}
+                        onChange={onHoursChange}
                     />
                     <DurationWheel
                         value={minutes}
                         min={0}
                         max={59}
-                        onChange={(next) => publish(hours, next, seconds)}
+                        locked={locked}
+                        onChange={onMinutesChange}
                     />
                     <DurationWheel
                         value={seconds}
                         min={0}
                         max={59}
-                        onChange={(next) => publish(hours, minutes, next)}
+                        locked={locked}
+                        onChange={onSecondsChange}
                     />
                 </div>
                 <div className="duration-picker-labels">

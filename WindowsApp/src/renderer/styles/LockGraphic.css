@@ -1,0 +1,50 @@
+.lock-graphic {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: min(34vw, 172px);
+    height: min(34vw, 172px);
+    margin: 0 auto;
+}
+
+.lock-graphic-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.lock-body,
+.lock-shackle {
+    stroke: #30d158;
+    fill: none;
+    transition: stroke 0.65s ease;
+}
+
+.lock-body {
+    stroke-width: 9;
+    fill: #30d158;
+    fill-opacity: 0;
+}
+
+.lock-shackle {
+    transform-origin: 88px 52px;
+    transition: stroke 0.65s ease, transform 0.65s ease;
+}
+
+.lock-graphic.locked .lock-body,
+.lock-graphic.locked .lock-shackle {
+    stroke: #ff453a;
+}
+
+.lock-graphic.locked .lock-shackle {
+    transform: rotate(0deg);
+}
+
+.lock-graphic:not(.locked) .lock-shackle {
+    transform: rotate(42deg);
+}
+
+.lock-keyhole-top,
+.lock-keyhole-bottom {
+    fill: #000000;
+}

@@ -1,23 +1,8 @@
 import "../styles/BlockerSetup.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DurationScrollPicker from "../components/DurationScrollPicker";
+import LockGraphic from "../components/LockGraphic";
 import { getUserTotalPoints, saveSessionPoints, signOut } from "../services/SupabaseClient";
-
-const CANDIDATE_APPS = [
-    { name: "Instagram", tokens: ["instagram"], domains: ["instagram.com", "www.instagram.com"] },
-    { name: "TikTok", tokens: ["tiktok"], domains: ["tiktok.com"] },
-    { name: "YouTube", tokens: ["youtube"], domains: ["youtube.com", "www.youtube.com"] },
-    { name: "X (Twitter)", tokens: ["twitter", "tweetdeck"], domains: ["twitter.com", "x.com"] },
-    { name: "Reddit", tokens: ["reddit"], domains: ["reddit.com"] },
-    { name: "Facebook", tokens: ["facebook"], domains: ["facebook.com"] },
-    { name: "Notepad (test)", tokens: ["notepad"], domains: [] },
-];
-
-const MODES = [
-    { id: "breathing", label: "Breathing", hint: "Pause, then through" },
-    { id: "reflect", label: "Reflect", hint: "Purpose + your note" },
-    { id: "hard", label: "Hard block", hint: "No way through" },
-];
 
 export function strictnessToMode(strictness) {
     if (strictness === "gentle") return "breathing";
@@ -26,58 +11,41 @@ export function strictnessToMode(strictness) {
     return "breathing";
 }
 
-function formatRemaining(ms) {
-    if (ms == null) return "";
-    const total = Math.max(0, Math.round(ms / 1000));
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${m}:${String(s).padStart(2, "0")}`;
+function normalizeWebsite(input) {
+    let value = input.trim().toLowerCase();
+    if (!value) return null;
+    value = value.replace(/^https?:\/\//, "").replace(/^www\./, "");
+    value = value.split("/")[0].split("?")[0];
+    if (!value || !value.includes(".")) return null;
+    return value;
 }
 
-function filterApps(apps, query) {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return apps;
-
-    return apps
-        .map((app) => {
-            const label = app.name.toLowerCase();
-            const compactLabel = label.replace(/\s/g, "");
-            const compactQuery = normalizedQuery.replace(/\s/g, "");
-            const score =
-                label === normalizedQuery
-                    ? 0
-                    : label.startsWith(normalizedQuery)
-                      ? 1
-                      : compactLabel.startsWith(compactQuery)
-                        ? 2
-                        : label.includes(normalizedQuery)
-                          ? 3
-                          : compactLabel.includes(compactQuery)
-                            ? 4
-                            : 100;
-            return { app, score };
-        })
-        .filter(({ score }) => score < 100)
-        .sort((a, b) => a.score - b.score || a.app.name.localeCompare(b.app.name))
-        .map(({ app }) => app);
+function formatDurationPill(hours, minutes) {
+    if (hours > 0 && minutes === 0) return `${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m`;
+    return "5m";
 }
 
 function BlockerSetup({ session, defaultMode = "breathing" }) {
-    const [view, setView] = useState("session");
-    const [selected, setSelected] = useState(() => new Set());
-    const [query, setQuery] = useState("");
+    const [view, setView] = useState("duration");
+    const [websites, setWebsites] = useState([]);
+    const [urlInput, setUrlInput] = useState("");
+    const [urlError, setUrlError] = useState("");
+    const [hours, setHours] = useState(0);
+    const [minutes, setMinutes] = useState(30);
+    const [seconds, setSeconds] = useState(0);
     const [mode, setMode] = useState(defaultMode);
-    const [duration, setDuration] = useState(30);
     const [active, setActive] = useState(null);
     const [now, setNow] = useState(Date.now());
     const [points, setPoints] = useState(0);
     const wasActiveRef = useRef(false);
     const lastAwardedEndedAtRef = useRef(null);
 
-    const email = session?.user?.email || "your account";
-    const visibleApps = useMemo(() => filterApps(CANDIDATE_APPS, query), [query]);
-    const selectedCount = selected.size;
-    const canLockIn = selectedCount > 0;
+    const sessionRunning = !!active;
+    const selectedCount = websites.length;
+    const totalSeconds = Math.max(5, hours * 3600 + minutes * 60 + seconds);
+    const durationMinutes = Math.max(1, Math.ceil(totalSeconds / 60));
 
     useEffect(() => {
         setMode(defaultMode);
@@ -131,30 +99,49 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
     }, [session.user.id]);
 
     useEffect(() => {
-        if (!active) return;
+        if (!active?.endsAt) return;
         const id = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(id);
     }, [active]);
 
-    function toggle(name) {
-        setSelected((prev) => {
-            const next = new Set(prev);
-            next.has(name) ? next.delete(name) : next.add(name);
-            return next;
-        });
+    useEffect(() => {
+        if (!active?.endsAt) return;
+        const remainingMs = Math.max(0, active.endsAt - now);
+        const totalSeconds = Math.floor(remainingMs / 1000);
+        setHours(Math.floor(totalSeconds / 3600));
+        setMinutes(Math.floor((totalSeconds % 3600) / 60));
+        setSeconds(totalSeconds % 60);
+    }, [active, now]);
+
+    function addWebsite() {
+        const normalized = normalizeWebsite(urlInput);
+        if (!normalized) {
+            setUrlError("Enter a valid website (e.g. instagram.com)");
+            return;
+        }
+        if (websites.includes(normalized)) {
+            setUrlError("That website is already in your list");
+            return;
+        }
+        setWebsites((prev) => [...prev, normalized].sort());
+        setUrlInput("");
+        setUrlError("");
+    }
+
+    function removeWebsite(domain) {
+        if (sessionRunning) return;
+        setWebsites((prev) => prev.filter((item) => item !== domain));
     }
 
     async function handleLockIn() {
-        const chosen = CANDIDATE_APPS.filter((a) => selected.has(a.name));
-        const apps = chosen.flatMap((a) => a.tokens);
-        const appLabels = chosen.map((a) => a.name);
-        const domains = chosen.flatMap((a) => a.domains || []);
+        if (selectedCount === 0) return;
+        const domains = websites.flatMap((domain) => [domain, `www.${domain}`]);
         const res = await window.tether?.startSession({
-            apps,
-            appLabels,
+            apps: [],
+            appLabels: websites,
             domains,
             mode,
-            durationMinutes: duration,
+            durationMinutes,
         });
         if (res && !res.ok) {
             alert(res.error);
@@ -172,163 +159,157 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
         await signOut();
     }
 
-    if (active) {
-        const remaining = active.endsAt ? active.endsAt - now : null;
-        const modeLabel = MODES.find((m) => m.id === active.mode)?.label || active.mode;
+    if (view === "websites") {
         return (
-            <div className="session-shell">
-                <div className="session-inner">
-                    <div className="session-header">
-                        <span className="session-account">{email} · {points} pts</span>
-                        <button type="button" className="session-signout" onClick={handleSignOut}>
-                            Sign out
-                        </button>
-                    </div>
-
-                    <div className="session-active">
-                        <span className="session-badge">Session active</span>
-                        <div className="session-timer">{formatRemaining(remaining)}</div>
-                        <p className="session-meta">
-                            {modeLabel} · blocking {active.appLabels?.length || 0} app
-                            {(active.appLabels?.length || 0) === 1 ? "" : "s"}
-                        </p>
-                        <div className="session-apps">
-                            {(active.appLabels || []).map((a) => (
-                                <span key={a} className="session-app-tag">{a}</span>
-                            ))}
-                        </div>
-                        {active.mode === "hard" ? (
-                            <p className="session-locked">
-                                Hard session — can&apos;t be ended early. Hold tight until the timer runs out.
-                            </p>
-                        ) : (
-                            <button type="button" className="session-stop" onClick={handleStopSession}>
-                                End session early
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    if (view === "apps") {
-        return (
-            <div className="blocker">
-                <div className="blocker-frame">
-                    <div className="blocker-topbar">
-                        <button type="button" className="blocker-back" onClick={() => setView("session")}>
-                            <span className="blocker-back-chevron" aria-hidden />
+            <div className="tether-screen">
+                <div className="tether-frame">
+                    <div className="tether-topbar">
+                        <button
+                            type="button"
+                            className="tether-back"
+                            onClick={() => setView("duration")}
+                        >
+                            <span className="tether-back-chevron" aria-hidden />
                             Back
                         </button>
+                        <span className="tether-topbar-duration">
+                            {formatDurationPill(hours, minutes)}
+                        </span>
+                        <span className="tether-topbar-spacer" aria-hidden />
                     </div>
 
-                    <h1 className="blocker-title">Block Apps</h1>
-                    <p className="blocker-count">{selectedCount} apps selected</p>
+                    <h1 className="tether-title">Choose websites</h1>
+                    <p className="tether-subtitle-count">
+                        {selectedCount} website{selectedCount === 1 ? "" : "s"} selected
+                    </p>
 
-                    <label className="blocker-search">
-                        <span className="blocker-search-icon" aria-hidden />
-                        <input
-                            type="search"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search"
-                            spellCheck={false}
-                        />
-                    </label>
-
-                    <div className="blocker-grid">
-                        {visibleApps.map((app) => {
-                            const isOn = selected.has(app.name);
-                            return (
-                                <button
-                                    key={app.name}
-                                    type="button"
-                                    className={`blocker-app ${isOn ? "on" : ""}`}
-                                    onClick={() => toggle(app.name)}
-                                >
-                                    <span className="blocker-app-icon-wrap">
-                                        <span className="blocker-app-icon">{app.name.charAt(0)}</span>
-                                        {isOn && (
-                                            <span className="blocker-app-check" aria-hidden>
-                                                <svg viewBox="0 0 24 24" width="14" height="14">
-                                                    <path
-                                                        d="M6 12.5 L10 16.5 L18 8"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        strokeWidth="2.5"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                    />
-                                                </svg>
-                                            </span>
-                                        )}
-                                    </span>
-                                    <span className="blocker-app-label">{app.name}</span>
-                                </button>
-                            );
-                        })}
+                    <div className="tether-url-row">
+                        <label className="tether-search">
+                            <span className="tether-search-icon" aria-hidden />
+                            <input
+                                type="text"
+                                value={urlInput}
+                                onChange={(e) => {
+                                    setUrlInput(e.target.value);
+                                    setUrlError("");
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        addWebsite();
+                                    }
+                                }}
+                                placeholder="e.g. instagram.com"
+                                spellCheck={false}
+                                disabled={sessionRunning}
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            className="tether-url-add"
+                            onClick={addWebsite}
+                            disabled={sessionRunning}
+                        >
+                            Add
+                        </button>
                     </div>
+
+                    {urlError && <p className="tether-error">{urlError}</p>}
+
+                    <ul className="tether-url-list">
+                        {websites.length === 0 ? (
+                            <li className="tether-url-empty">No websites added yet</li>
+                        ) : (
+                            websites.map((domain) => (
+                                <li key={domain} className="tether-url-item">
+                                    <span>{domain}</span>
+                                    {!sessionRunning && (
+                                        <button
+                                            type="button"
+                                            className="tether-url-remove"
+                                            onClick={() => removeWebsite(domain)}
+                                            aria-label={`Remove ${domain}`}
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </li>
+                            ))
+                        )}
+                    </ul>
+
+                    <button
+                        type="button"
+                        className="tether-done"
+                        onClick={() => setView("duration")}
+                    >
+                        Done · {selectedCount} website{selectedCount === 1 ? "" : "s"}
+                    </button>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="session-shell">
-            <div className="session-inner">
-                <div className="session-header">
-                    <span className="session-account">{email} · {points} pts</span>
-                    <button type="button" className="session-signout" onClick={handleSignOut}>
-                        Sign out
-                    </button>
-                </div>
+        <div className="tether-screen tether-screen-duration">
+            <div className="tether-frame tether-frame-duration">
+                <button type="button" className="tether-logout" onClick={handleSignOut}>
+                    Log out
+                </button>
 
-                <h1 className="session-heading">Start session</h1>
-                <p className="session-subheading">Set your focus time, pick apps, then lock in.</p>
+                <h1 className="tether-brand">Tether</h1>
+                <p className="tether-subtitle">
+                    {sessionRunning
+                        ? "Session in progress"
+                        : "Set a session duration"}
+                </p>
 
-                <p className="session-section-label">Duration</p>
                 <DurationScrollPicker
-                    durationMinutes={duration}
-                    onDurationChange={setDuration}
+                    hours={hours}
+                    minutes={minutes}
+                    seconds={seconds}
+                    onHoursChange={setHours}
+                    onMinutesChange={setMinutes}
+                    onSecondsChange={setSeconds}
+                    locked={sessionRunning}
                 />
 
-                <p className="session-section-label">Mode</p>
-                <div className="session-modes">
-                    {MODES.map((m) => (
-                        <button
-                            key={m.id}
-                            type="button"
-                            className={`session-mode ${mode === m.id ? "on" : ""}`}
-                            onClick={() => setMode(m.id)}
-                        >
-                            <span className="session-mode-label">{m.label}</span>
-                            <span className="session-mode-hint">{m.hint}</span>
-                        </button>
-                    ))}
+                <div className="tether-lock-wrap">
+                    <LockGraphic locked={sessionRunning} />
                 </div>
-
-                <p className="session-section-label">Apps</p>
-                <button type="button" className="session-select-apps" onClick={() => setView("apps")}>
-                    <span className="session-select-apps-text">
-                        <span className="session-select-apps-title">Select apps to block</span>
-                        <span className="session-select-apps-sub">
-                            {selectedCount === 0
-                                ? "No apps selected yet"
-                                : `${selectedCount} app${selectedCount === 1 ? "" : "s"} selected`}
-                        </span>
-                    </span>
-                    <span className="session-select-apps-chevron" aria-hidden>›</span>
-                </button>
 
                 <button
                     type="button"
-                    className="session-lockin"
-                    disabled={!canLockIn}
+                    className="tether-selected-pill"
+                    onClick={() => !sessionRunning && setView("websites")}
+                    disabled={sessionRunning}
+                >
+                    <span className="tether-selected-dot" aria-hidden />
+                    <span>
+                        Selected Websites · {selectedCount}
+                    </span>
+                </button>
+
+                {sessionRunning && active?.mode === "hard" ? (
+                    <p className="tether-session-hint">
+                        Hard session — hold tight until the timer runs out.
+                    </p>
+                ) : sessionRunning && active?.mode !== "hard" ? (
+                    <button type="button" className="tether-end-early" onClick={handleStopSession}>
+                        End session early
+                    </button>
+                ) : null}
+
+                <button
+                    type="button"
+                    className="tether-lockin"
+                    disabled={sessionRunning || selectedCount === 0}
                     onClick={handleLockIn}
                 >
-                    {canLockIn ? `Lock in · ${selectedCount} apps` : "Select apps to lock in"}
+                    {sessionRunning ? "Session Running" : "Lock-In!"}
                 </button>
+
+                <p className="tether-points">{points} pts</p>
             </div>
         </div>
     );

@@ -33,20 +33,34 @@
     grid-template-columns: repeat(3, 1fr);
     height: 168px;
     overflow: hidden;
+    touch-action: none;
 }
 
 .duration-wheel-column {
     height: 100%;
     overflow: hidden;
+    cursor: ns-resize;
+    touch-action: none;
+}
+
+.duration-wheel-column.locked {
+    cursor: default;
+    pointer-events: none;
 }
 
 .duration-wheel-list {
     height: 100%;
     overflow-y: auto;
+    overscroll-behavior: contain;
     scroll-snap-type: y mandatory;
     scrollbar-width: none;
     padding: 56px 0;
-    box-sizing: content-box;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.duration-wheel-column:not(.locked) .duration-wheel-list {
+    pointer-events: auto;
 }
 
 .duration-wheel-list::-webkit-scrollbar {
@@ -74,20 +88,24 @@
 }
 
 .duration-picker-labels {
-    position: relative;
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
     z-index: 2;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    margin-top: -56px;
     height: 56px;
     align-items: center;
     pointer-events: none;
-    padding: 0 8px;
 }
 
 .duration-picker-labels span {
     color: #b0b0b8;
     font-size: 0.95rem;
     font-weight: 700;
-    padding-left: 42%;
+    line-height: 1;
+    padding-left: 46%;
+    white-space: nowrap;
 }

@@ -83,7 +83,7 @@ function AuthScreen() {
 
                 {/* Heading */}
                 <div className="heading-group">
-                    <h1 className="title">{isLogin ? "Welcome back" : "Create an account"}</h1>
+                    <h1 className="title">{isLogin ? "Welcome back!!!" : "Create an account"}</h1>
                     <p className="subtitle">
                         {isLogin
                             ? "Log in to continue your focus journey"

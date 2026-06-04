@@ -1,5 +1,7 @@
-.blocker {
+.tether-screen {
     min-height: 100vh;
+    height: 100vh;
+    overflow-y: auto;
     background: #000000;
     color: #ffffff;
     font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -8,27 +10,168 @@
     justify-content: center;
     align-items: flex-start;
     padding: 24px 16px 32px;
+    box-sizing: border-box;
 }
 
-.blocker-frame {
+.tether-frame {
     width: 84%;
     max-width: 620px;
-    min-height: 90vh;
+    height: 100%;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
-.blocker-topbar {
+.tether-screen-duration {
+    overflow: hidden;
+}
+
+.tether-frame-duration {
+    align-items: stretch;
+}
+
+.tether-logout {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    color: #0a84ff;
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 40px;
+}
+
+.tether-brand {
+    font-size: clamp(2.2rem, 5vw, 2.9rem);
+    font-weight: 700;
+    letter-spacing: 0;
+    margin-bottom: 14px;
+}
+
+.tether-subtitle {
+    color: #8e8e96;
+    font-size: 1.15rem;
+    margin-bottom: 28px;
+}
+
+.tether-subtitle-count {
+    color: #92929a;
+    font-size: 1.15rem;
+    margin-top: 8px;
+    margin-bottom: 24px;
+}
+
+.tether-lock-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    margin: 20px 0;
+}
+
+.tether-selected-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    align-self: center;
+    padding: 10px 18px;
+    background: #1f1f22;
+    border: none;
+    border-radius: 18px;
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    margin-bottom: 24px;
+}
+
+.tether-selected-pill:disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+.tether-selected-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #0a84ff;
+    flex-shrink: 0;
+}
+
+.tether-lockin {
+    width: 100%;
+    height: 70px;
+    background: #1f1f22;
+    border: none;
+    border-radius: 16px;
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.tether-lockin:disabled {
+    color: #6d6d73;
+    cursor: default;
+}
+
+.tether-lockin:not(:disabled):hover {
+    filter: brightness(1.08);
+}
+
+.tether-end-early {
+    align-self: center;
+    margin-bottom: 16px;
+    padding: 12px 24px;
+    background: transparent;
+    border: 1px solid #3a3d45;
+    border-radius: 12px;
+    color: #8f8f95;
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.tether-end-early:hover {
+    color: #ffffff;
+    border-color: #5a5d65;
+}
+
+.tether-session-hint {
+    text-align: center;
+    color: #92929a;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    max-width: 320px;
+    align-self: center;
+}
+
+.tether-points {
+    text-align: center;
+    color: #5e5e66;
+    font-size: 0.85rem;
+    margin-top: 16px;
+}
+
+.tether-topbar {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    width: 100%;
+    margin-bottom: 28px;
 }
 
-.blocker-back {
+.tether-back {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    justify-self: start;
     background: none;
     border: none;
     color: #0a84ff;
@@ -36,18 +179,17 @@
     font-family: inherit;
     cursor: pointer;
     padding: 0;
-    justify-self: start;
 }
 
-.blocker-back-chevron {
+.tether-back-chevron {
     display: inline-block;
     width: 18px;
     height: 18px;
     position: relative;
 }
 
-.blocker-back-chevron::before,
-.blocker-back-chevron::after {
+.tether-back-chevron::before,
+.tether-back-chevron::after {
     content: "";
     position: absolute;
     left: 55%;
@@ -58,59 +200,50 @@
     transform-origin: left center;
 }
 
-.blocker-back-chevron::before {
+.tether-back-chevron::before {
     top: 28%;
     transform: rotate(-45deg);
 }
 
-.blocker-back-chevron::after {
+.tether-back-chevron::after {
     bottom: 28%;
     transform: rotate(45deg);
 }
 
-.blocker-duration-pill {
+.tether-topbar-duration {
     justify-self: center;
     color: #8e8e96;
     font-size: 1.05rem;
     font-weight: 600;
 }
 
-.blocker-signout {
+.tether-topbar-spacer {
     justify-self: end;
-    background: none;
-    border: none;
-    color: #0a84ff;
-    font-size: 0.9rem;
-    font-family: inherit;
-    cursor: pointer;
-    padding: 0;
 }
 
-.blocker-title {
-    margin-top: 40px;
+.tether-title {
     font-size: clamp(2rem, 5vw, 2.5rem);
     font-weight: 700;
-    letter-spacing: 0;
 }
 
-.blocker-count {
-    margin-top: 10px;
-    color: #92929a;
-    font-size: 1.15rem;
+.tether-url-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
 }
 
-.blocker-search {
+.tether-search {
+    flex: 1;
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-top: 26px;
     height: 64px;
     padding: 0 18px;
     background: #1f1f22;
     border-radius: 18px;
 }
 
-.blocker-search-icon {
+.tether-search-icon {
     width: 26px;
     height: 26px;
     flex-shrink: 0;
@@ -119,7 +252,7 @@
     position: relative;
 }
 
-.blocker-search-icon::after {
+.tether-search-icon::after {
     content: "";
     position: absolute;
     width: 10px;
@@ -131,100 +264,88 @@
     border-radius: 2px;
 }
 
-.blocker-search input {
+.tether-search input {
     flex: 1;
     background: transparent;
     border: none;
     outline: none;
     color: #ffffff;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-family: inherit;
 }
 
-.blocker-search input::placeholder {
+.tether-search input::placeholder {
     color: #9b9ba3;
 }
 
-.blocker-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    column-gap: 24px;
-    row-gap: 28px;
-    margin-top: 30px;
+.tether-search input:disabled {
+    opacity: 0.6;
+}
+
+.tether-url-add {
+    height: 64px;
+    padding: 0 22px;
+    background: #0a84ff;
+    border: none;
+    border-radius: 18px;
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.tether-url-add:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.tether-error {
+    color: #ff453a;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+}
+
+.tether-url-list {
+    list-style: none;
     flex: 1;
     overflow-y: auto;
-    padding-bottom: 10px;
-    align-content: start;
-}
-
-.blocker-app {
+    margin: 16px 0 24px;
+    padding: 0;
     display: flex;
     flex-direction: column;
+    gap: 10px;
+    min-height: 120px;
+}
+
+.tether-url-item {
+    display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: #1f1f22;
+    border-radius: 14px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.tether-url-empty {
+    color: #92929a;
+    padding: 14px 0;
+    font-size: 1rem;
+}
+
+.tether-url-remove {
     background: none;
     border: none;
-    padding: 0;
+    color: #0a84ff;
+    font-size: 1.5rem;
+    line-height: 1;
     cursor: pointer;
-    font-family: inherit;
+    padding: 0 4px;
 }
 
-.blocker-app-icon-wrap {
-    position: relative;
-    width: 74px;
-    height: 74px;
-}
-
-.blocker-app-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    border-radius: 16px;
-    background: linear-gradient(145deg, #2a2d35, #1a1c22);
-    color: #ffffff;
-    font-size: 1.6rem;
-    font-weight: 700;
-    transition: opacity 0.15s ease, filter 0.15s ease;
-}
-
-.blocker-app:not(.on) .blocker-app-icon {
-    opacity: 0.45;
-    filter: grayscale(1);
-}
-
-.blocker-app-check {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: #0a84ff;
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.blocker-app-label {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #85858c;
-    text-align: center;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.blocker-app.on .blocker-app-label {
-    color: #ffffff;
-}
-
-.blocker-start {
-    margin-top: 18px;
+.tether-done {
     width: 100%;
     height: 70px;
     background: #0a84ff;
@@ -235,307 +356,8 @@
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    transition: filter 0.15s ease;
 }
 
-.blocker-start:hover:not(:disabled) {
+.tether-done:hover {
     filter: brightness(1.08);
-}
-
-.blocker-start:disabled {
-    opacity: 0.45;
-    cursor: default;
-}
-
-.session-active {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    margin-top: 60px;
-    gap: 14px;
-    flex: 1;
-}
-
-.session-badge {
-    font-size: 0.8rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #0a84ff;
-    font-weight: 600;
-}
-
-.session-timer {
-    font-size: 4rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-}
-
-.session-meta {
-    color: #92929a;
-    font-size: 1rem;
-}
-
-.session-apps {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 6px;
-}
-
-.session-app-tag {
-    padding: 6px 12px;
-    background: #1f1f22;
-    border: 1px solid #2a2d35;
-    border-radius: 999px;
-    font-size: 0.85rem;
-    color: #ffffff;
-}
-
-.blocker-stop {
-    margin-top: 24px;
-    padding: 14px 28px;
-    background: transparent;
-    border: 1px solid #3a3d45;
-    border-radius: 12px;
-    color: #8f8f95;
-    font-size: 0.95rem;
-    font-family: inherit;
-    cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.blocker-stop:hover {
-    color: #ffffff;
-    border-color: #5a5d65;
-}
-
-.session-locked {
-    margin-top: 24px;
-    max-width: 340px;
-    text-align: center;
-    color: #92929a;
-    font-size: 0.9rem;
-    line-height: 1.5;
-}
-
-.session-shell {
-    min-height: 100vh;
-    background: #0d0d0f;
-    color: #ffffff;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    display: flex;
-    justify-content: center;
-    padding: 40px 24px;
-}
-
-.session-inner {
-    width: 100%;
-    max-width: 560px;
-    display: flex;
-    flex-direction: column;
-}
-
-.session-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 32px;
-}
-
-.session-account {
-    font-size: 0.95rem;
-    color: #8f8f95;
-}
-
-.session-signout {
-    background: none;
-    border: none;
-    color: #0a84ff;
-    font-size: 0.95rem;
-    font-family: inherit;
-    cursor: pointer;
-    padding: 0;
-}
-
-.session-heading {
-    font-size: 2.25rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-}
-
-.session-subheading {
-    margin-top: 8px;
-    margin-bottom: 28px;
-    color: #8f8f95;
-    font-size: 1rem;
-    line-height: 1.4;
-}
-
-.session-section-label {
-    margin-bottom: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #8f8f95;
-}
-
-.session-durations {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 24px;
-}
-
-.session-chip {
-    flex: 1;
-    padding: 14px 8px;
-    background: #1f1f22;
-    border: 1px solid #2a2d35;
-    border-radius: 12px;
-    color: #8f8f95;
-    font-size: 1rem;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.session-chip.on {
-    color: #ffffff;
-    border-color: #0a84ff;
-    background: #16222e;
-}
-
-.session-modes {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 24px;
-}
-
-.session-mode {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 14px 10px;
-    background: #1f1f22;
-    border: 1px solid #2a2d35;
-    border-radius: 12px;
-    color: #8f8f95;
-    font-family: inherit;
-    cursor: pointer;
-    text-align: center;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.session-mode.on {
-    color: #ffffff;
-    border-color: #0a84ff;
-    background: #16222e;
-}
-
-.session-mode-label {
-    font-size: 0.9rem;
-    font-weight: 700;
-}
-
-.session-mode-hint {
-    font-size: 0.7rem;
-    color: #8f8f95;
-}
-
-.session-mode.on .session-mode-hint {
-    color: #8f8f95;
-}
-
-.session-select-apps {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 18px;
-    margin-bottom: 28px;
-    background: #1f1f22;
-    border: 1px solid #2a2d35;
-    border-radius: 14px;
-    color: inherit;
-    font-family: inherit;
-    cursor: pointer;
-    text-align: left;
-    transition: border-color 0.15s ease;
-}
-
-.session-select-apps:hover {
-    border-color: #3a3d45;
-}
-
-.session-select-apps-text {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.session-select-apps-title {
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: #ffffff;
-}
-
-.session-select-apps-sub {
-    font-size: 0.9rem;
-    color: #8f8f95;
-}
-
-.session-select-apps-chevron {
-    font-size: 1.75rem;
-    font-weight: 300;
-    color: #0a84ff;
-    line-height: 1;
-}
-
-.session-lockin {
-    width: 100%;
-    height: 56px;
-    background: #0a84ff;
-    border: none;
-    border-radius: 14px;
-    color: #ffffff;
-    font-size: 1.05rem;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-    transition: filter 0.15s ease;
-}
-
-.session-lockin:hover:not(:disabled) {
-    filter: brightness(1.08);
-}
-
-.session-lockin:disabled {
-    background: #323232;
-    color: #8f8f95;
-    cursor: default;
-}
-
-.session-stop {
-    margin-top: 24px;
-    padding: 14px 28px;
-    background: transparent;
-    border: 1px solid #3a3d45;
-    border-radius: 12px;
-    color: #8f8f95;
-    font-size: 0.95rem;
-    font-family: inherit;
-    cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.session-stop:hover {
-    color: #ffffff;
-    border-color: #5a5d65;
 }

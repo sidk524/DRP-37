@@ -6,14 +6,14 @@
 }
 
 :root {
-    --bg:           #111111;
-    --surface:      #2a2a2a;
-    --surface-btn:  #323232;
-    --border:       #3a3a3a;
+    --bg:           #000000;
+    --surface:      #1f1f22;
+    --surface-btn:  #2b2b30;
+    --border:       #1d1d20;
     --text-primary: #ffffff;
-    --text-subtle:  #888888;
-    --accent:       #4a9eff;
-    --radius:       14px;
+    --text-subtle:  #8f8f95;
+    --accent:       #0a84ff;
+    --radius:       18px;
     --font:         'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -33,10 +33,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 100%;
-    max-width: 400px;
-    padding: 40px 32px 32px;
-    gap: 24px;
+    width: 84%;
+    max-width: 560px;
+    padding: 40px 0 32px;
+    gap: 20px;
 }
 
 /* ── Logo ───────────────────────────────────────────────────── */
@@ -80,7 +80,7 @@
 }
 
 .title {
-    font-size: 1.75rem;
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.02em;
@@ -120,7 +120,7 @@
 
 .input-field:focus {
     border-color: var(--accent);
-    background: #2f2f2f;
+    background: #252528;
 }
 
 /* ── Continue Button ────────────────────────────────────────── */
@@ -139,8 +139,13 @@
     margin-top: 4px;
 }
 
-.btn-continue:hover {
-    background: #3d3d3d;
+.btn-continue:not(:disabled):hover {
+    background: #35353a;
+    color: var(--text-primary);
+}
+
+.btn-continue:not(:disabled) {
+    background: var(--surface-btn);
     color: var(--text-primary);
 }
 
