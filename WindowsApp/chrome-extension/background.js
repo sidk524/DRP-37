@@ -1,10 +1,12 @@
 const BRIDGE_URL = "http://127.0.0.1:17894/api/block-state";
 const STREAM_URL = "http://127.0.0.1:17894/api/block-state/stream";
 const RULE_ID_BASE = 1000;
+const CONTINUE_GRACE_MS = 60 * 1000;
 
 let stream = null;
 let pollTimer = null;
 let lastStateKey = "";
+let currentState = { active: false, domains: [] };
 
 function normalizeHost(value) {
     return String(value || "")
@@ -14,6 +16,10 @@ function normalizeHost(value) {
         .split("/")[0]
         .split("?")[0]
         .replace(/:\d+$/, "");
+}
+
+function ruleFilter(host) {
+    return `||${host}`;
 }
 
 function expandDomains(domains = []) {
@@ -34,6 +40,29 @@ function expandDomains(domains = []) {
 function stateKey(state) {
     const hosts = expandDomains(state?.domains || []).sort().join(",");
     return `${state?.active ? "1" : "0"}:${hosts}:${state?.endsAt || 0}`;
+}
+
+async function getAllowedUntil() {
+    const data = await chrome.storage.local.get(["allowedUntil"]);
+    return data.allowedUntil || {};
+}
+
+async function setAllowedUntil(allowedUntil) {
+    await chrome.storage.local.set({ allowedUntil });
+}
+
+async function activeHostsForState(state) {
+    const now = Date.now();
+    const allowedUntil = await getAllowedUntil();
+    let changed = false;
+    for (const [host, until] of Object.entries(allowedUntil)) {
+        if (!Number.isFinite(until) || until <= now) {
+            delete allowedUntil[host];
+            changed = true;
+        }
+    }
+    if (changed) await setAllowedUntil(allowedUntil);
+    return expandDomains(state.domains).filter((host) => (allowedUntil[host] || 0) <= now);
 }
 
 async function fetchState() {
@@ -61,7 +90,9 @@ async function clearRules(connected) {
 }
 
 async function applyRules(state) {
-    const key = stateKey(state);
+    currentState = state || { active: false, domains: [] };
+    const hosts = state?.active && state?.domains?.length ? await activeHostsForState(state) : [];
+    const key = `${stateKey(state)}:${hosts.sort().join(",")}`;
     if (key === lastStateKey) return;
 
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
@@ -72,7 +103,6 @@ async function applyRules(state) {
         return;
     }
 
-    const hosts = expandDomains(state.domains);
     if (!hosts.length) {
         await clearRules(true);
         return;
@@ -83,10 +113,10 @@ async function applyRules(state) {
         priority: 1,
         action: {
             type: "redirect",
-            redirect: { extensionPath: "/blocked.html" },
+            redirect: { extensionPath: `/blocked.html?host=${encodeURIComponent(host)}` },
         },
         condition: {
-            urlFilter: `||${host}^`,
+            urlFilter: ruleFilter(host),
             resourceTypes: ["main_frame"],
         },
     }));
@@ -102,6 +132,10 @@ async function applyRules(state) {
             blocking: true,
             domains: state.domains,
             hosts,
+            rules: addRules.map((rule) => ({
+                id: rule.id,
+                filter: rule.condition.urlFilter,
+            })),
             endsAt: state.endsAt,
             mode: state.mode,
             lastError: null,
@@ -116,6 +150,23 @@ async function applyRules(state) {
             lastError: error.message || "Could not apply browser blocking rules.",
         });
     }
+}
+
+async function allowHost(host) {
+    const normalized = normalizeHost(host);
+    if (!normalized) return { ok: false };
+    const allowedUntil = await getAllowedUntil();
+    for (const expanded of expandDomains([normalized])) {
+        allowedUntil[expanded] = Date.now() + CONTINUE_GRACE_MS;
+    }
+    await setAllowedUntil(allowedUntil);
+    lastStateKey = "";
+    await applyRules(currentState);
+    setTimeout(() => {
+        lastStateKey = "";
+        syncFromDesktop();
+    }, CONTINUE_GRACE_MS + 500);
+    return { ok: true, url: `https://${normalized}/` };
 }
 
 async function syncFromDesktop() {
@@ -170,6 +221,12 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.alarms.create("tether-sync", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "tether-sync") syncFromDesktop();
+});
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== "allow-host") return false;
+    allowHost(message.host).then(sendResponse);
+    return true;
 });
 
 connectStream();

@@ -14,7 +14,8 @@ Blocks websites in Chrome or Edge during an active Tether desktop focus session.
 ## How it connects
 
 - The desktop app serves `GET http://127.0.0.1:17894/api/block-state` and a live stream at `/api/block-state/stream`.
-- The extension applies `declarativeNetRequest` rules when `active` is true and redirects blocked sites to `blocked.html`.
+- The extension applies `declarativeNetRequest` rules when `active` is true and redirects blocked sites to the friction page in `blocked.html`.
+- Breathing and reflect modes can continue after a short grace; hard mode stays blocked until the session ends.
 - The extension polls the desktop app as a fallback if the live stream is unavailable.
 
 ## Notes

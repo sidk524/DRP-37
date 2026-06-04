@@ -11,7 +11,7 @@ function renderList(items = []) {
     }
 }
 
-chrome.storage.local.get(["connected", "blocking", "domains", "hosts", "endsAt", "lastError"], (data) => {
+chrome.storage.local.get(["connected", "blocking", "domains", "hosts", "rules", "endsAt", "lastError"], (data) => {
     if (!data.connected) {
         statusEl.className = "err";
         statusEl.textContent = data.lastError || "Desktop app not reachable. Start Tether with npm run dev.";

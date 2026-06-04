@@ -3,32 +3,135 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Blocked by Tether</title>
+  <title>Tether Friction</title>
   <style>
     * { box-sizing: border-box; }
+    :root {
+      --bg: #0d0d0f;
+      --text: #f2f2f2;
+      --subtle: #8a8a93;
+      --accent: #4a9eff;
+    }
     body {
       margin: 0;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: system-ui, sans-serif;
-      background: #0f1419;
-      color: #e8eaed;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: radial-gradient(circle at 50% 42%, #16181d 0%, var(--bg) 70%);
+      color: var(--text);
+      overflow: hidden;
     }
     main {
       text-align: center;
-      max-width: 28rem;
-      padding: 2rem;
+      max-width: 460px;
+      padding: 24px;
+      animation: fade-in 0.6s ease both;
     }
-    h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.75rem; }
-    p { margin: 0; line-height: 1.5; color: #9aa0a6; }
+    .app {
+      color: var(--subtle);
+      font-size: 1.05rem;
+      margin: 0 0 28px;
+    }
+    .breath-stage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 320px;
+      height: 320px;
+      max-width: 80vw;
+      max-height: 80vw;
+      margin: 0 auto 28px;
+    }
+    .breath-circle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 260px;
+      height: 260px;
+      max-width: 68vw;
+      max-height: 68vw;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 45%, rgba(74, 158, 255, 0.35) 0%, rgba(74, 158, 255, 0.12) 55%, rgba(74, 158, 255, 0) 75%);
+      box-shadow: 0 0 80px 10px rgba(74, 158, 255, 0.15);
+      animation: breathe 8s ease-in-out infinite;
+    }
+    .breath-label {
+      font-size: 1.25rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .hint {
+      margin: 0 0 22px;
+      color: var(--subtle);
+      line-height: 1.5;
+    }
+    .title {
+      font-size: 1.8rem;
+      margin: 0 0 14px;
+    }
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 18px 0 8px;
+    }
+    button {
+      width: 100%;
+      padding: 15px 18px;
+      border-radius: 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .chip {
+      background: #1c1e24;
+      border: 1px solid #2a2d35;
+      color: var(--text);
+    }
+    .primary {
+      margin-top: 10px;
+      background: var(--accent);
+      border: none;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .quiet {
+      width: auto;
+      background: none;
+      border: none;
+      color: var(--subtle);
+      padding: 8px 12px;
+    }
+    .hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .lock {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+    @keyframes breathe {
+      0% { transform: scale(0.55); opacity: 0.6; }
+      50% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0.55); opacity: 0.6; }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <h1>Blocked by Tether</h1>
-    <p>This site is blocked for your current focus session. End the session in the Tether desktop app to continue.</p>
+  <main id="app">
+    <p class="app">You're about to open this site</p>
+    <div class="breath-stage">
+      <div class="breath-circle">
+        <span class="breath-label">Breathe in</span>
+      </div>
+    </div>
+    <p class="hint">Take a breath before you scroll.</p>
   </main>
+  <script src="blocked.js"></script>
 </body>
 </html>

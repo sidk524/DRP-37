@@ -24,7 +24,7 @@ Website blocking in the browser uses the extension in `chrome-extension/`. The d
 3. Enable **Developer mode**.
 4. Choose **Load unpacked** and select `WindowsApp/chrome-extension`.
 5. Pin the extension. Its popup should show **Connected** while the desktop app is running.
-6. Lock in a session in the desktop app; blocked sites redirect to the extension block page.
+6. Lock in a session in the desktop app; blocked sites redirect to the extension friction page.
 
 See `chrome-extension/README.md` for details.
 
