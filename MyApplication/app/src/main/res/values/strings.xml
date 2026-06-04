@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">FocusBlock</string>
+    <string name="app_name">Tether</string>
+    <string name="app_blocking_accessibility_description">Closes selected apps while a block session is active.</string>
 </resources>

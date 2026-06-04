@@ -30,11 +30,14 @@ import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -56,6 +59,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,9 +69,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drp37.blocker.data.BlockSessionRepository
+import com.drp37.blocker.data.clearActiveBlockSession
+import com.drp37.blocker.data.isAppBlockingServiceEnabled
 import com.drp37.blocker.data.loadLaunchableApps
+import com.drp37.blocker.data.openAppBlockingSettings
+import com.drp37.blocker.data.saveActiveBlockSession
 import com.drp37.blocker.model.InstalledApp
 import com.drp37.blocker.ui.theme.MyApplicationTheme
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.max
@@ -77,6 +87,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val installedApps = remember { loadLaunchableApps(context) }
     val selectedPackages = remember(installedApps) {
@@ -92,11 +103,40 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var isStartingSession by remember { mutableStateOf(false) }
     var sessionError by remember { mutableStateOf<String?>(null) }
+    var showAccessibilityDialog by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf(BlockerFlowScreen.Duration) }
     val selectedPackageSet = selectedPackages
         .filterValues { it }
         .keys
         .toSet()
+
+    fun showAccessibilityPromptIfNeeded() {
+        if (isAppBlockingServiceEnabled(context)) {
+            if (sessionError == "Enable Tether in Accessibility settings first.") {
+                sessionError = null
+            }
+            showAccessibilityDialog = false
+        } else {
+            sessionError = "Enable Tether in Accessibility settings first."
+            showAccessibilityDialog = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        showAccessibilityPromptIfNeeded()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                showAccessibilityPromptIfNeeded()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(installedApps) {
         runCatching {
@@ -109,6 +149,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
 
             if (restoredRemainingSeconds <= 0) {
                 BlockSessionRepository.endSession(activeSession.id)
+                clearActiveBlockSession(context)
                 return@runCatching
             }
 
@@ -117,6 +158,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
             }
             activeSessionId = activeSession.id
             remainingSeconds = restoredRemainingSeconds
+            saveActiveBlockSession(context, activeSession)
             sessionRunning = true
         }
     }
@@ -137,6 +179,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                 runCatching { BlockSessionRepository.endSession(sessionId) }
             }
             activeSessionId = null
+            clearActiveBlockSession(context)
         }
     }
 
@@ -163,27 +206,32 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                 onMinutesChange = { minutes = it },
                 onSecondsChange = { seconds = it },
                 onStartSession = {
-                    val totalDurationSeconds = (hours * 3600 + minutes * 60 + seconds).takeIf { it > 0 } ?: 5
-                    isStartingSession = true
-                    sessionError = null
-                    coroutineScope.launch {
-                        runCatching {
-                            BlockSessionRepository.createSession(
-                                appsBlocked = selectedPackageSet,
-                                totalDurationSeconds = totalDurationSeconds
-                            )
-                        }.onSuccess { session ->
-                            val elapsedSeconds = Duration.between(
-                                Instant.parse(session.startedAt),
-                                Instant.now()
-                            ).seconds.toInt()
-                            activeSessionId = session.id
-                            remainingSeconds = max(1, session.totalDurationSeconds - elapsedSeconds)
-                            sessionRunning = true
-                        }.onFailure { error ->
-                            sessionError = error.message ?: "Could not start block session."
-                        }.also {
-                            isStartingSession = false
+                    if (!isAppBlockingServiceEnabled(context)) {
+                        showAccessibilityPromptIfNeeded()
+                    } else {
+                        val totalDurationSeconds = (hours * 3600 + minutes * 60 + seconds).takeIf { it > 0 } ?: 5
+                        isStartingSession = true
+                        sessionError = null
+                        coroutineScope.launch {
+                            runCatching {
+                                BlockSessionRepository.createSession(
+                                    appsBlocked = selectedPackageSet,
+                                    totalDurationSeconds = totalDurationSeconds
+                                )
+                            }.onSuccess { session ->
+                                val elapsedSeconds = Duration.between(
+                                    Instant.parse(session.startedAt),
+                                    Instant.now()
+                                ).seconds.toInt()
+                                activeSessionId = session.id
+                                remainingSeconds = max(1, session.totalDurationSeconds - elapsedSeconds)
+                                saveActiveBlockSession(context, session)
+                                sessionRunning = true
+                            }.onFailure { error ->
+                                sessionError = error.message ?: "Could not start block session."
+                            }.also {
+                                isStartingSession = false
+                            }
                         }
                     }
                 },
@@ -194,6 +242,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                             runCatching { BlockSessionRepository.endSession(sessionId) }
                         }
                         activeSessionId = null
+                        clearActiveBlockSession(context)
                         sessionRunning = false
                         isStartingSession = false
                         onLogout()
@@ -201,6 +250,37 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                 }
             )
         }
+    }
+
+    if (showAccessibilityDialog) {
+        AlertDialog(
+            onDismissRequest = { showAccessibilityDialog = false },
+            title = {
+                Text(text = "Enable Accessibility")
+            },
+            text = {
+                Text(
+                    text = "Tether needs its accessibility service to detect when a selected app is opened. During an active session, it uses that access only to send blocked apps back to the home screen. Enable Tether in Accessibility settings, then return here and press Lock-In again."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAccessibilityDialog = false
+                        openAppBlockingSettings(context)
+                    }
+                ) {
+                    Text(text = "OK")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showAccessibilityDialog = false }
+                ) {
+                    Text(text = "Cancel")
+                }
+            }
+        )
     }
 }
 

@@ -3,7 +3,7 @@ package com.drp37.blocker.data
 import android.content.Context
 import com.drp37.blocker.model.BlockList
 
-private const val PREFS_NAME = "focus_block_prefs"
+private const val PREFS_NAME = "tether_prefs"
 private const val KEY_BLOCK_LIST_PACKAGES = "block_list_packages"
 private const val KEY_BLOCK_LIST_DURATION_MINUTES = "block_list_duration_minutes"
 

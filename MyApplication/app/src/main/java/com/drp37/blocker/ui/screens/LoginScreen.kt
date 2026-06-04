@@ -1,4 +1,4 @@
-package com.drp37.blocker.ui.screens
+    package com.drp37.blocker.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
