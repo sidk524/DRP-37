@@ -47,7 +47,7 @@ The server expands known targets through `src/blockTargetRegistry.js` and stores
 | --- | --- |
 | `canonical_targets` | Shared target IDs such as `instagram` or `youtube` |
 | `apps_blocked` | Android package names used by the accessibility service |
-| `domains_blocked` | Website hostnames used by the Windows hosts blocker |
+| `domains_blocked` | Website hostnames used by the Windows Chrome/Edge extension bridge |
 | `process_tokens` | Optional Windows foreground process match tokens |
 
 Unknown Android packages are stored only in `apps_blocked`. Unknown website domains are stored only in `domains_blocked`.

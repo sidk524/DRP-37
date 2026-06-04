@@ -74,6 +74,7 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
     const [points, setPoints] = useState(0);
     const [sessionError, setSessionError] = useState("");
     const [remoteSessionId, setRemoteSessionId] = useState(null);
+    const [extensionStatus, setExtensionStatus] = useState(null);
     const wasActiveRef = useRef(false);
     const lastAwardedEndedAtRef = useRef(null);
     const restoredSessionRef = useRef(false);
@@ -93,6 +94,18 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
             setPoints(totalPoints);
         } catch (error) {
             console.error("Failed to load focus points:", error);
+        }
+    }
+
+    async function refreshExtensionStatus() {
+        if (!window.tether?.getExtensionStatus) return null;
+        try {
+            const status = await window.tether.getExtensionStatus();
+            setExtensionStatus(status);
+            return status;
+        } catch {
+            setExtensionStatus(null);
+            return null;
         }
     }
 
@@ -119,8 +132,11 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
         if (res && !res.ok) {
             throw new Error(res.error);
         }
-        if (res?.warning) {
-            setSessionError(`Session restored, but websites weren't blocked: ${res.warning}`);
+        if (selectedDomains.length) {
+            const status = await refreshExtensionStatus();
+            if (!status?.clientsConnected) {
+                setSessionError("Session started, but Chrome or Edge is not connected. Load the Tether extension to block websites in the browser.");
+            }
         }
         return res?.session || null;
     }
@@ -128,6 +144,12 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
     useEffect(() => {
         refreshPoints();
     }, [session.user.id]);
+
+    useEffect(() => {
+        refreshExtensionStatus();
+        const id = setInterval(refreshExtensionStatus, 4000);
+        return () => clearInterval(id);
+    }, []);
 
     useEffect(() => {
         if (restoredSessionRef.current) return;
@@ -385,6 +407,23 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
                         Selected Websites · {selectedCount}
                     </span>
                 </button>
+
+                {selectedCount > 0 && !sessionRunning && (
+                    <div className="tether-extension-card">
+                        <p className="tether-extension-title">Browser extension setup</p>
+                        <ul>
+                            <li>Desktop app running</li>
+                            <li>
+                                Load <code>WindowsApp/chrome-extension</code> in Chrome or Edge
+                            </li>
+                            <li>
+                                {extensionStatus?.clientsConnected
+                                    ? "Extension connected"
+                                    : "Open the extension popup and check for Connected"}
+                            </li>
+                        </ul>
+                    </div>
+                )}
 
                 {sessionRunning && active?.mode === "hard" ? (
                     <p className="tether-session-hint">

@@ -15,6 +15,19 @@ VITE_WEB_SERVER_URL=http://13.60.4.193:3000
 
 In Electron, API calls go through the main process (no browser CORS). During `npm run dev`, Vite also proxies `/api` to `VITE_WEB_SERVER_URL` as a fallback. After changing `.env`, restart with `npm run dev`.
 
+Website blocking in the browser uses the extension in `chrome-extension/`. The desktop app exposes block state at `http://127.0.0.1:17894`. No admin rights or hosts-file edits are required for websites.
+
+## Chrome/Edge Extension
+
+1. Run `npm run dev` in `WindowsApp/`.
+2. In Chrome, open `chrome://extensions`. In Edge, open `edge://extensions`.
+3. Enable **Developer mode**.
+4. Choose **Load unpacked** and select `WindowsApp/chrome-extension`.
+5. Pin the extension. Its popup should show **Connected** while the desktop app is running.
+6. Lock in a session in the desktop app; blocked sites redirect to the extension block page.
+
+See `chrome-extension/README.md` for details.
+
 Deploy the latest `web-server` to EC2 (push to `main` or run the CI/CD workflow) so `OPTIONS` preflight and CORS headers match the repo. Until then, the desktop app still works via the main-process proxy; a direct browser client to the same host would not.
 
 ## Google sign-in (desktop)

@@ -17,7 +17,7 @@ const { exec } = require("child_process");
 const config = require("./config");
 const { getForegroundApp } = require("./foregroundDetector");
 const overlay = require("./overlayWindow");
-const hosts = require("./hostsBlocker");
+const extensionBridge = require("../extension/extensionBridge");
 
 // Processes we must never terminate, even if a blocklist token would match —
 // killing these can crash the desktop session. A safety net around hard mode.
@@ -163,11 +163,21 @@ function sessionView() {
     };
 }
 
+function extensionBlockState() {
+    return {
+        active: session.active,
+        domains: session.domains,
+        endsAt: session.endsAt,
+        mode: session.mode,
+    };
+}
+
 function broadcast() {
     const view = sessionView();
     for (const win of BrowserWindow.getAllWindows()) {
         win.webContents.send("session:update", view);
     }
+    extensionBridge.notifyStateChange();
 }
 
 function startSession({
@@ -211,18 +221,10 @@ function startSession({
         durationMinutes: safeDurationMinutes,
     };
 
-    // Hard mode also blocks the websites at the network level (hosts file), so
-    // it works for browser tabs, not just native apps. Non-fatal if it can't:
-    // process-killing still applies and we warn the user (e.g. needs admin).
-    let warning = null;
     if (normalizedDomains.length > 0) {
-        const res = hosts.blockDomains(normalizedDomains);
-        if (!res.ok) {
-            warning = res.error;
-            console.warn(`[blocker] website blocking failed: ${res.error}`);
-        } else {
-            console.log(`[blocker] blocked ${res.blocked.length} hostnames via hosts file`);
-        }
+        console.log(
+            `[blocker] website blocking via browser extension (${normalizedDomains.length} domain(s))`
+        );
     }
 
     if (expiryTimer) clearTimeout(expiryTimer);
@@ -232,7 +234,7 @@ function startSession({
         `[blocker] session started · ${session.mode} · ${durationMinutes}m · [${[...blocklist, ...normalizedDomains].join(", ")}]`
     );
     broadcast();
-    return { ok: true, session: sessionView(), warning };
+    return { ok: true, session: sessionView() };
 }
 
 function stopSession(reason = "manual") {
@@ -268,7 +270,6 @@ function stopSession(reason = "manual") {
     };
     graceUntil.clear();
     overlay.hideFriction();
-    hosts.unblockDomains(); // always lift any website block we put in place
     console.log(`[blocker] session stopped (${reason})`);
     broadcast();
     return { ok: true, session: sessionView() };
@@ -278,6 +279,7 @@ function registerIpc() {
     // Session control (invoke -> returns ack).
     ipcMain.handle("session:start", (_e, cfg) => startSession(cfg));
     ipcMain.handle("session:get", () => sessionView());
+    ipcMain.handle("extension:status", () => extensionBridge.status());
 
     // Manual stop. Hard sessions are a commitment — they can't be ended early;
     // only the expiry timer (or app quit) ends them. Breathing/reflect can stop.
@@ -305,10 +307,8 @@ function registerIpc() {
 
 function start() {
     registerIpc();
-
-    // Clear any leftover website block from a previous session that didn't shut
-    // down cleanly (e.g. a crash), so the user is never stuck blocked at launch.
-    hosts.unblockDomains();
+    extensionBridge.setStateProvider(extensionBlockState);
+    extensionBridge.start();
     timer = setInterval(() => {
         tick().catch((err) => console.warn("[blocker] tick error:", err.message));
     }, config.pollIntervalMs);
@@ -334,7 +334,7 @@ function stop() {
     expiryTimer = null;
     globalShortcut.unregisterAll();
     overlay.destroy();
-    hosts.unblockDomains(); // never leave the hosts file blocked after we exit
+    extensionBridge.stop();
 }
 
 module.exports = { start, stop };
