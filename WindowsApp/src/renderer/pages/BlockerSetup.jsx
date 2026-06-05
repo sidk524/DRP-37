@@ -106,10 +106,8 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
 
         const res = await window.tether?.startSession({
             sessionId: serverSession.id,
-            apps: [],
             appLabels: sessionLabels(serverSession),
             domains: serverSession.domains_blocked || [],
-            processTokens: serverSession.process_tokens || [],
             mode,
             durationMinutes: sessionDurationMinutes(serverSession),
             startedAt: sessionStartedAt(serverSession),

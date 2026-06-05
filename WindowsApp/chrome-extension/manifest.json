@@ -1,9 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Tether Website Blocker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Blocks websites during an active Tether desktop focus session.",
-  "permissions": ["declarativeNetRequest", "declarativeNetRequestFeedback", "alarms", "storage"],
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "alarms",
+    "storage",
+    "tabs",
+    "webNavigation"
+  ],
   "host_permissions": [
     "http://127.0.0.1:17894/*",
     "http://*/*",

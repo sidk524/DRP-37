@@ -1,13 +1,15 @@
 const INTENTIONS = ["Check a message", "Post something", "Just looking"];
 const BREATH_SECONDS = 4;
 const BREATH_CYCLES = 3;
+const VALID_MODES = new Set(["breathing", "reflect", "hard"]);
 
 const appEl = document.getElementById("app");
 const params = new URLSearchParams(window.location.search);
 const host = params.get("host") || "this site";
+let mode = params.get("mode") || "breathing";
+if (!VALID_MODES.has(mode)) mode = "breathing";
 
-let mode = "breathing";
-let phase = "breathing";
+let phase = mode === "hard" ? "hard" : "breathing";
 let elapsed = 0;
 let start = 0;
 
@@ -137,9 +139,18 @@ function renderReflect() {
 function renderHard() {
     appEl.textContent = "";
 
-    const lock = document.createElement("div");
-    lock.className = "lock";
-    lock.textContent = "LOCK";
+    const lockWrap = document.createElement("div");
+    lockWrap.className = "lock-wrap";
+    lockWrap.innerHTML = `
+        <svg class="lock-svg" viewBox="0 0 100 100" aria-hidden="true">
+          <g>
+            <path class="lock-shackle" d="M 30 44 A 23 25 0 0 1 76 44"></path>
+          </g>
+          <rect class="lock-body" x="22" y="44" width="64" height="42" rx="9"></rect>
+          <circle class="lock-keyhole-top" cx="54" cy="60" r="7"></circle>
+          <path class="lock-keyhole-bottom" d="M 50.16 62.9 L 57.84 62.9 L 61.68 76.76 L 46.32 76.76 Z"></path>
+        </svg>
+    `;
 
     const title = document.createElement("h1");
     title.className = "title";
@@ -149,7 +160,7 @@ function renderHard() {
     hint.className = "hint";
     hint.textContent = "You set this to hard block. There is no way through until your session ends.";
 
-    appEl.append(lock, title, hint, button("primary", "Go back", goBack));
+    appEl.append(lockWrap, title, hint, button("primary", "Go back", goBack));
 }
 
 function render() {
@@ -168,7 +179,4 @@ function render() {
     renderIntention();
 }
 
-chrome.storage.local.get(["mode"], (data) => {
-    mode = data.mode || "breathing";
-    render();
-});
+render();

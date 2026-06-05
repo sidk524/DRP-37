@@ -2,11 +2,22 @@ const BRIDGE_URL = "http://127.0.0.1:17894/api/block-state";
 const STREAM_URL = "http://127.0.0.1:17894/api/block-state/stream";
 const RULE_ID_BASE = 1000;
 const CONTINUE_GRACE_MS = 60 * 1000;
+const BLOCKED_PAGE = "blocked.html";
+
+const DOMAIN_GROUPS = [
+    ["x.com", "www.x.com", "twitter.com", "www.twitter.com"],
+    ["instagram.com", "www.instagram.com"],
+    ["reddit.com", "www.reddit.com", "old.reddit.com"],
+    ["youtube.com", "www.youtube.com", "m.youtube.com"],
+    ["facebook.com", "www.facebook.com"],
+    ["tiktok.com", "www.tiktok.com"],
+    ["netflix.com", "www.netflix.com"],
+];
 
 let stream = null;
 let pollTimer = null;
 let lastStateKey = "";
-let currentState = { active: false, domains: [] };
+let currentState = { active: false, domains: [], mode: "breathing" };
 
 function normalizeHost(value) {
     return String(value || "")
@@ -18,15 +29,15 @@ function normalizeHost(value) {
         .replace(/:\d+$/, "");
 }
 
-function ruleFilter(host) {
-    return `||${host}`;
+function apexHost(host) {
+    return host.startsWith("www.") ? host.slice(4) : host;
 }
 
 function expandDomains(domains = []) {
     const hosts = new Set();
-    for (const raw of domains) {
-        const host = normalizeHost(raw);
-        if (!host || !host.includes(".")) continue;
+    const normalized = domains.map(normalizeHost).filter((host) => host && host.includes("."));
+
+    for (const host of normalized) {
         hosts.add(host);
         if (host.startsWith("www.")) {
             hosts.add(host.slice(4));
@@ -34,12 +45,40 @@ function expandDomains(domains = []) {
             hosts.add(`www.${host}`);
         }
     }
+
+    for (const group of DOMAIN_GROUPS) {
+        const groupHosts = new Set(group.map(normalizeHost));
+        const matchesGroup = normalized.some((host) => groupHosts.has(host) || groupHosts.has(apexHost(host)));
+        if (matchesGroup) {
+            for (const groupHost of groupHosts) {
+                hosts.add(groupHost);
+            }
+        }
+    }
+
     return [...hosts];
+}
+
+function blockPagePath(host, mode = "breathing") {
+    const safeMode = ["breathing", "reflect", "hard"].includes(mode) ? mode : "breathing";
+    return `/${BLOCKED_PAGE}?host=${encodeURIComponent(host)}&mode=${encodeURIComponent(safeMode)}`;
+}
+
+function blockPageFullUrl(host, mode = "breathing") {
+    return chrome.runtime.getURL(blockPagePath(host, mode).replace(/^\//, ""));
+}
+
+function blockedPageUrl() {
+    return chrome.runtime.getURL(BLOCKED_PAGE);
+}
+
+function isBlockedPageUrl(url) {
+    return typeof url === "string" && url.startsWith(blockedPageUrl());
 }
 
 function stateKey(state) {
     const hosts = expandDomains(state?.domains || []).sort().join(",");
-    return `${state?.active ? "1" : "0"}:${hosts}:${state?.endsAt || 0}`;
+    return `${state?.active ? "1" : "0"}:${hosts}:${state?.endsAt || 0}:${state?.mode || "breathing"}`;
 }
 
 async function getAllowedUntil() {
@@ -89,8 +128,24 @@ async function clearRules(connected) {
     });
 }
 
+function buildBlockRule(host, mode, index) {
+    return {
+        id: RULE_ID_BASE + index,
+        priority: 1,
+        action: {
+            type: "redirect",
+            redirect: { extensionPath: blockPagePath(host, mode) },
+        },
+        condition: {
+            urlFilter: `||${host}^`,
+            resourceTypes: ["main_frame"],
+        },
+    };
+}
+
 async function applyRules(state) {
-    currentState = state || { active: false, domains: [] };
+    currentState = state || { active: false, domains: [], mode: "breathing" };
+    const mode = currentState.mode || "breathing";
     const hosts = state?.active && state?.domains?.length ? await activeHostsForState(state) : [];
     const key = `${stateKey(state)}:${hosts.sort().join(",")}`;
     if (key === lastStateKey) return;
@@ -108,18 +163,7 @@ async function applyRules(state) {
         return;
     }
 
-    const addRules = hosts.map((host, index) => ({
-        id: RULE_ID_BASE + index,
-        priority: 1,
-        action: {
-            type: "redirect",
-            redirect: { extensionPath: `/blocked.html?host=${encodeURIComponent(host)}` },
-        },
-        condition: {
-            urlFilter: ruleFilter(host),
-            resourceTypes: ["main_frame"],
-        },
-    }));
+    const addRules = hosts.map((host, index) => buildBlockRule(host, mode, index));
 
     try {
         await chrome.declarativeNetRequest.updateDynamicRules({
@@ -134,10 +178,10 @@ async function applyRules(state) {
             hosts,
             rules: addRules.map((rule) => ({
                 id: rule.id,
-                filter: rule.condition.urlFilter,
+                domain: rule.condition.urlFilter.replace(/^\|\|/, "").replace(/\^$/, ""),
             })),
             endsAt: state.endsAt,
-            mode: state.mode,
+            mode,
             lastError: null,
         });
     } catch (error) {
@@ -167,6 +211,28 @@ async function allowHost(host) {
         syncFromDesktop();
     }, CONTINUE_GRACE_MS + 500);
     return { ok: true, url: `https://${normalized}/` };
+}
+
+async function maybeRedirectTab(tabId, url) {
+    if (!url || isBlockedPageUrl(url)) return;
+    if (url.startsWith("chrome://") || url.startsWith("chrome-extension://") || url.startsWith("about:")) return;
+
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return;
+    }
+
+    if (!currentState?.active || !currentState?.domains?.length) return;
+
+    const host = normalizeHost(parsed.hostname);
+    const blockedHosts = new Set(await activeHostsForState(currentState));
+    if (!blockedHosts.has(host)) return;
+
+    await chrome.tabs.update(tabId, {
+        url: blockPageFullUrl(host, currentState.mode || "breathing"),
+    });
 }
 
 async function syncFromDesktop() {
@@ -221,6 +287,16 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.alarms.create("tether-sync", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "tether-sync") syncFromDesktop();
+});
+
+chrome.webNavigation.onCommitted.addListener((details) => {
+    if (details.frameId !== 0) return;
+    maybeRedirectTab(details.tabId, details.url);
+});
+
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+    if (details.frameId !== 0) return;
+    maybeRedirectTab(details.tabId, details.url);
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

@@ -3,24 +3,19 @@ import "../styles/LockGraphic.css";
 function LockGraphic({ locked }) {
     return (
         <div className={`lock-graphic ${locked ? "locked" : ""}`} aria-hidden>
-            <svg className="lock-graphic-svg" viewBox="0 0 120 120">
-                <rect
-                    className="lock-body"
-                    x="28"
-                    y="52"
-                    width="64"
-                    height="48"
-                    rx="10"
-                />
+            <svg className="lock-graphic-svg" viewBox="0 0 100 100">
+                <g className="lock-shackle-wrap">
+                    <path
+                        className="lock-shackle"
+                        d="M 30 44 A 23 25 0 0 1 76 44"
+                    />
+                </g>
+                <rect className="lock-body" x="22" y="44" width="64" height="42" rx="9" />
+                <circle className="lock-keyhole-top" cx="54" cy="60" r="7" />
                 <path
-                    className="lock-shackle"
-                    d="M 52 52 A 28 28 0 0 1 88 52"
-                    fill="none"
-                    strokeWidth="9"
-                    strokeLinecap="round"
+                    className="lock-keyhole-bottom"
+                    d="M 50.16 62.9 L 57.84 62.9 L 61.68 76.76 L 46.32 76.76 Z"
                 />
-                <circle className="lock-keyhole-top" cx="60" cy="68" r="7" />
-                <path className="lock-keyhole-bottom" d="M 52 72 L 68 72 L 62 92 L 58 92 Z" />
             </svg>
         </div>
     );
