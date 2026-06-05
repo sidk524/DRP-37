@@ -233,6 +233,7 @@ function renderGoalReminder() {
 }
 
 function renderHard() {
+    document.title = "Tether — Blocked";
     appEl.textContent = "";
 
     const lockWrap = document.createElement("div");
@@ -287,7 +288,11 @@ function render() {
     renderIntention();
 }
 
-chrome.storage.local.get(["friction"], (data) => {
-    friction = normalizeFriction(data.friction);
+if (mode === "hard") {
     render();
-});
+} else {
+    chrome.storage.local.get(["friction"], (data) => {
+        friction = normalizeFriction(data.friction);
+        render();
+    });
+}

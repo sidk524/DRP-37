@@ -51,6 +51,11 @@ private val strictnessOptions = listOf(
         value = "moderate",
         label = "Firm friction",
         description = "Firm: breathing, message typing, and goal reminder."
+    ),
+    StrictnessOption(
+        value = "hard",
+        label = "Hard block",
+        description = "Hard: no way through until your session ends."
     )
 )
 private const val letterPlaceholder = "You said you wanted to read before bed. Put the phone down. You'll feel better."

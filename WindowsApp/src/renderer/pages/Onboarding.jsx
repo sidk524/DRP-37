@@ -60,6 +60,13 @@ export const STRICTNESS_LEVELS = [
         tint: "firm",
         description: "Firm: 10s pause + intention check. You can still get through.",
     },
+    {
+        value: "hard",
+        label: "Hard block",
+        icon: "⛔",
+        tint: "hard",
+        description: "Hard: no way through until your session ends.",
+    },
 ];
 
 export const LETTER_PLACEHOLDER =

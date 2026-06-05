@@ -119,7 +119,7 @@ function updateSession({ mode, friction } = {}) {
     }
 
     if (mode !== undefined) {
-        session.mode = ["breathing", "reflect"].includes(mode) ? mode : "reflect";
+        session.mode = ["breathing", "reflect", "hard"].includes(mode) ? mode : "reflect";
     }
 
     if (friction !== undefined) {

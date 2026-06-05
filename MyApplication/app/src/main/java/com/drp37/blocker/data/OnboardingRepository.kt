@@ -60,6 +60,7 @@ object OnboardingRepository {
             val strictness = when (row.optString("strictness")) {
                 "gentle" -> "gentle"
                 "moderate" -> "moderate"
+                "hard" -> "hard"
                 else -> "moderate"
             }
             OnboardingSettings(
@@ -127,6 +128,7 @@ private fun normalizeStrictness(strictness: String): String {
     return when (strictness) {
         "gentle" -> "gentle"
         "moderate" -> "moderate"
+        "hard" -> "hard"
         else -> "moderate"
     }
 }

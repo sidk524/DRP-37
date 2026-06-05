@@ -205,6 +205,10 @@
     background: rgba(74, 158, 255, 0.1);
 }
 
+.strictness-hard {
+    background: rgba(255, 69, 58, 0.1);
+}
+
 .strictness-card:hover {
     transform: translateY(-1px);
 }
@@ -217,6 +221,11 @@
 .strictness-firm.selected {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px rgba(74, 158, 255, 0.35);
+}
+
+.strictness-hard.selected {
+    border-color: rgba(255, 69, 58, 0.85);
+    box-shadow: 0 0 0 1px rgba(255, 69, 58, 0.35);
 }
 
 .strictness-icon {

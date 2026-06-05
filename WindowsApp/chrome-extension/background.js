@@ -211,6 +211,9 @@ async function applyRules(state) {
 }
 
 async function allowHost(host) {
+    if (currentState.mode === "hard") {
+        return { ok: false, error: "hard-blocked" };
+    }
     const normalized = normalizeHost(host);
     if (!normalized) return { ok: false };
     const allowedUntil = await getAllowedUntil();

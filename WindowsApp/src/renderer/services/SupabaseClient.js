@@ -105,7 +105,7 @@ export async function loadOnboarding(userId) {
         .maybeSingle();
     if (error) throw error;
     if (!data) return null;
-    const strictness = ["gentle", "moderate"].includes(data.strictness)
+    const strictness = ["gentle", "moderate", "hard"].includes(data.strictness)
         ? data.strictness
         : "moderate";
     return {

@@ -60,7 +60,7 @@ fun FrictionScreen(
     onCancel: () -> Unit
 ) {
     val appName = rememberAppLabel(blockedPackage)
-    val firm = settings?.strictness == "moderate" &&
+    val firm = settings?.strictness in setOf("moderate", "hard") &&
         settings.futureMessage.isNotBlank() &&
         settings.goals.isNotEmpty()
     var phase by remember(blockedPackage, settings) { mutableStateOf(FrictionPhase.Breathing) }

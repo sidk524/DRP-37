@@ -18,6 +18,7 @@ import {
 export function strictnessToMode(strictness) {
     if (strictness === "gentle") return "breathing";
     if (strictness === "moderate") return "reflect";
+    if (strictness === "hard") return "hard";
     return "reflect";
 }
 
