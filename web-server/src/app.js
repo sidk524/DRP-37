@@ -30,7 +30,15 @@ const supabaseAdmin = supabaseUrl && supabaseSecretKey
 const app = express();
 const SESSION_FIELDS = "id,user_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
 const GROUP_FIELDS = "id,name,invite_code,created_by,created_at";
+const DEFAULT_GROUP_FIELDS = `${GROUP_FIELDS},default_group_key`;
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const DEFAULT_GROUPS = [
+    { key: "late_night", label: "Late night", name: "Late night", inviteCode: "LATENITE" },
+    { key: "first_thing_morning", label: "First thing morning", name: "First thing morning", inviteCode: "MORNING1" },
+    { key: "meals", label: "Meals", name: "Meals", inviteCode: "MEALS000" },
+    { key: "work_hours", label: "Work hours", name: "Work hours", inviteCode: "WORKHOUR" }
+];
+const DEFAULT_GROUP_LABELS = new Map(DEFAULT_GROUPS.map((group) => [group.label, group]));
 
 app.disable("x-powered-by");
 app.use(helmet());
@@ -147,6 +155,9 @@ const makeHttpError = (status, message) => {
 
 const missingSchemaError = (error) => {
     const message = String(error?.message || "");
+    if (error?.code === "PGRST204" && /default_group_key/i.test(message)) {
+        return makeHttpError(503, "Default groups are not available. Run Supabase migration 005_default_leaderboard_groups.sql.");
+    }
     if (!["PGRST205", "42P01"].includes(error?.code)) return null;
     if (!/(leaderboard_groups|group_members)/i.test(message)) return null;
     return makeHttpError(503, "Group tables are not available. Run Supabase migration 003_leaderboard_groups.sql.");
@@ -204,6 +215,43 @@ const ensureGroupMember = async (groupId, userId) => {
     if (error && error.code !== "23505") throw error;
 };
 
+const ensureDefaultGroups = async () => {
+    const defaultKeys = DEFAULT_GROUPS.map((group) => group.key);
+    const { data: existingGroups, error: existingError } = await supabaseAdmin
+        .from("leaderboard_groups")
+        .select(DEFAULT_GROUP_FIELDS)
+        .in("default_group_key", defaultKeys);
+
+    if (existingError) throw existingError;
+
+    const existingKeys = new Set((existingGroups || []).map((group) => group.default_group_key));
+    const missingGroups = DEFAULT_GROUPS
+        .filter((group) => !existingKeys.has(group.key))
+        .map((group) => ({
+            name: group.name,
+            invite_code: group.inviteCode,
+            created_by: null,
+            default_group_key: group.key
+        }));
+
+    if (missingGroups.length > 0) {
+        const { error: insertError } = await supabaseAdmin
+            .from("leaderboard_groups")
+            .insert(missingGroups)
+            .select("id");
+
+        if (insertError && insertError.code !== "23505") throw insertError;
+    }
+
+    const { data: defaultGroups, error: finalError } = await supabaseAdmin
+        .from("leaderboard_groups")
+        .select(DEFAULT_GROUP_FIELDS)
+        .in("default_group_key", defaultKeys);
+
+    if (finalError) throw finalError;
+    return defaultGroups || [];
+};
+
 const listUserGroups = async (userId) => {
     const { data: memberships, error: membershipError } = await supabaseAdmin
         .from("group_members")
@@ -258,6 +306,45 @@ const groupMemberCount = async (groupId) => {
 
     if (error) throw error;
     return (data || []).length;
+};
+
+const syncDefaultGroupMemberships = async (userId, selectedLabels) => {
+    const selectedKeys = new Set(selectedLabels.map((label) => DEFAULT_GROUP_LABELS.get(label).key));
+    const defaultGroups = await ensureDefaultGroups();
+    const defaultGroupIds = defaultGroups.map((group) => group.id);
+
+    if (!defaultGroupIds.length) return listUserGroups(userId);
+
+    const { data: memberships, error: membershipsError } = await supabaseAdmin
+        .from("group_members")
+        .select("id,group_id")
+        .eq("user_id", userId)
+        .in("group_id", defaultGroupIds);
+
+    if (membershipsError) throw membershipsError;
+
+    const membershipsByGroupId = new Map((memberships || []).map((membership) => [membership.group_id, membership]));
+    const defaultGroupsById = new Map(defaultGroups.map((group) => [group.id, group]));
+
+    for (const group of defaultGroups) {
+        if (selectedKeys.has(group.default_group_key) && !membershipsByGroupId.has(group.id)) {
+            await ensureGroupMember(group.id, userId);
+        }
+    }
+
+    for (const membership of memberships || []) {
+        const group = defaultGroupsById.get(membership.group_id);
+        if (!group || selectedKeys.has(group.default_group_key)) continue;
+        const { error } = await supabaseAdmin
+            .from("group_members")
+            .delete()
+            .eq("id", membership.id)
+            .eq("user_id", userId);
+
+        if (error) throw error;
+    }
+
+    return listUserGroups(userId);
 };
 
 const lockedSecondsForSession = (session) => {
@@ -334,6 +421,28 @@ app.post("/api/groups/join", requireSupabase, requireUser, async (req, res, next
         await ensureGroupMember(group.id, req.user.id);
         const memberCount = await groupMemberCount(group.id);
         res.json({ group: publicGroup(group, memberCount) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.post("/api/groups/defaults/sync", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const safeScrollingWorst = validateStringArray(req.body?.scrollingWorst, "scrollingWorst");
+        if (safeScrollingWorst.error) {
+            res.status(400).json({ error: safeScrollingWorst.error });
+            return;
+        }
+
+        const selectedLabels = [...new Set(safeScrollingWorst)];
+        const unknownLabels = selectedLabels.filter((label) => !DEFAULT_GROUP_LABELS.has(label));
+        if (unknownLabels.length > 0) {
+            res.status(400).json({ error: "scrollingWorst contains unknown options" });
+            return;
+        }
+
+        const groups = await syncDefaultGroupMemberships(req.user.id, selectedLabels);
+        res.json({ groups });
     } catch (error) {
         next(error);
     }

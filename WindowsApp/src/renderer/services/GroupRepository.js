@@ -25,3 +25,11 @@ export async function getGroupLeaderboard(groupId) {
     const data = await request(`/api/groups/${encodeURIComponent(groupId)}/leaderboard`);
     return data.leaderboard || [];
 }
+
+export async function syncDefaultGroups({ scrollingWorst }) {
+    const data = await request("/api/groups/defaults/sync", {
+        method: "POST",
+        body: { scrollingWorst },
+    });
+    return data.groups || [];
+}

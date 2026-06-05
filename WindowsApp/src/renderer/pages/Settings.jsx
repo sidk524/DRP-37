@@ -4,6 +4,7 @@ import {
     STEPS,
     STRICTNESS_LEVELS,
 } from "./Onboarding";
+import { syncDefaultGroups } from "../services/GroupRepository";
 import { loadOnboarding, saveOnboarding } from "../services/SupabaseClient";
 import "../styles/Onboarding.css";
 import "../styles/Settings.css";
@@ -89,6 +90,7 @@ function Settings({ session, onBack, onSaved }) {
                 futureMessage: responses.futureMessage.trim(),
             };
             await saveOnboarding(session.user.id, nextResponses);
+            await syncDefaultGroups({ scrollingWorst: nextResponses.scrollingWorst });
             setResponses(nextResponses);
             await onSaved?.(nextResponses);
             setSaved(true);

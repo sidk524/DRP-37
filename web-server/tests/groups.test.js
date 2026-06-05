@@ -6,6 +6,7 @@ const makeQuery = (result) => {
     };
     [
         "eq",
+        "delete",
         "in",
         "insert",
         "not",
@@ -233,6 +234,145 @@ describe("group leaderboard API", () => {
         expect(response.status).toBe(503);
         expect(response.body).toEqual({
             error: "Group tables are not available. Run Supabase migration 003_leaderboard_groups.sql."
+        });
+    });
+
+    it("syncs selected worst-time options into matching default groups", async () => {
+        const defaultGroups = [
+            { id: "group-late", name: "Late night", invite_code: "LATENITE", created_by: null, created_at: "2026-06-05T09:00:00.000Z", default_group_key: "late_night" },
+            { id: "group-morning", name: "First thing morning", invite_code: "MORNING1", created_by: null, created_at: "2026-06-05T09:00:00.000Z", default_group_key: "first_thing_morning" },
+            { id: "group-meals", name: "Meals", invite_code: "MEALS000", created_by: null, created_at: "2026-06-05T09:00:00.000Z", default_group_key: "meals" },
+            { id: "group-work", name: "Work hours", invite_code: "WORKHOUR", created_by: null, created_at: "2026-06-05T09:00:00.000Z", default_group_key: "work_hours" }
+        ];
+        const existingDefaultGroupsQuery = makeQuery({ data: defaultGroups, error: null });
+        const finalDefaultGroupsQuery = makeQuery({ data: defaultGroups, error: null });
+        const currentDefaultMembershipsQuery = makeQuery({ data: [], error: null });
+        const lateMembershipQuery = makeQuery({ data: { id: "member-late" }, error: null });
+        const mealsMembershipQuery = makeQuery({ data: { id: "member-meals" }, error: null });
+        const userMembershipsQuery = makeQuery({
+            data: [{ group_id: "group-late" }, { group_id: "group-meals" }],
+            error: null
+        });
+        const groupsQuery = makeQuery({
+            data: [defaultGroups[0], defaultGroups[2]],
+            error: null
+        });
+        const allMembersQuery = makeQuery({
+            data: [{ group_id: "group-late" }, { group_id: "group-meals" }],
+            error: null
+        });
+        const { app } = loadApp({
+            adminQueries: [
+                existingDefaultGroupsQuery,
+                finalDefaultGroupsQuery,
+                currentDefaultMembershipsQuery,
+                lateMembershipQuery,
+                mealsMembershipQuery,
+                userMembershipsQuery,
+                groupsQuery,
+                allMembersQuery
+            ]
+        });
+
+        const response = await authorizedPost(app, "/api/groups/defaults/sync")
+            .send({ scrollingWorst: ["Late night", "Meals"] });
+
+        expect(response.status).toBe(200);
+        expect(lateMembershipQuery.insert).toHaveBeenCalledWith({
+            group_id: "group-late",
+            user_id: "user-1"
+        });
+        expect(mealsMembershipQuery.insert).toHaveBeenCalledWith({
+            group_id: "group-meals",
+            user_id: "user-1"
+        });
+        expect(response.body.groups.map((group) => group.name)).toEqual(["Late night", "Meals"]);
+    });
+
+    it("leaves unselected default groups without touching custom groups", async () => {
+        const defaultGroups = [
+            { id: "group-late", name: "Late night", invite_code: "LATENITE", created_by: null, created_at: "2026-06-05T09:00:00.000Z", default_group_key: "late_night" },
+            { id: "group-morning", name: "First thing morning", invite_code: "MORNING1", created_by: null, created_at: "2026-06-05T09:00:00.000Z", default_group_key: "first_thing_morning" },
+            { id: "group-meals", name: "Meals", invite_code: "MEALS000", created_by: null, created_at: "2026-06-05T09:00:00.000Z", default_group_key: "meals" },
+            { id: "group-work", name: "Work hours", invite_code: "WORKHOUR", created_by: null, created_at: "2026-06-05T09:00:00.000Z", default_group_key: "work_hours" }
+        ];
+        const customGroup = {
+            id: "group-custom",
+            name: "hello",
+            invite_code: "ABCDEFGH",
+            created_by: "user-1",
+            created_at: "2026-06-05T09:00:00.000Z"
+        };
+        const existingDefaultGroupsQuery = makeQuery({ data: defaultGroups, error: null });
+        const finalDefaultGroupsQuery = makeQuery({ data: defaultGroups, error: null });
+        const currentDefaultMembershipsQuery = makeQuery({
+            data: [
+                { id: "member-late", group_id: "group-late" },
+                { id: "member-meals", group_id: "group-meals" }
+            ],
+            error: null
+        });
+        const deleteMealsQuery = makeQuery({ data: [], error: null });
+        const userMembershipsQuery = makeQuery({
+            data: [{ group_id: "group-late" }, { group_id: "group-custom" }],
+            error: null
+        });
+        const groupsQuery = makeQuery({
+            data: [defaultGroups[0], customGroup],
+            error: null
+        });
+        const allMembersQuery = makeQuery({
+            data: [{ group_id: "group-late" }, { group_id: "group-custom" }],
+            error: null
+        });
+        const { app } = loadApp({
+            adminQueries: [
+                existingDefaultGroupsQuery,
+                finalDefaultGroupsQuery,
+                currentDefaultMembershipsQuery,
+                deleteMealsQuery,
+                userMembershipsQuery,
+                groupsQuery,
+                allMembersQuery
+            ]
+        });
+
+        const response = await authorizedPost(app, "/api/groups/defaults/sync")
+            .send({ scrollingWorst: ["Late night"] });
+
+        expect(response.status).toBe(200);
+        expect(deleteMealsQuery.delete).toHaveBeenCalled();
+        expect(deleteMealsQuery.eq).toHaveBeenCalledWith("id", "member-meals");
+        expect(deleteMealsQuery.eq).not.toHaveBeenCalledWith("id", "member-custom");
+        expect(response.body.groups.map((group) => group.name)).toEqual(["hello", "Late night"]);
+    });
+
+    it("rejects unknown worst-time options", async () => {
+        const { app } = loadApp({ adminQueries: [] });
+
+        const response = await authorizedPost(app, "/api/groups/defaults/sync")
+            .send({ scrollingWorst: ["Lunch break"] });
+
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ error: "scrollingWorst contains unknown options" });
+    });
+
+    it("returns an actionable error when default group metadata is missing", async () => {
+        const defaultGroupsQuery = makeQuery({
+            data: null,
+            error: {
+                code: "PGRST204",
+                message: "Could not find the 'default_group_key' column of 'leaderboard_groups' in the schema cache"
+            }
+        });
+        const { app } = loadApp({ adminQueries: [defaultGroupsQuery] });
+
+        const response = await authorizedPost(app, "/api/groups/defaults/sync")
+            .send({ scrollingWorst: ["Late night"] });
+
+        expect(response.status).toBe(503);
+        expect(response.body).toEqual({
+            error: "Default groups are not available. Run Supabase migration 005_default_leaderboard_groups.sql."
         });
     });
 });

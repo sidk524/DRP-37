@@ -1,6 +1,7 @@
 import "../styles/Home.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthSession } from "../hooks/useAuthSession";
+import { syncDefaultGroups } from "../services/GroupRepository";
 import { loadOnboarding } from "../services/SupabaseClient";
 import AuthScreen from "./AuthScreen";
 import BlockerSetup, { strictnessToMode } from "../pages/BlockerSetup";
@@ -10,16 +11,23 @@ function AuthGate() {
     const { session, loading } = useAuthSession();
     const [onboarded, setOnboarded] = useState(null);
     const [defaultMode, setDefaultMode] = useState("breathing");
+    const syncedDefaultsForUserRef = useRef(null);
 
     useEffect(() => {
         if (!session) {
             setOnboarded(null);
+            syncedDefaultsForUserRef.current = null;
             return;
         }
         loadOnboarding(session.user.id)
             .then((settings) => {
                 if (settings?.strictness) {
                     setDefaultMode(strictnessToMode(settings.strictness));
+                }
+                if (settings && syncedDefaultsForUserRef.current !== session.user.id) {
+                    syncedDefaultsForUserRef.current = session.user.id;
+                    syncDefaultGroups({ scrollingWorst: settings.scrollingWorst })
+                        .catch((error) => console.error("Failed to sync default groups:", error));
                 }
                 setOnboarded(!!settings);
             })

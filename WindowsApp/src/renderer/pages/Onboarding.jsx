@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { syncDefaultGroups } from "../services/GroupRepository";
 import { saveOnboarding } from "../services/SupabaseClient";
 import "../styles/Onboarding.css";
 
@@ -114,6 +115,7 @@ function Onboarding({ session, onComplete }) {
         setError("");
         try {
             await saveOnboarding(session.user.id, responses);
+            await syncDefaultGroups({ scrollingWorst: responses.scrollingWorst });
             onComplete(responses.strictness);
         } catch (err) {
             setError(err.message || "Failed to save. Please try again.");
