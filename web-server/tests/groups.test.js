@@ -217,4 +217,22 @@ describe("group leaderboard API", () => {
         });
         expect(sessionsQuery.not).toHaveBeenCalledWith("ended_at", "is", null);
     });
+
+    it("returns an actionable error when group tables are missing", async () => {
+        const membershipQuery = makeQuery({
+            data: null,
+            error: {
+                code: "PGRST205",
+                message: "Could not find the table 'public.group_members' in the schema cache"
+            }
+        });
+        const { app } = loadApp({ adminQueries: [membershipQuery] });
+
+        const response = await authorizedGet(app, "/api/groups");
+
+        expect(response.status).toBe(503);
+        expect(response.body).toEqual({
+            error: "Group tables are not available. Run Supabase migration 003_leaderboard_groups.sql."
+        });
+    });
 });

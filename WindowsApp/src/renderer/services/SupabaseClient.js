@@ -138,6 +138,10 @@ const MODE_POINTS_MULTIPLIER = {
 
 const EXTRA_APP_MULTIPLIER = 0.25;
 
+function isMissingTableError(error) {
+    return error?.code === "PGRST205" || /Could not find the table/i.test(error?.message || "");
+}
+
 function calculateFocusPoints(mode, actualMs, blockedAppsCount = 1) {
     const minutes = Math.max(0, actualMs) / 60000;
     const multiplier = MODE_POINTS_MULTIPLIER[mode] || MODE_POINTS_MULTIPLIER.breathing;
@@ -164,6 +168,7 @@ export async function saveSessionPoints({ userId, mode, actualMs = 0, plannedMs 
         .select()
         .single();
 
+    if (isMissingTableError(error)) return null;
     if (error) throw error;
     return data;
 }
@@ -174,6 +179,7 @@ export async function getUserTotalPoints(userId) {
         .select("points")
         .eq("user_id", userId);
 
+    if (isMissingTableError(error)) return 0;
     if (error) throw error;
     return (data || []).reduce((sum, row) => sum + (row.points || 0), 0);
 }

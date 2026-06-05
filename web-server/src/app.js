@@ -145,6 +145,13 @@ const makeHttpError = (status, message) => {
     return error;
 };
 
+const missingSchemaError = (error) => {
+    const message = String(error?.message || "");
+    if (!["PGRST205", "42P01"].includes(error?.code)) return null;
+    if (!/(leaderboard_groups|group_members)/i.test(message)) return null;
+    return makeHttpError(503, "Group tables are not available. Run Supabase migration 003_leaderboard_groups.sql.");
+};
+
 const generateInviteCode = () => {
     let code = "";
     for (let index = 0; index < 8; index += 1) {
@@ -501,6 +508,11 @@ app.use((_req, res) => {
 
 app.use((err, _req, res, _next) => {
     console.error(err);
+    const schemaError = missingSchemaError(err);
+    if (schemaError) {
+        res.status(schemaError.status).json({ error: schemaError.message });
+        return;
+    }
     const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600
         ? err.status
         : 500;

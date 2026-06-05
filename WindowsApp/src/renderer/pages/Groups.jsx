@@ -21,6 +21,11 @@ function normalizeInviteCode(value) {
     return value.trim().toUpperCase().replace(/\s+/g, "");
 }
 
+function visibleErrorMessage(message) {
+    const value = String(message || "").trim();
+    return value === "Internal server error" ? "" : value;
+}
+
 function Groups({ onBack }) {
     const [groups, setGroups] = useState([]);
     const [selectedGroupId, setSelectedGroupId] = useState(null);
@@ -37,6 +42,7 @@ function Groups({ onBack }) {
         () => groups.find((group) => group.id === selectedGroupId) || null,
         [groups, selectedGroupId]
     );
+    const visibleError = visibleErrorMessage(error);
 
     async function refreshGroups(preferredGroupId = selectedGroupId) {
         setLoadingGroups(true);
@@ -133,7 +139,7 @@ function Groups({ onBack }) {
                     Compete on all-time locked-in time from completed blocking sessions.
                 </p>
 
-                {error && <p className="tether-error groups-error">{error}</p>}
+                {visibleError && <p className="tether-error groups-error">{visibleError}</p>}
 
                 <div className="groups-stack">
                     <section className="groups-card">
