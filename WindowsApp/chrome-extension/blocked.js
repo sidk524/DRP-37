@@ -2,6 +2,7 @@ const INTENTIONS = ["Check a message", "Post something", "Just looking"];
 const BREATH_SECONDS = 4;
 const BREATH_CYCLES = 3;
 const VALID_MODES = new Set(["breathing", "reflect", "hard"]);
+const EXERCISE_TASKS = ["Run 1 km", "Do 50 pushups", "Do 50 sit-ups"];
 
 const appEl = document.getElementById("app");
 const params = new URLSearchParams(window.location.search);
@@ -13,6 +14,7 @@ let friction = { futureMessage: "", goals: [] };
 let phase = mode === "hard" ? "hard" : "breathing";
 let elapsed = 0;
 let start = 0;
+let selectedExerciseTask = null;
 
 function siteName() {
     return host.replace(/^www\./, "");
@@ -27,12 +29,15 @@ function normalizeFriction(value = {}) {
     };
 }
 
-function hasFirmContext() {
-    return !!friction.futureMessage && friction.goals.length > 0;
+function hasExerciseGoal() {
+    return friction.goals.some((goal) => goal.trim().toLowerCase() === "exercise");
 }
 
-function normalizeTypedText(value) {
-    return String(value || "").trim().replace(/\s+/g, " ");
+function pickExerciseTask() {
+    if (!selectedExerciseTask) {
+        selectedExerciseTask = EXERCISE_TASKS[Math.floor(Math.random() * EXERCISE_TASKS.length)];
+    }
+    return selectedExerciseTask;
 }
 
 function button(className, text, onClick) {
@@ -80,7 +85,7 @@ function renderBreathing() {
     hint.textContent = "Take a breath before you scroll.";
 
     const ready = button("quiet hidden", "I'm ready ->", () => {
-        phase = mode === "reflect" ? "message" : "intention";
+        phase = "intention";
         render();
     });
 
@@ -97,7 +102,7 @@ function renderBreathing() {
         breathLabel.textContent = cyclePos < BREATH_SECONDS ? "Breathe in" : "Breathe out";
         if (elapsed >= cycleLength) ready.classList.remove("hidden");
         if (elapsed >= cycleLength * BREATH_CYCLES) {
-            phase = mode === "reflect" ? "message" : "intention";
+            phase = "intention";
             render();
             return;
         }
@@ -154,81 +159,28 @@ function renderReflect() {
     );
 }
 
-function renderMessageTyping() {
+function renderExerciseTask() {
+    document.title = "Tether — Exercise first";
     appEl.textContent = "";
 
     const title = document.createElement("h1");
     title.className = "title";
-    title.textContent = "Type your message to yourself";
+    title.textContent = "Complete this first";
 
     const hint = document.createElement("p");
     hint.className = "hint";
-    hint.textContent = `Before opening ${siteName()}, type the message you wrote during onboarding.`;
+    hint.textContent = `You wanted to exercise more. Before opening ${siteName()}, finish this:`;
 
-    const quote = document.createElement("div");
-    quote.className = "message-quote";
-    quote.textContent = friction.futureMessage;
-
-    const input = document.createElement("textarea");
-    input.className = "message-input";
-    input.rows = 4;
-    input.placeholder = "Type your message here";
-    input.autofocus = true;
-
-    const status = document.createElement("p");
-    status.className = "message-status";
-    status.textContent = "Match the message exactly to continue.";
-
-    const next = button("primary", "Next", () => {
-        phase = "goal";
-        render();
-    });
-    next.disabled = true;
-
-    input.addEventListener("input", () => {
-        const matches = normalizeTypedText(input.value) === normalizeTypedText(friction.futureMessage);
-        next.disabled = !matches;
-        status.textContent = matches ? "Matched." : "Match the message exactly to continue.";
-    });
+    const task = document.createElement("div");
+    task.className = "task-card";
+    task.textContent = pickExerciseTask();
 
     appEl.append(
         title,
         hint,
-        quote,
-        input,
-        status,
-        next,
+        task,
+        button("primary", "I've completed this", continueThrough),
         button("quiet", "Actually, not now", goBack)
-    );
-    input.focus();
-}
-
-function renderGoalReminder() {
-    appEl.textContent = "";
-
-    const title = document.createElement("h1");
-    title.className = "title";
-    title.textContent = friction.goals.length === 1 ? "Remember your goal" : "Remember your goals";
-
-    const hint = document.createElement("p");
-    hint.className = "hint";
-    hint.textContent = "You said you wanted more of this:";
-
-    const goals = document.createElement("div");
-    goals.className = "goal-list";
-    for (const goal of friction.goals) {
-        const item = document.createElement("div");
-        item.className = "goal-card";
-        item.textContent = goal;
-        goals.appendChild(item);
-    }
-
-    appEl.append(
-        title,
-        hint,
-        goals,
-        button("primary", `Continue to ${siteName()}`, continueThrough),
-        button("quiet", "You're right, close it", goBack)
     );
 }
 
@@ -265,24 +217,16 @@ function render() {
         renderHard();
         return;
     }
-    if (phase === "breathing") {
-        renderBreathing();
-        return;
-    }
     if (mode === "reflect") {
-        if (!hasFirmContext()) {
-            renderReflect();
-            return;
-        }
-        if (phase === "message") {
-            renderMessageTyping();
-            return;
-        }
-        if (phase === "goal") {
-            renderGoalReminder();
+        if (hasExerciseGoal()) {
+            renderExerciseTask();
             return;
         }
         renderReflect();
+        return;
+    }
+    if (phase === "breathing") {
+        renderBreathing();
         return;
     }
     renderIntention();
