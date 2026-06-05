@@ -97,6 +97,25 @@ export async function checkOnboardingComplete(userId) {
     return !!data;
 }
 
+export async function loadOnboarding(userId) {
+    const { data, error } = await supabase
+        .from('onboarding')
+        .select('do_more_of,scrolling_worst,future_message,strictness')
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const strictness = ["gentle", "moderate"].includes(data.strictness)
+        ? data.strictness
+        : "moderate";
+    return {
+        doMoreOf: data.do_more_of || [],
+        scrollingWorst: data.scrolling_worst || [],
+        futureMessage: data.future_message || '',
+        strictness,
+    };
+}
+
 export async function saveOnboarding(userId, responses) {
     const { data, error } = await supabase
         .from('onboarding')

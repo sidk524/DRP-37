@@ -9,12 +9,30 @@ const host = params.get("host") || "this site";
 let mode = params.get("mode") || "breathing";
 if (!VALID_MODES.has(mode)) mode = "breathing";
 
+let friction = { futureMessage: "", goals: [] };
 let phase = mode === "hard" ? "hard" : "breathing";
 let elapsed = 0;
 let start = 0;
 
 function siteName() {
     return host.replace(/^www\./, "");
+}
+
+function normalizeFriction(value = {}) {
+    return {
+        futureMessage: String(value.futureMessage || "").trim(),
+        goals: Array.isArray(value.goals)
+            ? value.goals.map((goal) => String(goal).trim()).filter(Boolean)
+            : [],
+    };
+}
+
+function hasFirmContext() {
+    return !!friction.futureMessage && friction.goals.length > 0;
+}
+
+function normalizeTypedText(value) {
+    return String(value || "").trim().replace(/\s+/g, " ");
 }
 
 function button(className, text, onClick) {
@@ -62,7 +80,7 @@ function renderBreathing() {
     hint.textContent = "Take a breath before you scroll.";
 
     const ready = button("quiet hidden", "I'm ready ->", () => {
-        phase = "intention";
+        phase = mode === "reflect" ? "message" : "intention";
         render();
     });
 
@@ -79,7 +97,7 @@ function renderBreathing() {
         breathLabel.textContent = cyclePos < BREATH_SECONDS ? "Breathe in" : "Breathe out";
         if (elapsed >= cycleLength) ready.classList.remove("hidden");
         if (elapsed >= cycleLength * BREATH_CYCLES) {
-            phase = "intention";
+            phase = mode === "reflect" ? "message" : "intention";
             render();
             return;
         }
@@ -136,6 +154,84 @@ function renderReflect() {
     );
 }
 
+function renderMessageTyping() {
+    appEl.textContent = "";
+
+    const title = document.createElement("h1");
+    title.className = "title";
+    title.textContent = "Type your message to yourself";
+
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = `Before opening ${siteName()}, type the message you wrote during onboarding.`;
+
+    const quote = document.createElement("div");
+    quote.className = "message-quote";
+    quote.textContent = friction.futureMessage;
+
+    const input = document.createElement("textarea");
+    input.className = "message-input";
+    input.rows = 4;
+    input.placeholder = "Type your message here";
+    input.autofocus = true;
+
+    const status = document.createElement("p");
+    status.className = "message-status";
+    status.textContent = "Match the message exactly to continue.";
+
+    const next = button("primary", "Next", () => {
+        phase = "goal";
+        render();
+    });
+    next.disabled = true;
+
+    input.addEventListener("input", () => {
+        const matches = normalizeTypedText(input.value) === normalizeTypedText(friction.futureMessage);
+        next.disabled = !matches;
+        status.textContent = matches ? "Matched." : "Match the message exactly to continue.";
+    });
+
+    appEl.append(
+        title,
+        hint,
+        quote,
+        input,
+        status,
+        next,
+        button("quiet", "Actually, not now", goBack)
+    );
+    input.focus();
+}
+
+function renderGoalReminder() {
+    appEl.textContent = "";
+
+    const title = document.createElement("h1");
+    title.className = "title";
+    title.textContent = friction.goals.length === 1 ? "Remember your goal" : "Remember your goals";
+
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "You said you wanted more of this:";
+
+    const goals = document.createElement("div");
+    goals.className = "goal-list";
+    for (const goal of friction.goals) {
+        const item = document.createElement("div");
+        item.className = "goal-card";
+        item.textContent = goal;
+        goals.appendChild(item);
+    }
+
+    appEl.append(
+        title,
+        hint,
+        goals,
+        button("primary", `Continue to ${siteName()}`, continueThrough),
+        button("quiet", "You're right, close it", goBack)
+    );
+}
+
 function renderHard() {
     appEl.textContent = "";
 
@@ -173,10 +269,25 @@ function render() {
         return;
     }
     if (mode === "reflect") {
+        if (!hasFirmContext()) {
+            renderReflect();
+            return;
+        }
+        if (phase === "message") {
+            renderMessageTyping();
+            return;
+        }
+        if (phase === "goal") {
+            renderGoalReminder();
+            return;
+        }
         renderReflect();
         return;
     }
     renderIntention();
 }
 
-render();
+chrome.storage.local.get(["friction"], (data) => {
+    friction = normalizeFriction(data.friction);
+    render();
+});

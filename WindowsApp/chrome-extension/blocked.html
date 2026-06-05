@@ -97,12 +97,62 @@
       color: #ffffff;
       font-weight: 600;
     }
+    .primary:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
     .quiet {
       width: auto;
       background: none;
       border: none;
       color: var(--subtle);
       padding: 8px 12px;
+    }
+    .message-quote {
+      padding: 16px 18px;
+      margin: 4px 0 14px;
+      border-left: 4px solid var(--accent);
+      border-radius: 0 12px 12px 0;
+      background: rgba(74, 158, 255, 0.1);
+      color: var(--text);
+      line-height: 1.5;
+      text-align: left;
+      font-style: italic;
+    }
+    .message-input {
+      width: 100%;
+      min-height: 112px;
+      padding: 14px 16px;
+      border: 1px solid #2a2d35;
+      border-radius: 12px;
+      background: #1c1e24;
+      color: var(--text);
+      font: inherit;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+    }
+    .message-input:focus {
+      border-color: var(--accent);
+    }
+    .message-status {
+      margin: 10px 0 4px;
+      color: var(--subtle);
+      font-size: 0.9rem;
+    }
+    .goal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 14px 0 8px;
+    }
+    .goal-card {
+      padding: 15px 18px;
+      border: 1px solid #2a2d35;
+      border-radius: 12px;
+      background: rgba(74, 158, 255, 0.1);
+      color: var(--text);
+      font-weight: 600;
     }
     .hidden {
       opacity: 0;

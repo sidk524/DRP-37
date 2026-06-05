@@ -2,7 +2,7 @@ import { useState } from "react";
 import { saveOnboarding } from "../services/SupabaseClient";
 import "../styles/Onboarding.css";
 
-const STEPS = [
+export const STEPS = [
     {
         id: "goals",
         section: "Goals",
@@ -45,7 +45,7 @@ const STEPS = [
     },
 ];
 
-const STRICTNESS_LEVELS = [
+export const STRICTNESS_LEVELS = [
     {
         value: "gentle",
         label: "Gentle nudges",
@@ -60,16 +60,9 @@ const STRICTNESS_LEVELS = [
         tint: "firm",
         description: "Firm: 10s pause + intention check. You can still get through.",
     },
-    {
-        value: "strict",
-        label: "Hard block",
-        icon: "🧱",
-        tint: "hard",
-        description: "Hard: blocked apps close. No way through until your session ends.",
-    },
 ];
 
-const LETTER_PLACEHOLDER =
+export const LETTER_PLACEHOLDER =
     "You said you wanted to read before bed. Put the phone down. You'll feel better.";
 
 function Onboarding({ session, onComplete }) {

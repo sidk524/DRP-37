@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('tether', {
     getOAuthRedirectUrl: () => ipcRenderer.invoke('oauth:redirect-url'),
     oauthLogin: (url) => ipcRenderer.invoke('oauth:login', url),
     startSession: (config) => ipcRenderer.invoke('session:start', config),
+    updateSession: (config) => ipcRenderer.invoke('session:update', config),
     stopSession: () => ipcRenderer.invoke('session:stop'),
     getSession: () => ipcRenderer.invoke('session:get'),
     getExtensionStatus: () => ipcRenderer.invoke('extension:status'),

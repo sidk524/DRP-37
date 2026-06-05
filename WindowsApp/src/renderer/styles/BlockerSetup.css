@@ -31,8 +31,15 @@
     align-items: stretch;
 }
 
+.tether-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+}
+
+.tether-header-action,
 .tether-logout {
-    align-self: flex-start;
     background: none;
     border: none;
     color: #0a84ff;
@@ -41,7 +48,6 @@
     font-family: inherit;
     cursor: pointer;
     padding: 0;
-    margin-bottom: 40px;
 }
 
 .tether-brand {

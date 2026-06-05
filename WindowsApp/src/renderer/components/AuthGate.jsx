@@ -1,15 +1,11 @@
 import "../styles/Home.css";
 import { useEffect, useState } from "react";
 import { useAuthSession } from "../hooks/useAuthSession";
-import { checkOnboardingComplete } from "../services/SupabaseClient";
+import { loadOnboarding } from "../services/SupabaseClient";
 import AuthScreen from "./AuthScreen";
 import BlockerSetup, { strictnessToMode } from "../pages/BlockerSetup";
 import Onboarding from "../pages/Onboarding";
 
-// Reactive auth gate — the Electron equivalent of Android's MainActivity:
-//   no session          -> AuthScreen
-//   session, no onboard -> Onboarding
-//   session + onboarded -> BlockerSetup (session page first; Block Apps on demand)
 function AuthGate() {
     const { session, loading } = useAuthSession();
     const [onboarded, setOnboarded] = useState(null);
@@ -20,8 +16,13 @@ function AuthGate() {
             setOnboarded(null);
             return;
         }
-        checkOnboardingComplete(session.user.id)
-            .then(setOnboarded)
+        loadOnboarding(session.user.id)
+            .then((settings) => {
+                if (settings?.strictness) {
+                    setDefaultMode(strictnessToMode(settings.strictness));
+                }
+                setOnboarded(!!settings);
+            })
             .catch(() => setOnboarded(false));
     }, [session]);
 
@@ -55,7 +56,13 @@ function AuthGate() {
         );
     }
 
-    return <BlockerSetup session={session} defaultMode={defaultMode} />;
+    return (
+        <BlockerSetup
+            session={session}
+            defaultMode={defaultMode}
+            onStrictnessChange={(strictness) => setDefaultMode(strictnessToMode(strictness))}
+        />
+    );
 }
 
 export default AuthGate;

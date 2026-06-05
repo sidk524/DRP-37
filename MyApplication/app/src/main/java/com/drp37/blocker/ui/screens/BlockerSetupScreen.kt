@@ -184,6 +184,11 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
     }
 
     when (screen) {
+        BlockerFlowScreen.Settings -> {
+            OnboardingSettingsScreen(
+                onBack = { screen = BlockerFlowScreen.Duration }
+            )
+        }
         BlockerFlowScreen.AppSelection -> {
             AppSelectionScreen(
                 installedApps = installedApps,
@@ -236,6 +241,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                     }
                 },
                 onSelectApps = { screen = BlockerFlowScreen.AppSelection },
+                onSettings = { screen = BlockerFlowScreen.Settings },
                 onLogout = {
                     coroutineScope.launch {
                         activeSessionId?.let { sessionId ->
@@ -451,6 +457,7 @@ private fun DurationLockScreen(
     onSecondsChange: (Int) -> Unit,
     onStartSession: () -> Unit,
     onSelectApps: () -> Unit,
+    onSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
     val selectedDurationSeconds = hours * 3600 + minutes * 60 + seconds
@@ -484,6 +491,19 @@ private fun DurationLockScreen(
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterStart)
+                            .clickable(onClick = onSettings)
+                    ) {
+                        Text(
+                            text = "Settings",
+                            color = Color(0xFF0A84FF),
+                            fontSize = layout.logoutTextSize.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
                             .clickable(onClick = onLogout)
                     ) {
                         Text(
@@ -1301,6 +1321,7 @@ private data class DurationLockLayoutMetrics(
 
 private enum class BlockerFlowScreen {
     AppSelection,
+    Settings,
     Duration
 }
 

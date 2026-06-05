@@ -1,7 +1,7 @@
 const BRIDGE_URL = "http://127.0.0.1:17894/api/block-state";
 const STREAM_URL = "http://127.0.0.1:17894/api/block-state/stream";
 const RULE_ID_BASE = 1000;
-const CONTINUE_GRACE_MS = 60 * 1000;
+const CONTINUE_GRACE_MS = 2500;
 const BLOCKED_PAGE = "blocked.html";
 
 const DOMAIN_GROUPS = [
@@ -17,7 +17,7 @@ const DOMAIN_GROUPS = [
 let stream = null;
 let pollTimer = null;
 let lastStateKey = "";
-let currentState = { active: false, domains: [], mode: "breathing" };
+let currentState = { active: false, domains: [], mode: "breathing", friction: {} };
 
 function normalizeHost(value) {
     return String(value || "")
@@ -68,6 +68,15 @@ function blockPageFullUrl(host, mode = "breathing") {
     return chrome.runtime.getURL(blockPagePath(host, mode).replace(/^\//, ""));
 }
 
+function normalizeFriction(friction = {}) {
+    return {
+        futureMessage: String(friction.futureMessage || "").trim(),
+        goals: Array.isArray(friction.goals)
+            ? friction.goals.map((goal) => String(goal).trim()).filter(Boolean)
+            : [],
+    };
+}
+
 function blockedPageUrl() {
     return chrome.runtime.getURL(BLOCKED_PAGE);
 }
@@ -78,7 +87,8 @@ function isBlockedPageUrl(url) {
 
 function stateKey(state) {
     const hosts = expandDomains(state?.domains || []).sort().join(",");
-    return `${state?.active ? "1" : "0"}:${hosts}:${state?.endsAt || 0}:${state?.mode || "breathing"}`;
+    const friction = normalizeFriction(state?.friction);
+    return `${state?.active ? "1" : "0"}:${hosts}:${state?.endsAt || 0}:${state?.mode || "breathing"}:${JSON.stringify(friction)}`;
 }
 
 async function getAllowedUntil() {
@@ -124,6 +134,7 @@ async function clearRules(connected) {
         connected,
         blocking: false,
         domains: [],
+        friction: normalizeFriction(),
         lastError: connected ? null : "Desktop app not reachable.",
     });
 }
@@ -144,8 +155,9 @@ function buildBlockRule(host, mode, index) {
 }
 
 async function applyRules(state) {
-    currentState = state || { active: false, domains: [], mode: "breathing" };
+    currentState = state || { active: false, domains: [], mode: "breathing", friction: {} };
     const mode = currentState.mode || "breathing";
+    const friction = normalizeFriction(currentState.friction);
     const hosts = state?.active && state?.domains?.length ? await activeHostsForState(state) : [];
     const key = `${stateKey(state)}:${hosts.sort().join(",")}`;
     if (key === lastStateKey) return;
@@ -182,6 +194,7 @@ async function applyRules(state) {
             })),
             endsAt: state.endsAt,
             mode,
+            friction,
             lastError: null,
         });
     } catch (error) {
@@ -191,6 +204,7 @@ async function applyRules(state) {
             blocking: false,
             domains: state.domains,
             hosts,
+            friction,
             lastError: error.message || "Could not apply browser blocking rules.",
         });
     }

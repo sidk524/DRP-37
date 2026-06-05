@@ -2,18 +2,23 @@ import "../styles/BlockerSetup.css";
 import { useEffect, useRef, useState } from "react";
 import DurationScrollPicker from "../components/DurationScrollPicker";
 import LockGraphic from "../components/LockGraphic";
+import Settings from "./Settings";
 import {
     createSession,
     endSession,
     loadActiveSession,
 } from "../services/BlockSessionRepository";
-import { getUserTotalPoints, saveSessionPoints, signOut } from "../services/SupabaseClient";
+import {
+    getUserTotalPoints,
+    loadOnboarding,
+    saveSessionPoints,
+    signOut,
+} from "../services/SupabaseClient";
 
 export function strictnessToMode(strictness) {
     if (strictness === "gentle") return "breathing";
     if (strictness === "moderate") return "reflect";
-    if (strictness === "strict") return "hard";
-    return "breathing";
+    return "reflect";
 }
 
 function normalizeWebsite(input) {
@@ -60,7 +65,7 @@ function sessionEndsAt(serverSession) {
     return sessionStartedAt(serverSession) + (serverSession?.total_duration_seconds || 60) * 1000;
 }
 
-function BlockerSetup({ session, defaultMode = "breathing" }) {
+function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }) {
     const [view, setView] = useState("duration");
     const [websites, setWebsites] = useState([]);
     const [urlInput, setUrlInput] = useState("");
@@ -74,6 +79,7 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
     const [points, setPoints] = useState(0);
     const [sessionError, setSessionError] = useState("");
     const [remoteSessionId, setRemoteSessionId] = useState(null);
+    const [onboardingSettings, setOnboardingSettings] = useState(null);
     const wasActiveRef = useRef(false);
     const lastAwardedEndedAtRef = useRef(null);
     const restoredSessionRef = useRef(false);
@@ -96,6 +102,15 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
         }
     }
 
+    async function loadFrictionContext() {
+        const settings = onboardingSettings || await loadOnboarding(session.user.id);
+        if (settings) setOnboardingSettings(settings);
+        return {
+            futureMessage: settings?.futureMessage || "",
+            goals: settings?.doMoreOf || [],
+        };
+    }
+
     async function startLocalSession(serverSession) {
         const endsAt = sessionEndsAt(serverSession);
         if (endsAt <= Date.now()) return null;
@@ -103,12 +118,14 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
         const selectedDomains = displayDomains(serverSession.domains_blocked);
         setWebsites(selectedDomains);
         setRemoteSessionId(serverSession.id);
+        const friction = await loadFrictionContext();
 
         const res = await window.tether?.startSession({
             sessionId: serverSession.id,
             appLabels: sessionLabels(serverSession),
             domains: serverSession.domains_blocked || [],
             mode,
+            friction,
             durationMinutes: sessionDurationMinutes(serverSession),
             startedAt: sessionStartedAt(serverSession),
             endsAt,
@@ -250,6 +267,36 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
         await signOut();
     }
 
+    async function handleSettingsSaved(settings) {
+        setOnboardingSettings(settings);
+        const nextMode = strictnessToMode(settings.strictness);
+        const friction = {
+            futureMessage: settings.futureMessage || "",
+            goals: settings.doMoreOf || [],
+        };
+        setMode(nextMode);
+        onStrictnessChange?.(settings.strictness);
+        if (sessionRunning) {
+            const res = await window.tether?.updateSession({
+                mode: nextMode,
+                friction,
+            });
+            if (res && !res.ok) {
+                setSessionError(res.error || "Could not update active session.");
+            }
+        }
+    }
+
+    if (view === "settings") {
+        return (
+            <Settings
+                session={session}
+                onBack={() => setView("duration")}
+                onSaved={handleSettingsSaved}
+            />
+        );
+    }
+
     if (view === "websites") {
         return (
             <div className="tether-screen">
@@ -344,9 +391,18 @@ function BlockerSetup({ session, defaultMode = "breathing" }) {
     return (
         <div className="tether-screen tether-screen-duration">
             <div className="tether-frame tether-frame-duration">
-                <button type="button" className="tether-logout" onClick={handleSignOut}>
-                    Log out
-                </button>
+                <div className="tether-header-actions">
+                    <button
+                        type="button"
+                        className="tether-header-action"
+                        onClick={() => setView("settings")}
+                    >
+                        Settings
+                    </button>
+                    <button type="button" className="tether-header-action" onClick={handleSignOut}>
+                        Log out
+                    </button>
+                </div>
 
                 <h1 className="tether-brand">Tether</h1>
                 <p className="tether-subtitle">

@@ -9,6 +9,10 @@ let session = {
     appLabels: [],
     domains: [],
     mode: "breathing",
+    friction: {
+        futureMessage: "",
+        goals: [],
+    },
     startedAt: null,
     endsAt: null,
     durationMinutes: 0,
@@ -23,6 +27,7 @@ function sessionView() {
         mode: session.mode,
         appLabels: session.appLabels,
         domains: session.domains,
+        friction: session.friction,
         startedAt: session.startedAt,
         endsAt: session.endsAt,
         durationMinutes: session.durationMinutes,
@@ -37,6 +42,16 @@ function extensionBlockState() {
         domains: session.domains,
         endsAt: session.endsAt,
         mode: session.mode,
+        friction: session.friction,
+    };
+}
+
+function normalizeFriction(friction = {}) {
+    return {
+        futureMessage: String(friction.futureMessage || "").trim(),
+        goals: Array.isArray(friction.goals)
+            ? friction.goals.map((goal) => String(goal).trim()).filter(Boolean)
+            : [],
     };
 }
 
@@ -53,6 +68,7 @@ function startSession({
     appLabels = [],
     domains = [],
     mode = "breathing",
+    friction = {},
     durationMinutes = 30,
     startedAt = null,
     endsAt = null,
@@ -75,6 +91,7 @@ function startSession({
         appLabels,
         domains: normalizedDomains,
         mode: resolvedMode,
+        friction: normalizeFriction(friction),
         startedAt: safeStartedAt,
         endsAt: safeEndsAt,
         durationMinutes: safeDurationMinutes,
@@ -92,6 +109,24 @@ function startSession({
     console.log(
         `[blocker] session started · ${session.mode} · ${durationMinutes}m · [${normalizedDomains.join(", ")}]`
     );
+    broadcast();
+    return { ok: true, session: sessionView() };
+}
+
+function updateSession({ mode, friction } = {}) {
+    if (!session.active) {
+        return { ok: false, error: "No active session to update." };
+    }
+
+    if (mode !== undefined) {
+        session.mode = ["breathing", "reflect"].includes(mode) ? mode : "reflect";
+    }
+
+    if (friction !== undefined) {
+        session.friction = normalizeFriction(friction);
+    }
+
+    console.log(`[blocker] session updated · ${session.mode}`);
     broadcast();
     return { ok: true, session: sessionView() };
 }
@@ -121,6 +156,10 @@ function stopSession(reason = "manual") {
         appLabels: [],
         domains: [],
         mode: "breathing",
+        friction: {
+            futureMessage: "",
+            goals: [],
+        },
         startedAt: null,
         endsAt: null,
         durationMinutes: 0,
@@ -132,6 +171,7 @@ function stopSession(reason = "manual") {
 
 function registerIpc() {
     ipcMain.handle("session:start", (_e, cfg) => startSession(cfg));
+    ipcMain.handle("session:update", (_e, cfg) => updateSession(cfg));
     ipcMain.handle("session:get", () => sessionView());
     ipcMain.handle("extension:status", () => extensionBridge.status());
 

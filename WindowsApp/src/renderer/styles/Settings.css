@@ -1,0 +1,74 @@
+.settings-screen {
+    overflow-y: auto;
+}
+
+.settings-frame {
+    width: 84%;
+    max-width: 620px;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 32px;
+}
+
+.settings-title {
+    font-size: clamp(2rem, 5vw, 2.5rem);
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 10px;
+}
+
+.settings-subtitle {
+    color: #8e8e96;
+    font-size: 1rem;
+    line-height: 1.45;
+    margin-bottom: 22px;
+}
+
+.settings-status {
+    color: #8e8e96;
+    font-size: 1rem;
+    padding: 24px 0;
+}
+
+.settings-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.settings-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    padding: 20px;
+    background: #1f1f22;
+    border: 1px solid #2c2c30;
+    border-radius: 20px;
+}
+
+.settings-card-title {
+    color: #ffffff;
+    font-size: 1.15rem;
+    line-height: 1.35;
+    margin: 0;
+}
+
+.settings-error {
+    margin-top: 16px;
+}
+
+.settings-saved {
+    color: #30d158;
+    font-size: 0.95rem;
+    margin-top: 16px;
+}
+
+.settings-save {
+    margin-top: 18px;
+}
+
+.settings-save.btn-continue:not(:disabled) {
+    background: #0a84ff;
+    color: #ffffff;
+}
