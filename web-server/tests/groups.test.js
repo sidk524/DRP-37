@@ -1,0 +1,220 @@
+const request = require("supertest");
+
+const makeQuery = (result) => {
+    const query = {
+        then: (resolve, reject) => Promise.resolve(result).then(resolve, reject)
+    };
+    [
+        "eq",
+        "in",
+        "insert",
+        "not",
+        "select"
+    ].forEach((method) => {
+        query[method] = jest.fn(() => query);
+    });
+    [
+        "maybeSingle",
+        "single"
+    ].forEach((method) => {
+        query[method] = jest.fn(async () => result);
+    });
+    return query;
+};
+
+const loadApp = ({ authResult, adminQueries, usersById = {} }) => {
+    jest.resetModules();
+    process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_PUBLISHABLE_KEY = "publishable-key";
+    process.env.SUPABASE_SECRET_KEY = "secret-key";
+
+    const getUser = jest.fn(async () => authResult || {
+        data: { user: { id: "user-1" } },
+        error: null
+    });
+    const getUserById = jest.fn(async (userId) => ({
+        data: { user: usersById[userId] || { id: userId, email: `${userId}@example.com` } },
+        error: null
+    }));
+    const from = jest.fn(() => {
+        const query = adminQueries.shift();
+        if (!query) throw new Error("Unexpected Supabase query");
+        return query;
+    });
+
+    jest.doMock("@supabase/supabase-js", () => ({
+        createClient: jest.fn()
+            .mockReturnValueOnce({ auth: { getUser } })
+            .mockReturnValueOnce({ from, auth: { admin: { getUserById } } })
+    }));
+
+    return {
+        app: require("../src/app"),
+        from,
+        getUser,
+        getUserById
+    };
+};
+
+const authorizedPost = (app, path) => request(app)
+    .post(path)
+    .set("Authorization", "Bearer token");
+
+const authorizedGet = (app, path) => request(app)
+    .get(path)
+    .set("Authorization", "Bearer token");
+
+describe("group leaderboard API", () => {
+    afterEach(() => {
+        jest.dontMock("@supabase/supabase-js");
+        delete process.env.SUPABASE_URL;
+        delete process.env.SUPABASE_PUBLISHABLE_KEY;
+        delete process.env.SUPABASE_SECRET_KEY;
+    });
+
+    it("creates a group and adds the creator as a member", async () => {
+        const group = {
+            id: "group-1",
+            name: "Study Squad",
+            invite_code: "ABCDEFGH",
+            created_by: "user-1",
+            created_at: "2026-06-05T09:00:00.000Z"
+        };
+        const createQuery = makeQuery({ data: group, error: null });
+        const memberQuery = makeQuery({ data: { id: "member-1" }, error: null });
+        const { app } = loadApp({ adminQueries: [createQuery, memberQuery] });
+
+        const response = await authorizedPost(app, "/api/groups")
+            .send({ name: "  Study Squad  " });
+
+        expect(response.status).toBe(201);
+        expect(response.body).toEqual({
+            group: {
+                id: "group-1",
+                name: "Study Squad",
+                inviteCode: "ABCDEFGH",
+                createdBy: "user-1",
+                createdAt: "2026-06-05T09:00:00.000Z",
+                memberCount: 1
+            }
+        });
+        expect(createQuery.insert).toHaveBeenCalledWith({
+            name: "Study Squad",
+            invite_code: expect.stringMatching(/^[A-Z0-9]{8}$/),
+            created_by: "user-1"
+        });
+        expect(memberQuery.insert).toHaveBeenCalledWith({
+            group_id: "group-1",
+            user_id: "user-1"
+        });
+    });
+
+    it("joins a group with an invite code", async () => {
+        const group = {
+            id: "group-1",
+            name: "Study Squad",
+            invite_code: "ABCDEFGH",
+            created_by: "user-2",
+            created_at: "2026-06-05T09:00:00.000Z"
+        };
+        const groupQuery = makeQuery({ data: group, error: null });
+        const memberQuery = makeQuery({ data: { id: "member-2" }, error: null });
+        const countQuery = makeQuery({ data: [{ id: "member-1" }, { id: "member-2" }], error: null });
+        const { app } = loadApp({ adminQueries: [groupQuery, memberQuery, countQuery] });
+
+        const response = await authorizedPost(app, "/api/groups/join")
+            .send({ inviteCode: " abcd efgh " });
+
+        expect(response.status).toBe(200);
+        expect(groupQuery.eq).toHaveBeenCalledWith("invite_code", "ABCDEFGH");
+        expect(response.body.group.memberCount).toBe(2);
+    });
+
+    it("treats duplicate group joins as successful", async () => {
+        const group = {
+            id: "group-1",
+            name: "Study Squad",
+            invite_code: "ABCDEFGH",
+            created_by: "user-2",
+            created_at: "2026-06-05T09:00:00.000Z"
+        };
+        const groupQuery = makeQuery({ data: group, error: null });
+        const memberQuery = makeQuery({ data: null, error: { code: "23505" } });
+        const countQuery = makeQuery({ data: [{ id: "member-1" }, { id: "member-2" }], error: null });
+        const { app } = loadApp({ adminQueries: [groupQuery, memberQuery, countQuery] });
+
+        const response = await authorizedPost(app, "/api/groups/join")
+            .send({ inviteCode: "ABCDEFGH" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.group.memberCount).toBe(2);
+    });
+
+    it("rejects leaderboard reads for non-members", async () => {
+        const membershipQuery = makeQuery({ data: null, error: null });
+        const { app } = loadApp({ adminQueries: [membershipQuery] });
+
+        const response = await authorizedGet(app, "/api/groups/group-1/leaderboard");
+
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ error: "You are not a member of this group" });
+    });
+
+    it("ranks group members by all-time locked-in seconds", async () => {
+        const membershipQuery = makeQuery({ data: { id: "member-1" }, error: null });
+        const membersQuery = makeQuery({
+            data: [
+                { user_id: "user-1" },
+                { user_id: "user-2" }
+            ],
+            error: null
+        });
+        const sessionsQuery = makeQuery({
+            data: [
+                {
+                    user_id: "user-1",
+                    total_duration_seconds: 120,
+                    started_at: "2026-06-05T09:00:00.000Z",
+                    ended_at: "2026-06-05T09:01:00.000Z"
+                },
+                {
+                    user_id: "user-2",
+                    total_duration_seconds: 60,
+                    started_at: "2026-06-05T09:00:00.000Z",
+                    ended_at: "2026-06-05T09:05:00.000Z"
+                }
+            ],
+            error: null
+        });
+        const { app } = loadApp({
+            adminQueries: [membershipQuery, membersQuery, sessionsQuery],
+            usersById: {
+                "user-1": { id: "user-1", email: "alice@example.com" },
+                "user-2": { id: "user-2", email: "bob@example.com" }
+            }
+        });
+
+        const response = await authorizedGet(app, "/api/groups/group-1/leaderboard");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            leaderboard: [
+                {
+                    rank: 1,
+                    userId: "user-1",
+                    displayName: "alice",
+                    lockedSeconds: 60,
+                    isCurrentUser: true
+                },
+                {
+                    rank: 2,
+                    userId: "user-2",
+                    displayName: "bob",
+                    lockedSeconds: 60,
+                    isCurrentUser: false
+                }
+            ]
+        });
+        expect(sessionsQuery.not).toHaveBeenCalledWith("ended_at", "is", null);
+    });
+});

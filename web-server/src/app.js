@@ -1,5 +1,6 @@
 const express = require("express");
 const helmet = require("helmet");
+const { randomInt } = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 const ws = require("ws");
 const { expandBlockTargets } = require("./expandBlockTargets");
@@ -28,6 +29,8 @@ const supabaseAdmin = supabaseUrl && supabaseSecretKey
 
 const app = express();
 const SESSION_FIELDS = "id,user_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
+const GROUP_FIELDS = "id,name,invite_code,created_by,created_at";
+const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 app.disable("x-powered-by");
 app.use(helmet());
@@ -37,7 +40,7 @@ app.use((req, res, next) => {
         res.setHeader("Access-Control-Allow-Origin", origin);
         res.setHeader("Vary", "Origin");
     }
-    res.setHeader("Access-Control-Allow-Methods", "GET,PUT,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,Accept");
     if (req.method === "OPTIONS") {
         res.sendStatus(204);
@@ -135,6 +138,254 @@ const validateStringArray = (value, fieldName) => {
     }
     return value;
 };
+
+const makeHttpError = (status, message) => {
+    const error = new Error(message);
+    error.status = status;
+    return error;
+};
+
+const generateInviteCode = () => {
+    let code = "";
+    for (let index = 0; index < 8; index += 1) {
+        code += INVITE_ALPHABET[randomInt(INVITE_ALPHABET.length)];
+    }
+    return code;
+};
+
+const normalizeInviteCode = (value) => String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+
+const publicGroup = (group, memberCount = 1) => ({
+    id: group.id,
+    name: group.name,
+    inviteCode: group.invite_code,
+    createdBy: group.created_by,
+    createdAt: group.created_at,
+    memberCount
+});
+
+const createGroupWithInvite = async (userId, name) => {
+    let lastError = null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+        const { data, error } = await supabaseAdmin
+            .from("leaderboard_groups")
+            .insert({
+                name,
+                invite_code: generateInviteCode(),
+                created_by: userId
+            })
+            .select(GROUP_FIELDS)
+            .single();
+
+        if (!error) return data;
+        lastError = error;
+        if (error.code !== "23505") throw error;
+    }
+    throw lastError || new Error("Could not create a unique invite code");
+};
+
+const ensureGroupMember = async (groupId, userId) => {
+    const { error } = await supabaseAdmin
+        .from("group_members")
+        .insert({
+            group_id: groupId,
+            user_id: userId
+        })
+        .select("id")
+        .maybeSingle();
+
+    if (error && error.code !== "23505") throw error;
+};
+
+const listUserGroups = async (userId) => {
+    const { data: memberships, error: membershipError } = await supabaseAdmin
+        .from("group_members")
+        .select("group_id")
+        .eq("user_id", userId);
+
+    if (membershipError) throw membershipError;
+    const groupIds = [...new Set((memberships || []).map((membership) => membership.group_id).filter(Boolean))];
+    if (!groupIds.length) return [];
+
+    const { data: groups, error: groupsError } = await supabaseAdmin
+        .from("leaderboard_groups")
+        .select(GROUP_FIELDS)
+        .in("id", groupIds);
+
+    if (groupsError) throw groupsError;
+
+    const { data: allMembers, error: membersError } = await supabaseAdmin
+        .from("group_members")
+        .select("group_id")
+        .in("group_id", groupIds);
+
+    if (membersError) throw membersError;
+
+    const memberCounts = new Map();
+    for (const member of allMembers || []) {
+        memberCounts.set(member.group_id, (memberCounts.get(member.group_id) || 0) + 1);
+    }
+
+    return (groups || [])
+        .map((group) => publicGroup(group, memberCounts.get(group.id) || 0))
+        .sort((left, right) => left.name.localeCompare(right.name));
+};
+
+const assertGroupMember = async (groupId, userId) => {
+    const { data, error } = await supabaseAdmin
+        .from("group_members")
+        .select("id")
+        .eq("group_id", groupId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw makeHttpError(403, "You are not a member of this group");
+};
+
+const groupMemberCount = async (groupId) => {
+    const { data, error } = await supabaseAdmin
+        .from("group_members")
+        .select("id")
+        .eq("group_id", groupId);
+
+    if (error) throw error;
+    return (data || []).length;
+};
+
+const lockedSecondsForSession = (session) => {
+    const startedAt = new Date(session.started_at).getTime();
+    const endedAt = new Date(session.ended_at).getTime();
+    if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt) || endedAt <= startedAt) return 0;
+    const elapsedSeconds = Math.floor((endedAt - startedAt) / 1000);
+    const plannedSeconds = Number(session.total_duration_seconds);
+    if (!Number.isFinite(plannedSeconds) || plannedSeconds <= 0) return Math.max(0, elapsedSeconds);
+    return Math.max(0, Math.min(elapsedSeconds, plannedSeconds));
+};
+
+const displayNameForUser = async (userId) => {
+    const getUserById = supabaseAdmin.auth?.admin?.getUserById;
+    if (!getUserById) return "User";
+    const { data, error } = await getUserById(userId);
+    if (error) return "User";
+    const user = data?.user;
+    return user?.user_metadata?.name
+        || user?.user_metadata?.full_name
+        || user?.email?.split("@")[0]
+        || "User";
+};
+
+app.post("/api/groups", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const name = String(req.body?.name || "").trim();
+        if (!name) {
+            res.status(400).json({ error: "name is required" });
+            return;
+        }
+        if (name.length > 80) {
+            res.status(400).json({ error: "name must be 80 characters or fewer" });
+            return;
+        }
+
+        const group = await createGroupWithInvite(req.user.id, name);
+        await ensureGroupMember(group.id, req.user.id);
+        res.status(201).json({ group: publicGroup(group, 1) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.get("/api/groups", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const groups = await listUserGroups(req.user.id);
+        res.json({ groups });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.post("/api/groups/join", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const inviteCode = normalizeInviteCode(req.body?.inviteCode);
+        if (!inviteCode) {
+            res.status(400).json({ error: "inviteCode is required" });
+            return;
+        }
+
+        const { data: group, error } = await supabaseAdmin
+            .from("leaderboard_groups")
+            .select(GROUP_FIELDS)
+            .eq("invite_code", inviteCode)
+            .maybeSingle();
+
+        if (error) throw error;
+        if (!group) {
+            res.status(404).json({ error: "Invite code not found" });
+            return;
+        }
+
+        await ensureGroupMember(group.id, req.user.id);
+        const memberCount = await groupMemberCount(group.id);
+        res.json({ group: publicGroup(group, memberCount) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.get("/api/groups/:groupId/leaderboard", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const { groupId } = req.params;
+        await assertGroupMember(groupId, req.user.id);
+
+        const { data: members, error: membersError } = await supabaseAdmin
+            .from("group_members")
+            .select("user_id")
+            .eq("group_id", groupId);
+
+        if (membersError) throw membersError;
+
+        const memberIds = [...new Set((members || []).map((member) => member.user_id).filter(Boolean))];
+        if (!memberIds.length) {
+            res.json({ leaderboard: [] });
+            return;
+        }
+
+        const { data: sessions, error: sessionsError } = await supabaseAdmin
+            .from("block_sessions")
+            .select("user_id,total_duration_seconds,started_at,ended_at")
+            .in("user_id", memberIds)
+            .not("ended_at", "is", null);
+
+        if (sessionsError) throw sessionsError;
+
+        const totals = new Map(memberIds.map((userId) => [userId, 0]));
+        for (const session of sessions || []) {
+            totals.set(session.user_id, (totals.get(session.user_id) || 0) + lockedSecondsForSession(session));
+        }
+
+        const names = new Map(await Promise.all(memberIds.map(async (userId) => [
+            userId,
+            await displayNameForUser(userId)
+        ])));
+
+        const leaderboard = memberIds
+            .map((userId) => ({
+                userId,
+                displayName: names.get(userId) || "User",
+                lockedSeconds: totals.get(userId) || 0,
+                isCurrentUser: userId === req.user.id
+            }))
+            .sort((left, right) => right.lockedSeconds - left.lockedSeconds || left.displayName.localeCompare(right.displayName))
+            .map((entry, index) => ({
+                rank: index + 1,
+                ...entry
+            }));
+
+        res.json({ leaderboard });
+    } catch (error) {
+        next(error);
+    }
+});
 
 app.get("/api/session/current", requireSupabase, requireUser, async (req, res, next) => {
     try {

@@ -2,6 +2,7 @@ import "../styles/BlockerSetup.css";
 import { useEffect, useRef, useState } from "react";
 import DurationScrollPicker from "../components/DurationScrollPicker";
 import LockGraphic from "../components/LockGraphic";
+import Groups from "./Groups";
 import Settings from "./Settings";
 import {
     createSession,
@@ -298,6 +299,10 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         );
     }
 
+    if (view === "groups") {
+        return <Groups onBack={() => setView("duration")} />;
+    }
+
     if (view === "websites") {
         return (
             <div className="tether-screen">
@@ -393,6 +398,13 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         <div className="tether-screen tether-screen-duration">
             <div className="tether-frame tether-frame-duration">
                 <div className="tether-header-actions">
+                    <button
+                        type="button"
+                        className="tether-header-action"
+                        onClick={() => setView("groups")}
+                    >
+                        Groups
+                    </button>
                     <button
                         type="button"
                         className="tether-header-action"
