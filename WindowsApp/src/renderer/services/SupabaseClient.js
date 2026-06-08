@@ -93,6 +93,18 @@ export async function getCurrentUser() {
 }
 
 function toStringArray(value) {
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) return toStringArray(parsed);
+        } catch (e) {
+            // Not JSON, maybe comma separated?
+            if (value.includes(',')) {
+                return value.split(',').map(s => s.trim()).filter(Boolean);
+            }
+        }
+        return [value.trim()].filter(Boolean);
+    }
     if (!Array.isArray(value)) return [];
     return value.map((item) => String(item || "").trim()).filter(Boolean);
 }

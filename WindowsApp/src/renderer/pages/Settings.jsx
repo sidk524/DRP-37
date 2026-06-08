@@ -25,10 +25,11 @@ function Settings({ session, onBack, onSaved }) {
 
     const choiceSteps = useMemo(() => STEPS.filter((step) => step.multiKey), []);
     const selectedStrictness = STRICTNESS_LEVELS.find((level) => level.value === responses.strictness);
-    const canSave =
-        responses.doMoreOf.length > 0 &&
-        responses.scrollingWorst.length > 0 &&
-        responses.futureMessage.trim().length > 0;
+    const [initialResponses, setInitialResponses] = useState(DEFAULT_RESPONSES);
+    const isDirty = useMemo(() => {
+        if (loading) return false;
+        return JSON.stringify(responses) !== JSON.stringify(initialResponses);
+    }, [responses, initialResponses, loading]);
 
     useEffect(() => {
         let active = true;
@@ -36,7 +37,9 @@ function Settings({ session, onBack, onSaved }) {
         loadOnboarding(session.user.id)
             .then((data) => {
                 if (!active) return;
-                setResponses(data || DEFAULT_RESPONSES);
+                const nextResponses = data || DEFAULT_RESPONSES;
+                setResponses(nextResponses);
+                setInitialResponses(nextResponses);
             })
             .catch((err) => {
                 if (!active) return;
@@ -80,7 +83,6 @@ function Settings({ session, onBack, onSaved }) {
     }
 
     async function handleSave() {
-        if (!canSave) return;
         setSaving(true);
         setError("");
         setSaved(false);
@@ -92,6 +94,7 @@ function Settings({ session, onBack, onSaved }) {
             await saveOnboarding(session.user.id, nextResponses);
             await syncDefaultGroups({ scrollingWorst: nextResponses.scrollingWorst });
             setResponses(nextResponses);
+            setInitialResponses(nextResponses);
             await onSaved?.(nextResponses);
             setSaved(true);
         } catch (err) {
@@ -128,7 +131,10 @@ function Settings({ session, onBack, onSaved }) {
                                 <h2 className="settings-card-title">{step.question}</h2>
                                 <div className="onboarding-options">
                                     {step.options.map((option) => {
-                                        const selected = responses[step.multiKey].includes(option.label);
+                                        const selectedArray = Array.isArray(responses[step.multiKey]) 
+                                            ? responses[step.multiKey] 
+                                            : [];
+                                        const selected = selectedArray.includes(option.label);
                                         return (
                                             <button
                                                 key={option.label}
@@ -155,7 +161,7 @@ function Settings({ session, onBack, onSaved }) {
                                     <p>
                                         {responses.futureMessage.trim()
                                             ? `“${responses.futureMessage.trim()}”`
-                                            : `“${LETTER_PLACEHOLDER}”`}
+                                            : loading ? "" : `“${LETTER_PLACEHOLDER}”`}
                                     </p>
                                 </div>
                                 <textarea
@@ -201,7 +207,7 @@ function Settings({ session, onBack, onSaved }) {
                 <button
                     type="button"
                     className="btn-continue onboarding-cta settings-save"
-                    disabled={!canSave || loading || saving}
+                    disabled={!isDirty || loading || saving}
                     onClick={handleSave}
                 >
                     {saving ? "Saving..." : "Save settings"}
