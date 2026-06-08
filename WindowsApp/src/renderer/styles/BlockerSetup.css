@@ -372,3 +372,82 @@
 .tether-done:hover {
     filter: brightness(1.08);
 }
+
+.tether-complete {
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+}
+
+.tether-complete-icon {
+    font-size: 5rem;
+    margin-bottom: 20px;
+}
+
+.tether-points-large {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 40px 0;
+}
+
+.tether-points-value {
+    font-size: 4.5rem;
+    font-weight: 800;
+    color: #0a84ff;
+    line-height: 1;
+}
+
+.tether-points-label {
+    font-size: 1.2rem;
+    color: #8e8e96;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.tether-breakdown {
+    width: 100%;
+    background: #1c1c1e;
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 40px;
+    box-sizing: border-box;
+}
+
+.tether-breakdown-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.tether-breakdown-item {
+    margin-bottom: 16px;
+}
+
+.tether-breakdown-item:last-child {
+    margin-bottom: 0;
+}
+
+.tether-breakdown-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tether-breakdown-label {
+    color: #8e8e96;
+    font-size: 1rem;
+}
+
+.tether-breakdown-value {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.tether-complete-btn {
+    margin-top: auto;
+    width: 100%;
+}

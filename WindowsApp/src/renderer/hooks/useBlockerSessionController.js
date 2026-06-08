@@ -55,6 +55,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
     const [sessionError, setSessionError] = useState("");
     const [remoteSessionId, setRemoteSessionId] = useState(null);
     const [onboardingSettings, setOnboardingSettings] = useState(null);
+    const [lastCompletedSession, setLastCompletedSession] = useState(null);
     const wasActiveRef = useRef(false);
     const lastAwardedEndedAtRef = useRef(null);
     const restoredSessionRef = useRef(false);
@@ -121,7 +122,10 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             .then(async (serverSession) => {
                 if (!serverSession) return;
                 const restored = await startLocalSession(serverSession);
-                if (restored) setActive(restored);
+                if (restored) {
+                    setActive(restored);
+                    wasActiveRef.current = true;
+                }
             })
             .catch((error) => {
                 setSessionError(error.message || "Could not restore active session.");
@@ -135,7 +139,13 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         }
 
         getTetherSession()
-            .then((s) => setActive(s?.active ? s : null))
+            .then((s) => {
+                const isActive = !!s?.active;
+                setActive(isActive ? s : null);
+                // We do NOT update wasActiveRef here to avoid missing the transition
+                // if getTetherSession returns the same state as the first listener update.
+                // In 4d07ff8c, wasActiveRef was only updated in the listener.
+            })
             .catch((error) => {
                 console.error("Failed to get current focus session:", error);
                 setSessionError("Could not load current focus session.");
@@ -150,15 +160,22 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             if (wasActive && !isActive && endedAt && endedAt !== lastAwardedEndedAtRef.current) {
                 try {
                     if (endedByExpiry) {
-                        await saveSessionPoints({
-                            userId,
-                            mode: s.lastStop.mode,
-                            actualMs: s.lastStop.actualMs,
-                            plannedMs: s.lastStop.plannedMs,
-                            blockedAppsCount: s.lastStop.blockedAppsCount,
-                            endedAt: new Date(endedAt).toISOString(),
-                        });
-                        await refreshPoints();
+                        try {
+                            const summary = await saveSessionPoints({
+                                userId,
+                                mode: s.lastStop.mode,
+                                actualMs: s.lastStop.actualMs,
+                                plannedMs: s.lastStop.plannedMs,
+                                blockedAppsCount: s.lastStop.blockedAppsCount,
+                                endedAt: new Date(endedAt).toISOString(),
+                            });
+                            if (summary) {
+                                setLastCompletedSession(summary);
+                                await refreshPoints();
+                            }
+                        } catch (err) {
+                            console.error("Failed to save session points:", err);
+                        }
                     }
                     if (remoteSessionId) {
                         await endSession(remoteSessionId);
@@ -216,7 +233,10 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         try {
             const serverSession = await createSession({ domainsBlocked: websites, totalDurationSeconds: totalSeconds });
             const localSession = await startLocalSession(serverSession);
-            if (localSession) setActive(localSession);
+            if (localSession) {
+                setActive(localSession);
+                wasActiveRef.current = true;
+            }
         } catch (error) {
             setSessionError(error.message || "Could not start block session.");
         }
@@ -272,6 +292,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         sessionError,
         sessionRunning,
         selectedCount,
+        lastCompletedSession,
         setUrlInput,
         setUrlError,
         setHours,
@@ -283,5 +304,6 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         handleStopSession,
         handleSignOut,
         handleSettingsSaved,
+        setLastCompletedSession,
     };
 }

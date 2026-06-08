@@ -7,13 +7,13 @@ const IPC_CHANNELS = Object.freeze({
     sessionGet: "session:get",
     extensionStatus: "extension:status",
     oauthLogin: "oauth:login",
-    oauthRedirectUrl: "oauth:redirectUrl",
+    oauthRedirectUrl: "oauth:redirect-url",
     authSubmit: "auth:submit",
     webServerRequest: "webserver:request",
 });
 
 const IPC_EVENTS = Object.freeze({
-    sessionUpdate: "session:update:push",
+    sessionUpdate: "session:update",
 });
 
 async function invoke(channel, payload) {

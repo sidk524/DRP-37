@@ -4,6 +4,7 @@ import DurationScrollPicker from "../components/DurationScrollPicker";
 import LockGraphic from "../components/LockGraphic";
 import Groups from "./Groups";
 import Settings from "./Settings";
+import SessionComplete from "./SessionComplete";
 import { useBlockerSessionController } from "../hooks/useBlockerSessionController";
 
 export function strictnessToMode(strictness) {
@@ -45,6 +46,8 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         handleStopSession,
         handleSignOut,
         handleSettingsSaved,
+        lastCompletedSession,
+        setLastCompletedSession,
     } = useBlockerSessionController({
         userId: session.user.id,
         defaultMode,
@@ -63,6 +66,18 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
 
     if (view === "groups") {
         return <Groups onBack={() => setView("duration")} />;
+    }
+
+    if (lastCompletedSession) {
+        return (
+            <SessionComplete
+                session={lastCompletedSession}
+                onDone={() => {
+                    setLastCompletedSession(null);
+                    setView("duration");
+                }}
+            />
+        );
     }
 
     if (view === "websites") {
