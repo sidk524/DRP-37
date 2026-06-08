@@ -1,21 +1,50 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld('tether', {
-    getOAuthRedirectUrl: () => ipcRenderer.invoke('oauth:redirect-url'),
-    oauthLogin: (url) => ipcRenderer.invoke('oauth:login', url),
-    startSession: (config) => ipcRenderer.invoke('session:start', config),
-    updateSession: (config) => ipcRenderer.invoke('session:update', config),
-    stopSession: () => ipcRenderer.invoke('session:stop'),
-    getSession: () => ipcRenderer.invoke('session:get'),
-    getExtensionStatus: () => ipcRenderer.invoke('extension:status'),
-    webServerRequest: (payload) => ipcRenderer.invoke('webserver:request', payload),
+const IPC_CHANNELS = Object.freeze({
+    sessionStart: "session:start",
+    sessionUpdate: "session:update",
+    sessionStop: "session:stop",
+    sessionGet: "session:get",
+    extensionStatus: "extension:status",
+    oauthLogin: "oauth:login",
+    oauthRedirectUrl: "oauth:redirectUrl",
+    authSubmit: "auth:submit",
+    webServerRequest: "webserver:request",
+});
+
+const IPC_EVENTS = Object.freeze({
+    sessionUpdate: "session:update:push",
+});
+
+async function invoke(channel, payload) {
+    try {
+        return await ipcRenderer.invoke(channel, payload);
+    } catch (err) {
+        const wrapped = new Error(`IPC invoke failed for '${channel}': ${err?.message || err}`);
+        wrapped.cause = err;
+        throw wrapped;
+    }
+}
+
+contextBridge.exposeInMainWorld("tether", {
+    getOAuthRedirectUrl: () => invoke(IPC_CHANNELS.oauthRedirectUrl),
+    oauthLogin: (url) => invoke(IPC_CHANNELS.oauthLogin, url),
+    startSession: (config) => invoke(IPC_CHANNELS.sessionStart, config),
+    updateSession: (config) => invoke(IPC_CHANNELS.sessionUpdate, config),
+    stopSession: () => invoke(IPC_CHANNELS.sessionStop),
+    getSession: () => invoke(IPC_CHANNELS.sessionGet),
+    getExtensionStatus: () => invoke(IPC_CHANNELS.extensionStatus),
+    webServerRequest: (payload) => invoke(IPC_CHANNELS.webServerRequest, payload),
     onSessionUpdate: (callback) => {
+        if (typeof callback !== "function") {
+            throw new TypeError("onSessionUpdate callback must be a function.");
+        }
         const listener = (_event, data) => callback(data);
-        ipcRenderer.on('session:update', listener);
-        return () => ipcRenderer.removeListener('session:update', listener);
+        ipcRenderer.on(IPC_EVENTS.sessionUpdate, listener);
+        return () => ipcRenderer.removeListener(IPC_EVENTS.sessionUpdate, listener);
     },
-})
+});
 
 contextBridge.exposeInMainWorld("electronAPI", {
-    submitAuthForm: (payload) => ipcRenderer.invoke("auth:submit", payload),
+    submitAuthForm: (payload) => invoke(IPC_CHANNELS.authSubmit, payload),
 });
