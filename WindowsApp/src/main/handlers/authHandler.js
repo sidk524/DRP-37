@@ -1,41 +1,61 @@
 const { ipcMain } = require("electron");
+const { IPC_CHANNELS } = require("../../shared/ipc/contracts");
+
+let registered = false;
+
+function normalizePayload(payload) {
+    const safePayload = payload && typeof payload === "object" ? payload : {};
+    return {
+        email: String(safePayload.email || "").trim(),
+        password: String(safePayload.password || ""),
+        formEndpoint: String(safePayload.formEndpoint || "").trim().toLowerCase(),
+    };
+}
 
 function registerAuthHandlers() {
-    ipcMain.handle("auth:submit", async (event, payload) => {
-        const { email, password, formEndpoint } = payload;
+    if (registered) return;
+    ipcMain.removeHandler(IPC_CHANNELS.authSubmit);
+    ipcMain.handle(IPC_CHANNELS.authSubmit, async (_event, payload) => {
+        try {
+            const { email, password, formEndpoint } = normalizePayload(payload);
+            console.log("Auth form submit:", { formEndpoint, hasEmail: !!email, hasPassword: !!password });
 
-        console.log("Form endpoint:", formEndpoint);
-        console.log("Email:", email);
-        console.log("Password:", password);
+            if (!email || !password) {
+                return {
+                    success: false,
+                    message: "Email and password are required.",
+                };
+            }
 
-        if (!email || !password) {
+            if (formEndpoint === "login") {
+                // Login logic goes here
+                return {
+                    success: true,
+                    message: "Login submitted successfully.",
+                };
+            }
+
+            if (formEndpoint === "register") {
+                // Register logic goes here
+                return {
+                    success: true,
+                    message: "Register submitted successfully.",
+                };
+            }
+
             return {
                 success: false,
-                message: "Email and password are required.",
+                message: "Unknown auth action.",
             };
-        }
-
-        if (formEndpoint === "login") {
-            // Login logic goes here
+        } catch (err) {
+            console.error("[auth] auth-submit handler failed:", err);
             return {
-                success: true,
-                message: "Login submitted successfully.",
+                success: false,
+                message: "Unable to process authentication request.",
             };
         }
-
-        if (formEndpoint === "register") {
-            // Register logic goes here
-            return {
-                success: true,
-                message: "Register submitted successfully.",
-            };
-        }
-
-        return {
-            success: false,
-            message: "Unknown auth action.",
-        };
     });
+    registered = true;
 }
 
 module.exports = {

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getTetherOAuthRedirectUrl, tetherOAuthLogin, tetherApi } from "./TetherClient";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -35,11 +36,11 @@ export async function signInWithEmail(email, password) {
 }
 
 export async function signInWithGoogle() {
-    if (!window.tether?.oauthLogin || !window.tether?.getOAuthRedirectUrl) {
+    if (!tetherApi()?.oauthLogin || !tetherApi()?.getOAuthRedirectUrl) {
         throw new Error('Google sign-in is only available in the desktop app.');
     }
 
-    const redirectTo = await window.tether.getOAuthRedirectUrl();
+    const redirectTo = await getTetherOAuthRedirectUrl();
 
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -51,7 +52,7 @@ export async function signInWithGoogle() {
     if (error) throw error;
     if (!data?.url) throw new Error('Could not start Google sign-in.');
 
-    const callback = await window.tether.oauthLogin(data.url);
+    const callback = await tetherOAuthLogin(data.url);
 
     if (callback?.code) {
         const { data: sessionData, error: sessionError } =
@@ -73,7 +74,9 @@ export async function signInWithGoogle() {
 }
 
 export async function getSession() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    const session = data?.session ?? null;
     return session;
 }
 
@@ -83,8 +86,19 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    const user = data?.user ?? null;
     return user;
+}
+
+function toStringArray(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
+function normalizeStrictness(strictness) {
+    return ["gentle", "moderate", "hard"].includes(strictness) ? strictness : "moderate";
 }
 
 export async function checkOnboardingComplete(userId) {
@@ -105,26 +119,27 @@ export async function loadOnboarding(userId) {
         .maybeSingle();
     if (error) throw error;
     if (!data) return null;
-    const strictness = ["gentle", "moderate", "hard"].includes(data.strictness)
-        ? data.strictness
-        : "moderate";
+    const strictness = normalizeStrictness(data.strictness);
     return {
-        doMoreOf: data.do_more_of || [],
-        scrollingWorst: data.scrolling_worst || [],
+        doMoreOf: toStringArray(data.do_more_of),
+        scrollingWorst: toStringArray(data.scrolling_worst),
         futureMessage: data.future_message || '',
         strictness,
     };
 }
 
 export async function saveOnboarding(userId, responses) {
+    if (!userId) throw new Error("Missing user id.");
+    const safeResponses = responses && typeof responses === "object" ? responses : {};
+
     const { data, error } = await supabase
         .from('onboarding')
         .upsert({
             user_id: userId,
-            do_more_of: responses.doMoreOf,
-            scrolling_worst: responses.scrollingWorst,
-            future_message: responses.futureMessage,
-            strictness: responses.strictness,
+            do_more_of: toStringArray(safeResponses.doMoreOf),
+            scrolling_worst: toStringArray(safeResponses.scrollingWorst),
+            future_message: String(safeResponses.futureMessage || ''),
+            strictness: normalizeStrictness(safeResponses.strictness),
         }, { onConflict: 'user_id' });
     if (error) throw error;
     return data;
