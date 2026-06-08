@@ -60,6 +60,11 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
     const lastAwardedEndedAtRef = useRef(null);
     const restoredSessionRef = useRef(false);
 
+    function setCurrentActiveSession(session) {
+        setNow(Date.now());
+        setActive(session);
+    }
+
     const sessionRunning = !!active;
     const selectedCount = websites.length;
     const totalSeconds = Math.max(5, hours * 3600 + minutes * 60 + seconds);
@@ -123,7 +128,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
                 if (!serverSession) return;
                 const restored = await startLocalSession(serverSession);
                 if (restored) {
-                    setActive(restored);
+                    setCurrentActiveSession(restored);
                     wasActiveRef.current = true;
                 }
             })
@@ -141,7 +146,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         getTetherSession()
             .then((s) => {
                 const isActive = !!s?.active;
-                setActive(isActive ? s : null);
+                setCurrentActiveSession(isActive ? s : null);
                 // We do NOT update wasActiveRef here to avoid missing the transition
                 // if getTetherSession returns the same state as the first listener update.
                 // In 4d07ff8c, wasActiveRef was only updated in the listener.
@@ -188,13 +193,17 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             }
 
             wasActiveRef.current = isActive;
-            setActive(isActive ? s : null);
+            setCurrentActiveSession(isActive ? s : null);
         });
     }, [remoteSessionId, userId]);
 
     useEffect(() => {
         if (!active?.endsAt) return;
-        const id = setInterval(() => setNow(Date.now()), 1000);
+
+        const tick = () => setNow(Date.now());
+        tick();
+
+        const id = setInterval(tick, 1000);
         return () => clearInterval(id);
     }, [active]);
 
@@ -241,7 +250,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             const serverSession = await createSession({ domainsBlocked: websites, totalDurationSeconds: totalSeconds });
             const localSession = await startLocalSession(serverSession);
             if (localSession) {
-                setActive(localSession);
+                setCurrentActiveSession(localSession);
                 wasActiveRef.current = true;
             }
         } catch (error) {
