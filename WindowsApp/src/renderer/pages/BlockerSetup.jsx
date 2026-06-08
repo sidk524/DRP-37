@@ -41,6 +41,7 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         setMinutes,
         setSeconds,
         addWebsite,
+        addPresetWebsite,
         removeWebsite,
         handleLockIn,
         handleStopSession,
@@ -136,6 +137,41 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                     </div>
 
                     {urlError && <p className="tether-error">{urlError}</p>}
+
+                    <div className="tether-presets">
+                        <button
+                            type="button"
+                            className="tether-preset-btn"
+                            onClick={() => addPresetWebsite("instagram.com")}
+                            disabled={sessionRunning}
+                        >
+                            Instagram
+                        </button>
+                        <button
+                            type="button"
+                            className="tether-preset-btn"
+                            onClick={() => addPresetWebsite("tiktok.com")}
+                            disabled={sessionRunning}
+                        >
+                            TikTok
+                        </button>
+                        <button
+                            type="button"
+                            className="tether-preset-btn"
+                            onClick={() => addPresetWebsite("facebook.com")}
+                            disabled={sessionRunning}
+                        >
+                            Facebook
+                        </button>
+                        <button
+                            type="button"
+                            className="tether-preset-btn"
+                            onClick={() => addPresetWebsite("youtube.com")}
+                            disabled={sessionRunning}
+                        >
+                            YouTube
+                        </button>
+                    </div>
 
                     <ul className="tether-url-list">
                         {websites.length === 0 ? (

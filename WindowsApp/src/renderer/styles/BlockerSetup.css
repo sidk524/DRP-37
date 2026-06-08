@@ -373,6 +373,36 @@
     filter: brightness(1.08);
 }
 
+.tether-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.tether-preset-btn {
+    padding: 8px 14px;
+    background: #1c1c1e;
+    border: 1px solid #3a3d45;
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tether-preset-btn:hover:not(:disabled) {
+    background: #2c2c2e;
+    border-color: #0a84ff;
+}
+
+.tether-preset-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 .tether-complete {
     text-align: center;
     align-items: center;

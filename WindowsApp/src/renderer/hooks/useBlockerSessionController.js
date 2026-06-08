@@ -222,6 +222,13 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         setUrlError("");
     }
 
+    function addPresetWebsite(domain) {
+        if (sessionRunning) return;
+        if (websites.includes(domain)) return;
+        setWebsites((prev) => [...prev, domain].sort());
+        setUrlError("");
+    }
+
     function removeWebsite(domain) {
         if (sessionRunning) return;
         setWebsites((prev) => prev.filter((item) => item !== domain));
@@ -299,6 +306,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         setMinutes,
         setSeconds,
         addWebsite,
+        addPresetWebsite,
         removeWebsite,
         handleLockIn,
         handleStopSession,
