@@ -15,6 +15,9 @@ let server = null;
 let serverReady = false;
 
 function setStateProvider(fn) {
+    if (typeof fn !== "function") {
+        throw new TypeError("State provider must be a function.");
+    }
     getState = fn;
 }
 
@@ -26,8 +29,15 @@ function status() {
 }
 
 function statePayload() {
+    let state;
+    try {
+        state = getState();
+    } catch (err) {
+        console.warn(`[extension-bridge] state provider failed: ${err?.message || err}`);
+        state = { active: false, domains: [], endsAt: null, mode: "breathing", friction: { futureMessage: "", goals: [] } };
+    }
     return {
-        ...getState(),
+        ...(state && typeof state === "object" ? state : {}),
         extensionConnected: sseClients.size > 0,
     };
 }
@@ -90,6 +100,9 @@ function handleRequest(req, res) {
 function start() {
     if (server) return;
     server = http.createServer(handleRequest);
+    server.on("close", () => {
+        serverReady = false;
+    });
     server.listen(PORT, HOST, () => {
         serverReady = true;
         console.log(`[extension-bridge] http://${HOST}:${PORT}`);
@@ -110,7 +123,11 @@ function stop() {
     }
     sseClients.clear();
     if (server) {
-        server.close();
+        server.close((err) => {
+            if (err) {
+                console.warn(`[extension-bridge] close failed: ${err?.message || err}`);
+            }
+        });
         server = null;
     }
     serverReady = false;

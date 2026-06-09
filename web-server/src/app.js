@@ -439,6 +439,83 @@ app.put("/api/onboarding", requireSupabase, requireUser, async (req, res, next) 
     }
 });
 
+const MODE_POINTS_MULTIPLIER = {
+    breathing: 1,
+    reflect: 1.5,
+    hard: 2.5,
+};
+
+const EXTRA_APP_MULTIPLIER = 0.25;
+
+const normalizeSessionMode = (mode) => {
+    return ["breathing", "reflect", "hard"].includes(mode) ? mode : "breathing";
+};
+
+const calculateFocusPoints = (mode, actualMs, blockedAppsCount = 1) => {
+    const minutes = Math.max(0, actualMs) / 60000;
+    const multiplier = MODE_POINTS_MULTIPLIER[normalizeSessionMode(mode)];
+    const appsCount = Math.max(1, Math.round(blockedAppsCount) || 1);
+    const appsMultiplier = 1 + (appsCount - 1) * EXTRA_APP_MULTIPLIER;
+    return Math.max(0, Math.round(minutes * multiplier * appsMultiplier));
+};
+
+const publicFocusPointRecord = (row) => ({
+    id: row.id,
+    user_id: row.user_id,
+    mode: row.mode,
+    actual_ms: row.actual_ms,
+    planned_ms: row.planned_ms,
+    blocked_apps_count: row.blocked_apps_count,
+    points: row.points,
+    ended_at: row.ended_at,
+    created_at: row.created_at,
+});
+
+app.post("/api/focus-points", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const mode = normalizeSessionMode(String(req.body?.mode || "breathing"));
+        const actualMs = Math.max(0, Math.round(Number(req.body?.actualMs) || 0));
+        const plannedMs = Math.max(0, Math.round(Number(req.body?.plannedMs) || 0));
+        const blockedAppsCount = Math.max(1, Math.round(Number(req.body?.blockedAppsCount) || 1));
+        const endedAt = String(req.body?.endedAt || new Date().toISOString());
+        const points = calculateFocusPoints(mode, actualMs, blockedAppsCount);
+
+        const { data, error } = await supabaseAdmin
+            .from("focus_session_points")
+            .insert({
+                user_id: req.user.id,
+                mode,
+                actual_ms: actualMs,
+                planned_ms: plannedMs,
+                blocked_apps_count: blockedAppsCount,
+                points,
+                ended_at: endedAt,
+            })
+            .select("id,user_id,mode,actual_ms,planned_ms,blocked_apps_count,points,ended_at,created_at")
+            .single();
+
+        if (error) throw error;
+        res.status(201).json({ record: publicFocusPointRecord(data) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.get("/api/focus-points/total", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from("focus_session_points")
+            .select("points")
+            .eq("user_id", req.user.id);
+
+        if (error) throw error;
+        const total = (data || []).reduce((sum, row) => sum + (row.points || 0), 0);
+        res.json({ total });
+    } catch (error) {
+        next(error);
+    }
+});
+
 app.post("/api/groups", requireSupabase, requireUser, async (req, res, next) => {
     try {
         const name = String(req.body?.name || "").trim();

@@ -120,6 +120,51 @@ async function saveOnboarding(responses) {
     return data.onboarding;
 }
 
+const MODE_POINTS_MULTIPLIER = {
+    breathing: 1,
+    reflect: 1.5,
+    hard: 2.5,
+};
+
+const EXTRA_APP_MULTIPLIER = 0.25;
+
+function normalizeSessionMode(mode) {
+    return ["breathing", "reflect", "hard"].includes(mode) ? mode : "breathing";
+}
+
+function calculateFocusPoints(mode, actualMs, blockedAppsCount = 1) {
+    const minutes = Math.max(0, actualMs) / 60000;
+    const multiplier = MODE_POINTS_MULTIPLIER[normalizeSessionMode(mode)];
+    const appsCount = Math.max(1, Math.round(blockedAppsCount) || 1);
+    const appsMultiplier = 1 + (appsCount - 1) * EXTRA_APP_MULTIPLIER;
+    return Math.max(0, Math.round(minutes * multiplier * appsMultiplier));
+}
+
+async function saveSessionPoints({
+    mode,
+    actualMs = 0,
+    plannedMs = 0,
+    blockedAppsCount = 1,
+    endedAt,
+}) {
+    const data = await request("/api/focus-points", {
+        method: "POST",
+        body: {
+            mode: normalizeSessionMode(mode),
+            actualMs: Math.max(0, Math.round(actualMs)),
+            plannedMs: Math.max(0, Math.round(plannedMs)),
+            blockedAppsCount: Math.max(1, Math.round(blockedAppsCount) || 1),
+            endedAt: endedAt || new Date().toISOString(),
+        },
+    });
+    return data.record || null;
+}
+
+async function getUserTotalPoints() {
+    const data = await request("/api/focus-points/total");
+    return data.total || 0;
+}
+
 module.exports = {
     getCurrentSession,
     createSession,
@@ -131,4 +176,6 @@ module.exports = {
     syncDefaultGroups,
     loadOnboarding,
     saveOnboarding,
+    saveSessionPoints,
+    getUserTotalPoints,
 };

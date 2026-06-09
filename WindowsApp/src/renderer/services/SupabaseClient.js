@@ -6,8 +6,7 @@ function requireTether() {
 }
 
 export async function signUpWithEmail(email, password) {
-    const result = await requireTether().signUpWithEmail(email, password);
-    return result;
+    return requireTether().signUpWithEmail(email, password);
 }
 
 export async function signInWithEmail(email, password) {
@@ -44,4 +43,12 @@ export async function loadOnboarding(_userId) {
 
 export async function saveOnboarding(_userId, responses) {
     return requireTether().saveOnboarding(responses);
+}
+
+export async function saveSessionPoints(payload) {
+    return requireTether().saveSessionPoints(payload);
+}
+
+export async function getUserTotalPoints(_userId) {
+    return requireTether().getUserTotalPoints();
 }

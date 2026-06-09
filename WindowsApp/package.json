@@ -10,9 +10,10 @@
     "node": ">=20 <23"
   },
   "scripts": {
-    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron . --no-sandbox\"",
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --test src/main/**/*.test.js",
     "start": "electron . --no-sandbox",
     "dist": "npm run build && electron-builder",
     "pack": "npm run build && electron-builder --dir"

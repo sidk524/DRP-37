@@ -29,6 +29,8 @@ The server listens on `http://localhost:3000` by default.
 - `PUT /api/session/current` starts or ends the authenticated user's active block session.
 - `GET /api/onboarding` returns the authenticated user's onboarding settings, or `null`.
 - `PUT /api/onboarding` upserts the authenticated user's onboarding settings.
+- `POST /api/focus-points` records focus session points for the authenticated user.
+- `GET /api/focus-points/total` returns the authenticated user's total focus points.
 
 ## Block Session Sync
 

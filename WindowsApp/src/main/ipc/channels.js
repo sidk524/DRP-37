@@ -8,6 +8,8 @@ module.exports = {
 
     DATA_LOAD_ONBOARDING: "data:loadOnboarding",
     DATA_SAVE_ONBOARDING: "data:saveOnboarding",
+    DATA_SAVE_SESSION_POINTS: "data:saveSessionPoints",
+    DATA_GET_USER_TOTAL_POINTS: "data:getUserTotalPoints",
 
     WEBSERVER_GET_CURRENT_SESSION: "webserver:getCurrentSession",
     WEBSERVER_CREATE_SESSION: "webserver:createSession",

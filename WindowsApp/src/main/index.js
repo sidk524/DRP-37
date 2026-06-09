@@ -12,16 +12,35 @@ const isDev = process.env.NODE_ENV === "development";
 
 let mainWindow = null;
 
+process.on("uncaughtException", (error) => {
+    console.error("[main] uncaught exception:", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+    console.error("[main] unhandled rejection:", reason);
+});
+
 function focusMainWindow() {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    try {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+    } catch (err) {
+        console.warn(`[main] could not focus main window: ${err?.message || err}`);
+    }
 }
 
 function broadcastToAllWindows(channel, payload) {
     for (const win of BrowserWindow.getAllWindows()) {
-        win.webContents.send(channel, payload);
+        try {
+            if (!win || win.isDestroyed?.() || !win.webContents || win.webContents.isDestroyed?.()) {
+                continue;
+            }
+            win.webContents.send(channel, payload);
+        } catch (err) {
+            console.warn(`[main] failed to broadcast to window: ${err?.message || err}`);
+        }
     }
 }
 
@@ -43,6 +62,12 @@ function registerAllIpcHandlers() {
     ipcMain.handle(CHANNELS.DATA_LOAD_ONBOARDING, () => webServerService.loadOnboarding());
     ipcMain.handle(CHANNELS.DATA_SAVE_ONBOARDING, (_e, payload) =>
         webServerService.saveOnboarding(payload)
+    );
+    ipcMain.handle(CHANNELS.DATA_SAVE_SESSION_POINTS, (_e, payload) =>
+        webServerService.saveSessionPoints(payload)
+    );
+    ipcMain.handle(CHANNELS.DATA_GET_USER_TOTAL_POINTS, () =>
+        webServerService.getUserTotalPoints()
     );
 
     ipcMain.handle(CHANNELS.WEBSERVER_GET_CURRENT_SESSION, () =>
@@ -90,16 +115,22 @@ if (!process.env.APPDATA) {
 }
 
 function createWindow() {
-    const win = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        webPreferences: {
-            preload: path.join(__dirname, "preload.js"),
-            contextIsolation: true,
-            nodeIntegration: false,
-            sandbox: false,
-        },
-    });
+    let win;
+    try {
+        win = new BrowserWindow({
+            width: 1200,
+            height: 800,
+            webPreferences: {
+                preload: path.join(__dirname, "preload.js"),
+                contextIsolation: true,
+                nodeIntegration: false,
+                sandbox: false,
+            },
+        });
+    } catch (err) {
+        console.error("[main] failed to create main window:", err);
+        throw err;
+    }
 
     mainWindow = win;
     win.on("closed", () => {
@@ -119,13 +150,22 @@ function createWindow() {
         console.error("[window] render process gone:", details.reason, details.exitCode);
     });
 
-    if (isDev) {
-        win.loadURL("http://localhost:5173");
-        win.webContents.openDevTools({ mode: "right" });
-    } else {
-        win.setMenuBarVisibility(false);
-        win.setMenu(null);
-        win.loadFile(path.join(__dirname, "../../dist/index.html"));
+    try {
+        if (isDev) {
+            win.loadURL("http://localhost:5173").catch((err) => {
+                console.error("[main] failed to load dev URL:", err);
+            });
+            win.webContents.openDevTools({ mode: "right" });
+        } else {
+            win.setMenuBarVisibility(false);
+            win.setMenu(null);
+            win.loadFile(path.join(__dirname, "../../dist/index.html")).catch((err) => {
+                console.error("[main] failed to load renderer file:", err);
+            });
+        }
+    } catch (err) {
+        console.error("[main] window initialization failed:", err);
+        throw err;
     }
 }
 

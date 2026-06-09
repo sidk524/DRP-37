@@ -1,38 +1,25 @@
+const {
+    createInactiveSession,
+    createActiveSession,
+    normalizeFriction,
+    normalizeMode,
+    sessionView,
+} = require("./sessionState");
+
 let extensionBridge = null;
 let onSessionChange = null;
 let expiryTimer = null;
-
-let session = {
-    active: false,
-    sessionId: null,
-    appLabels: [],
-    domains: [],
-    mode: "breathing",
-    friction: {
-        futureMessage: "",
-        goals: [],
-    },
-    startedAt: null,
-    endsAt: null,
-    durationMinutes: 0,
-};
-
+let session = createInactiveSession();
 let lastStop = null;
 
-function sessionView() {
-    return {
-        active: session.active,
-        sessionId: session.sessionId,
-        mode: session.mode,
-        appLabels: session.appLabels,
-        domains: session.domains,
-        friction: session.friction,
-        startedAt: session.startedAt,
-        endsAt: session.endsAt,
-        durationMinutes: session.durationMinutes,
-        remainingMs: session.endsAt ? Math.max(0, session.endsAt - Date.now()) : null,
-        lastStop,
-    };
+function safeClearExpiryTimer() {
+    if (!expiryTimer) return;
+    try {
+        clearTimeout(expiryTimer);
+    } catch (err) {
+        console.warn(`[blocker] failed to clear session timer: ${err?.message || err}`);
+    }
+    expiryTimer = null;
 }
 
 function extensionBlockState() {
@@ -45,22 +32,35 @@ function extensionBlockState() {
     };
 }
 
-function normalizeFriction(friction = {}) {
-    return {
-        futureMessage: String(friction.futureMessage || "").trim(),
-        goals: Array.isArray(friction.goals)
-            ? friction.goals.map((goal) => String(goal).trim()).filter(Boolean)
-            : [],
-    };
+function broadcast() {
+    const view = sessionView(session, lastStop);
+    try {
+        if (onSessionChange) {
+            onSessionChange(view);
+        }
+    } catch (err) {
+        console.warn(`[blocker] failed to broadcast session update: ${err?.message || err}`);
+    }
+    try {
+        if (extensionBridge) {
+            extensionBridge.notifyStateChange();
+        }
+    } catch (err) {
+        console.warn(`[blocker] failed to notify extension bridge: ${err?.message || err}`);
+    }
 }
 
-function broadcast() {
-    const view = sessionView();
-    if (onSessionChange) {
-        onSessionChange(view);
-    }
-    if (extensionBridge) {
-        extensionBridge.notifyStateChange();
+function scheduleExpiry() {
+    safeClearExpiryTimer();
+    const endsAt = Number(session?.endsAt);
+    if (!session.active || !Number.isFinite(endsAt)) return;
+
+    const delay = Math.max(0, endsAt - Date.now());
+    try {
+        expiryTimer = setTimeout(() => stopSession("expired"), delay);
+    } catch (err) {
+        console.warn(`[blocker] failed to schedule session expiry: ${err?.message || err}`);
+        expiryTimer = null;
     }
 }
 
@@ -74,44 +74,34 @@ function startSession({
     startedAt = null,
     endsAt = null,
 } = {}) {
-    const normalizedDomains = domains.map((domain) => String(domain).toLowerCase()).filter(Boolean);
-    if (normalizedDomains.length === 0) {
-        return { ok: false, error: "Pick at least one website to block." };
-    }
-
-    const resolvedMode = ["breathing", "reflect", "hard"].includes(mode) ? mode : "breathing";
-
-    lastStop = null;
-    const now = Date.now();
-    const safeDurationMinutes = Math.max(1, durationMinutes);
-    const safeStartedAt = Number.isFinite(startedAt) ? startedAt : now;
-    const safeEndsAt = Number.isFinite(endsAt) ? endsAt : safeStartedAt + safeDurationMinutes * 60 * 1000;
-    session = {
-        active: true,
+    const created = createActiveSession({
         sessionId,
         appLabels,
-        domains: normalizedDomains,
-        mode: resolvedMode,
-        friction: normalizeFriction(friction),
-        startedAt: safeStartedAt,
-        endsAt: safeEndsAt,
-        durationMinutes: safeDurationMinutes,
-    };
+        domains,
+        mode,
+        friction,
+        durationMinutes,
+        startedAt,
+        endsAt,
+    });
+    if (!created.ok) return created;
 
-    if (normalizedDomains.length > 0) {
+    lastStop = null;
+    session = created.session;
+
+    if (session.domains.length > 0) {
         console.log(
-            `[blocker] website blocking via browser extension (${normalizedDomains.length} domain(s))`
+            `[blocker] website blocking via browser extension (${session.domains.length} domain(s))`
         );
     }
 
-    if (expiryTimer) clearTimeout(expiryTimer);
-    expiryTimer = setTimeout(() => stopSession("expired"), Math.max(0, session.endsAt - Date.now()));
+    scheduleExpiry();
 
     console.log(
-        `[blocker] session started · ${session.mode} · ${durationMinutes}m · [${normalizedDomains.join(", ")}]`
+        `[blocker] session started · ${session.mode} · ${session.durationMinutes}m · [${session.domains.join(", ")}]`
     );
     broadcast();
-    return { ok: true, session: sessionView() };
+    return { ok: true, session: sessionView(session, lastStop) };
 }
 
 function updateSession({ mode, friction } = {}) {
@@ -120,7 +110,7 @@ function updateSession({ mode, friction } = {}) {
     }
 
     if (mode !== undefined) {
-        session.mode = ["breathing", "reflect", "hard"].includes(mode) ? mode : "reflect";
+        session.mode = normalizeMode(mode, "reflect");
     }
 
     if (friction !== undefined) {
@@ -129,7 +119,7 @@ function updateSession({ mode, friction } = {}) {
 
     console.log(`[blocker] session updated · ${session.mode}`);
     broadcast();
-    return { ok: true, session: sessionView() };
+    return { ok: true, session: sessionView(session, lastStop) };
 }
 
 function stopSession(reason = "manual") {
@@ -153,29 +143,15 @@ function stopSession(reason = "manual") {
         endedAt,
     };
 
-    if (expiryTimer) clearTimeout(expiryTimer);
-    expiryTimer = null;
-    session = {
-        active: false,
-        sessionId: null,
-        appLabels: [],
-        domains: [],
-        mode: "breathing",
-        friction: {
-            futureMessage: "",
-            goals: [],
-        },
-        startedAt: null,
-        endsAt: null,
-        durationMinutes: 0,
-    };
+    safeClearExpiryTimer();
+    session = createInactiveSession();
     console.log(`[blocker] session stopped (${reason})`);
     broadcast();
-    return { ok: true, session: sessionView() };
+    return { ok: true, session: sessionView(session, lastStop) };
 }
 
 function getSession() {
-    return sessionView();
+    return sessionView(session, lastStop);
 }
 
 function initialize({ onSessionChange: callback, extensionBridge: bridge }) {
@@ -187,10 +163,13 @@ function initialize({ onSessionChange: callback, extensionBridge: bridge }) {
 }
 
 function stop() {
-    if (expiryTimer) clearTimeout(expiryTimer);
-    expiryTimer = null;
+    safeClearExpiryTimer();
     if (extensionBridge) {
-        extensionBridge.stop();
+        try {
+            extensionBridge.stop();
+        } catch (err) {
+            console.warn(`[blocker] extension bridge stop failed: ${err?.message || err}`);
+        }
     }
 }
 
