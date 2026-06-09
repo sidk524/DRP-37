@@ -2,11 +2,12 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    width: min(34vw, 172px);
-    height: min(34vw, 172px);
+    width: var(--lock-size);
+    height: var(--lock-size);
     margin: 0 auto;
     color: #30d158;
     transition: color 0.65s ease;
+    flex-shrink: 1;
 }
 
 .lock-graphic.locked {

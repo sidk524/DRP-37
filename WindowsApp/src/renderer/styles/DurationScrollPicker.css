@@ -6,20 +6,20 @@
 
 .duration-picker-frame {
     position: relative;
-    width: min(90%, 560px);
-    min-height: 190px;
+    width: min(100%, var(--frame-max-width));
+    min-height: calc(var(--duration-row-height) * 3 + 24px);
     background: #1f1f22;
     border-radius: 22px;
-    padding: 12px 16px;
+    padding: 12px clamp(10px, 3vw, 16px);
 }
 
 .duration-picker-highlight {
     position: absolute;
-    left: 16px;
-    right: 16px;
+    left: clamp(10px, 3vw, 16px);
+    right: clamp(10px, 3vw, 16px);
     top: 50%;
     transform: translateY(-50%);
-    height: 56px;
+    height: var(--duration-row-height);
     background: #48484f;
     border-radius: 12px;
     pointer-events: none;
@@ -31,7 +31,7 @@
     z-index: 1;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    height: 168px;
+    height: calc(var(--duration-row-height) * 3);
     overflow: hidden;
     touch-action: none;
 }
@@ -54,7 +54,7 @@
     overscroll-behavior: contain;
     scroll-snap-type: y mandatory;
     scrollbar-width: none;
-    padding: 56px 0;
+    padding: var(--duration-row-height) 0;
     box-sizing: border-box;
     pointer-events: none;
 }
@@ -68,14 +68,14 @@
 }
 
 .duration-wheel-row {
-    height: 56px;
+    height: var(--duration-row-height);
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    padding-left: 18%;
+    padding-left: clamp(12%, 18%, 22%);
     scroll-snap-align: center;
     color: #5e5e66;
-    font-size: 1.65rem;
+    font-size: clamp(1.35rem, 4vw, 1.65rem);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     transition: color 0.12s ease, font-size 0.12s ease;
@@ -83,29 +83,44 @@
 
 .duration-wheel-row.selected {
     color: #ffffff;
-    font-size: 1.85rem;
+    font-size: clamp(1.5rem, 4.5vw, 1.85rem);
     font-weight: 600;
 }
 
 .duration-picker-labels {
     position: absolute;
-    left: 16px;
-    right: 16px;
+    left: clamp(10px, 3vw, 16px);
+    right: clamp(10px, 3vw, 16px);
     top: 50%;
     transform: translateY(-50%);
     z-index: 2;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    height: 56px;
+    height: var(--duration-row-height);
     align-items: center;
     pointer-events: none;
 }
 
 .duration-picker-labels span {
     color: #b0b0b8;
-    font-size: 0.95rem;
+    font-size: clamp(0.82rem, 2.5vw, 0.95rem);
     font-weight: 700;
     line-height: 1;
-    padding-left: 46%;
+    padding-left: clamp(38%, 46%, 50%);
     white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+    .duration-picker-frame {
+        border-radius: 18px;
+    }
+
+    .duration-wheel-row {
+        padding-left: 14%;
+    }
+
+    .duration-picker-labels span {
+        padding-left: 36%;
+        font-size: 0.78rem;
+    }
 }

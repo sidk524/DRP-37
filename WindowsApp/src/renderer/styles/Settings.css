@@ -1,47 +1,52 @@
 .settings-screen {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .settings-frame {
-    width: 84%;
-    max-width: 620px;
+    width: 100%;
+    max-width: var(--frame-max-width);
     display: flex;
     flex-direction: column;
-    padding-bottom: 32px;
+    min-height: min-content;
+    padding-bottom: var(--frame-padding-y);
 }
 
 .settings-title {
-    font-size: clamp(2rem, 5vw, 2.5rem);
+    font-size: var(--title-size);
     font-weight: 700;
     color: #ffffff;
-    margin-bottom: 10px;
+    margin-bottom: clamp(8px, 1.5vh, 10px);
 }
 
 .settings-subtitle {
     color: #8e8e96;
-    font-size: 1rem;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
     line-height: 1.45;
-    margin-bottom: 22px;
+    margin-bottom: clamp(16px, 3vh, 22px);
 }
 
 .settings-status {
     color: #8e8e96;
     font-size: 1rem;
-    padding: 24px 0;
+    padding: clamp(16px, 3vh, 24px) 0;
 }
 
 .settings-stack {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: clamp(10px, 2vh, 14px);
 }
 
 .settings-card {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: clamp(12px, 2vh, 16px);
     width: 100%;
-    padding: 20px;
+    padding: clamp(16px, 3vh, 20px);
     background: #1f1f22;
     border: 1px solid #2c2c30;
     border-radius: 20px;
@@ -49,23 +54,24 @@
 
 .settings-card-title {
     color: #ffffff;
-    font-size: 1.15rem;
+    font-size: clamp(1.05rem, 2.5vw, 1.15rem);
     line-height: 1.35;
     margin: 0;
 }
 
 .settings-error {
-    margin-top: 16px;
+    margin-top: clamp(12px, 2vh, 16px);
 }
 
 .settings-saved {
     color: #30d158;
     font-size: 0.95rem;
-    margin-top: 16px;
+    margin-top: clamp(12px, 2vh, 16px);
 }
 
 .settings-save {
-    margin-top: 18px;
+    margin-top: clamp(14px, 2.5vh, 18px);
+    flex-shrink: 0;
 }
 
 .settings-save.btn-continue:not(:disabled) {

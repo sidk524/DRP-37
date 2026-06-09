@@ -1,7 +1,9 @@
 .tether-screen {
-    min-height: 100vh;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     background: #000000;
     color: #ffffff;
     font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -9,33 +11,36 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 24px 16px 32px;
+    padding: var(--frame-padding-y) var(--frame-padding-x);
     box-sizing: border-box;
 }
 
 .tether-frame {
-    width: 84%;
-    max-width: 620px;
-    height: 100%;
-    max-height: 100%;
+    width: 100%;
+    max-width: var(--frame-max-width);
+    min-height: min-content;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    flex: 1 0 auto;
+    padding-bottom: var(--frame-padding-y);
 }
 
 .tether-screen-duration {
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .tether-frame-duration {
     align-items: stretch;
+    min-height: min-content;
 }
 
 .tether-header-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 40px;
+    margin-bottom: var(--section-gap);
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .tether-header-action,
@@ -43,7 +48,7 @@
     background: none;
     border: none;
     color: #0a84ff;
-    font-size: 1.05rem;
+    font-size: clamp(0.95rem, 2.5vw, 1.05rem);
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
@@ -51,32 +56,32 @@
 }
 
 .tether-brand {
-    font-size: clamp(2.2rem, 5vw, 2.9rem);
+    font-size: var(--title-size-lg);
     font-weight: 700;
     letter-spacing: 0;
-    margin-bottom: 14px;
+    margin-bottom: clamp(8px, 1.5vh, 14px);
 }
 
 .tether-subtitle {
     color: #8e8e96;
-    font-size: 1.15rem;
-    margin-bottom: 28px;
+    font-size: clamp(1rem, 2.5vw, 1.15rem);
+    margin-bottom: var(--section-gap);
 }
 
 .tether-subtitle-count {
     color: #92929a;
-    font-size: 1.15rem;
+    font-size: clamp(1rem, 2.5vw, 1.15rem);
     margin-top: 8px;
-    margin-bottom: 24px;
+    margin-bottom: clamp(16px, 3vh, 24px);
 }
 
 .tether-lock-wrap {
-    flex: 1;
+    flex: 0 1 auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 120px;
-    margin: 20px 0;
+    min-height: clamp(80px, 15vh, 120px);
+    margin: clamp(12px, 2vh, 20px) 0;
 }
 
 .tether-selected-pill {
@@ -84,16 +89,16 @@
     align-items: center;
     gap: 10px;
     align-self: center;
-    padding: 10px 18px;
+    padding: clamp(8px, 1.5vh, 10px) clamp(14px, 3vw, 18px);
     background: #1f1f22;
     border: none;
     border-radius: 18px;
     color: #ffffff;
-    font-size: 1rem;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    margin-bottom: 24px;
+    margin-bottom: clamp(16px, 3vh, 24px);
 }
 
 .tether-selected-pill:disabled {
@@ -111,12 +116,14 @@
 
 .tether-lockin {
     width: 100%;
-    height: 70px;
+    min-height: var(--control-height);
+    margin-top: auto;
+    flex-shrink: 0;
     background: #1f1f22;
     border: none;
     border-radius: 16px;
     color: #ffffff;
-    font-size: 1.15rem;
+    font-size: clamp(1rem, 2.5vw, 1.15rem);
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
@@ -134,13 +141,13 @@
 
 .tether-end-early {
     align-self: center;
-    margin-bottom: 16px;
-    padding: 12px 24px;
+    margin-bottom: clamp(12px, 2vh, 16px);
+    padding: clamp(10px, 2vh, 12px) clamp(18px, 4vw, 24px);
     background: transparent;
     border: 1px solid #3a3d45;
     border-radius: 12px;
     color: #8f8f95;
-    font-size: 0.95rem;
+    font-size: clamp(0.88rem, 2.5vw, 0.95rem);
     font-family: inherit;
     cursor: pointer;
 }
@@ -153,8 +160,8 @@
 .tether-session-hint {
     text-align: center;
     color: #92929a;
-    font-size: 0.9rem;
-    margin-bottom: 16px;
+    font-size: clamp(0.85rem, 2.5vw, 0.9rem);
+    margin-bottom: clamp(12px, 2vh, 16px);
     max-width: 320px;
     align-self: center;
 }
@@ -163,7 +170,8 @@
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    margin-bottom: 28px;
+    margin-bottom: clamp(18px, 3vh, 28px);
+    gap: 8px;
 }
 
 .tether-back {
@@ -174,7 +182,7 @@
     background: none;
     border: none;
     color: #0a84ff;
-    font-size: 1.05rem;
+    font-size: clamp(0.95rem, 2.5vw, 1.05rem);
     font-family: inherit;
     cursor: pointer;
     padding: 0;
@@ -212,7 +220,7 @@
 .tether-topbar-duration {
     justify-self: center;
     color: #8e8e96;
-    font-size: 1.05rem;
+    font-size: clamp(0.95rem, 2.5vw, 1.05rem);
     font-weight: 600;
 }
 
@@ -221,23 +229,24 @@
 }
 
 .tether-title {
-    font-size: clamp(2rem, 5vw, 2.5rem);
+    font-size: var(--title-size);
     font-weight: 700;
 }
 
 .tether-url-row {
     display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: clamp(8px, 2vw, 10px);
+    margin-bottom: clamp(10px, 2vh, 12px);
 }
 
 .tether-search {
     flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 10px;
-    height: 64px;
-    padding: 0 18px;
+    min-height: var(--control-height);
+    padding: 0 clamp(14px, 3vw, 18px);
     background: #1f1f22;
     border-radius: 18px;
 }
@@ -265,11 +274,12 @@
 
 .tether-search input {
     flex: 1;
+    min-width: 0;
     background: transparent;
     border: none;
     outline: none;
     color: #ffffff;
-    font-size: 1.1rem;
+    font-size: clamp(0.95rem, 2.5vw, 1.1rem);
     font-family: inherit;
 }
 
@@ -282,16 +292,18 @@
 }
 
 .tether-url-add {
-    height: 64px;
-    padding: 0 22px;
+    min-height: var(--control-height);
+    padding: 0 clamp(16px, 3vw, 22px);
     background: #0a84ff;
     border: none;
     border-radius: 18px;
     color: #ffffff;
-    font-size: 1rem;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .tether-url-add:disabled {
@@ -302,41 +314,42 @@
 .tether-error {
     color: #ff453a;
     font-size: 0.9rem;
-    margin-bottom: 12px;
+    margin-bottom: clamp(10px, 2vh, 12px);
 }
 
 .tether-session-error {
     text-align: center;
-    margin-bottom: 12px;
+    margin-bottom: clamp(10px, 2vh, 12px);
 }
 
 .tether-url-list {
     list-style: none;
-    flex: 1;
+    flex: 1 1 auto;
     overflow-y: auto;
-    margin: 16px 0 24px;
+    margin: clamp(12px, 2vh, 16px) 0 clamp(16px, 3vh, 24px);
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    min-height: 120px;
+    gap: clamp(8px, 1.5vh, 10px);
+    min-height: clamp(80px, 12vh, 120px);
 }
 
 .tether-url-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 18px;
+    gap: 12px;
+    padding: clamp(12px, 2vh, 14px) clamp(14px, 3vw, 18px);
     background: #1f1f22;
     border-radius: 14px;
-    font-size: 1rem;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
     font-weight: 600;
 }
 
 .tether-url-empty {
     color: #92929a;
     padding: 14px 0;
-    font-size: 1rem;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
 }
 
 .tether-url-remove {
@@ -347,16 +360,18 @@
     line-height: 1;
     cursor: pointer;
     padding: 0 4px;
+    flex-shrink: 0;
 }
 
 .tether-done {
     width: 100%;
-    height: 70px;
+    min-height: var(--control-height);
+    flex-shrink: 0;
     background: #0a84ff;
     border: none;
     border-radius: 16px;
     color: #ffffff;
-    font-size: 1.15rem;
+    font-size: clamp(1rem, 2.5vw, 1.15rem);
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
@@ -369,17 +384,17 @@
 .tether-presets {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 20px;
+    gap: clamp(6px, 1.5vw, 8px);
+    margin-bottom: clamp(14px, 2.5vh, 20px);
 }
 
 .tether-preset-btn {
-    padding: 8px 14px;
+    padding: clamp(6px, 1.5vh, 8px) clamp(10px, 2.5vw, 14px);
     background: #1c1c1e;
     border: 1px solid #3a3d45;
     border-radius: 10px;
     color: #ffffff;
-    font-size: 0.9rem;
+    font-size: clamp(0.82rem, 2.5vw, 0.9rem);
     font-weight: 500;
     font-family: inherit;
     cursor: pointer;
@@ -399,30 +414,30 @@
 .tether-complete {
     text-align: center;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
 }
 
 .tether-complete-icon {
-    font-size: 5rem;
-    margin-bottom: 20px;
+    font-size: clamp(3.5rem, 12vw, 5rem);
+    margin-bottom: clamp(14px, 2.5vh, 20px);
 }
 
 .tether-points-large {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 40px 0;
+    margin: clamp(24px, 5vh, 40px) 0;
 }
 
 .tether-points-value {
-    font-size: 4.5rem;
+    font-size: clamp(3rem, 10vw, 4.5rem);
     font-weight: 800;
     color: #0a84ff;
     line-height: 1;
 }
 
 .tether-points-label {
-    font-size: 1.2rem;
+    font-size: clamp(1rem, 2.5vw, 1.2rem);
     color: #8e8e96;
     font-weight: 600;
     margin-top: 8px;
@@ -432,21 +447,21 @@
     width: 100%;
     background: #1c1c1e;
     border-radius: 20px;
-    padding: 24px;
-    margin-bottom: 40px;
+    padding: clamp(18px, 3vh, 24px);
+    margin-bottom: clamp(24px, 4vh, 40px);
     box-sizing: border-box;
 }
 
 .tether-breakdown-title {
-    font-size: 1.1rem;
+    font-size: clamp(1rem, 2.5vw, 1.1rem);
     font-weight: 700;
     color: #ffffff;
-    margin-bottom: 20px;
+    margin-bottom: clamp(14px, 2.5vh, 20px);
     text-align: left;
 }
 
 .tether-breakdown-item {
-    margin-bottom: 16px;
+    margin-bottom: clamp(12px, 2vh, 16px);
 }
 
 .tether-breakdown-item:last-child {
@@ -457,20 +472,39 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
 }
 
 .tether-breakdown-label {
     color: #8e8e96;
-    font-size: 1rem;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
 }
 
 .tether-breakdown-value {
     color: #ffffff;
     font-weight: 600;
-    font-size: 1rem;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
 }
 
 .tether-complete-btn {
     margin-top: auto;
     width: 100%;
+    flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+    .tether-url-row {
+        flex-direction: column;
+    }
+
+    .tether-url-add {
+        width: 100%;
+    }
+}
+
+@media (max-height: 680px) {
+    .tether-lock-wrap {
+        min-height: clamp(64px, 12vh, 96px);
+        margin: clamp(8px, 1.5vh, 16px) 0;
+    }
 }

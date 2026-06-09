@@ -1,45 +1,49 @@
 .groups-screen {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .groups-frame {
-    width: 84%;
-    max-width: 680px;
+    width: 100%;
+    max-width: var(--frame-max-width);
     display: flex;
     flex-direction: column;
-    padding-bottom: 32px;
+    padding-bottom: var(--frame-padding-y);
 }
 
 .groups-title {
-    font-size: clamp(2rem, 5vw, 2.5rem);
+    font-size: var(--title-size);
     font-weight: 700;
     color: #ffffff;
-    margin-bottom: 10px;
+    margin-bottom: clamp(8px, 1.5vh, 10px);
 }
 
 .groups-subtitle {
     color: #8e8e96;
-    font-size: 1rem;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
     line-height: 1.45;
-    margin-bottom: 22px;
+    margin-bottom: clamp(16px, 3vh, 22px);
 }
 
 .groups-error {
-    margin-bottom: 16px;
+    margin-bottom: clamp(12px, 2vh, 16px);
 }
 
 .groups-stack {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: clamp(10px, 2vh, 14px);
 }
 
 .groups-card {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: clamp(12px, 2vh, 16px);
     width: 100%;
-    padding: 20px;
+    padding: clamp(16px, 3vh, 20px);
     background: #1f1f22;
     border: 1px solid #2c2c30;
     border-radius: 20px;
@@ -48,7 +52,7 @@
 
 .groups-muted {
     color: #8e8e96;
-    font-size: 0.95rem;
+    font-size: clamp(0.88rem, 2.5vw, 0.95rem);
     line-height: 1.45;
     margin: 0;
 }
@@ -56,7 +60,7 @@
 .groups-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: clamp(8px, 1.5vh, 10px);
 }
 
 .groups-list-item {
@@ -65,7 +69,8 @@
     align-items: center;
     gap: 16px;
     width: 100%;
-    padding: 14px 16px;
+    min-height: var(--control-height-sm);
+    padding: clamp(12px, 2vh, 14px) clamp(14px, 3vw, 16px);
     border: 1px solid #2c2c30;
     border-radius: 14px;
     background: #000000;
@@ -92,14 +97,14 @@
 
 .groups-form-row {
     display: flex;
-    gap: 10px;
+    gap: clamp(8px, 2vw, 10px);
 }
 
 .groups-form-row input {
     flex: 1;
     min-width: 0;
-    height: 54px;
-    padding: 0 16px;
+    min-height: var(--control-height-sm);
+    padding: 0 clamp(14px, 3vw, 16px);
     border: 1px solid #2c2c30;
     border-radius: 14px;
     background: #000000;
@@ -128,7 +133,10 @@
 }
 
 .groups-form-row button {
-    padding: 0 20px;
+    min-height: var(--control-height-sm);
+    padding: 0 clamp(16px, 3vw, 20px);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .groups-form-row button:disabled {
@@ -140,40 +148,43 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
+    gap: clamp(10px, 2vw, 16px);
+    flex-wrap: wrap;
 }
 
 .groups-card-heading h2 {
     margin: 6px 0 0;
-    font-size: 1.2rem;
+    font-size: clamp(1.05rem, 2.5vw, 1.2rem);
 }
 
 .groups-copy {
-    padding: 10px 14px;
+    min-height: var(--control-height-sm);
+    padding: clamp(8px, 1.5vh, 10px) clamp(12px, 2.5vw, 14px);
     white-space: nowrap;
 }
 
 .groups-invite-code {
-    padding: 16px;
+    padding: clamp(12px, 2vh, 16px);
     border-radius: 14px;
     background: #000000;
     color: #ffffff;
-    font-size: 1.45rem;
+    font-size: clamp(1.15rem, 4vw, 1.45rem);
     font-weight: 800;
     letter-spacing: 0.12em;
     text-align: center;
 }
 
 .groups-leaderboard-card {
-    margin-bottom: 18px;
+    margin-bottom: clamp(14px, 2.5vh, 18px);
 }
 
 .groups-leaderboard-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: clamp(8px, 2vw, 12px);
+    margin-bottom: clamp(10px, 2vh, 14px);
+    flex-wrap: wrap;
 }
 
 .groups-leaderboard-header .onboarding-section {
@@ -186,15 +197,16 @@
     border-radius: 12px;
     background: #000000;
     gap: 4px;
+    flex-shrink: 0;
 }
 
 .groups-metric-toggle button {
     border: none;
     border-radius: 10px;
-    padding: 8px 14px;
+    padding: clamp(6px, 1.5vh, 8px) clamp(10px, 2.5vw, 14px);
     background: transparent;
     color: #8e8e96;
-    font-size: 0.82rem;
+    font-size: clamp(0.78rem, 2.5vw, 0.82rem);
     font-weight: 700;
     cursor: pointer;
 }
@@ -210,7 +222,7 @@
 }
 
 .groups-points-unavailable {
-    margin: 0 0 14px;
+    margin: 0 0 clamp(10px, 2vh, 14px);
 }
 
 .groups-leaderboard {
@@ -219,15 +231,15 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: clamp(8px, 1.5vh, 10px);
 }
 
 .groups-leaderboard li {
     display: grid;
     grid-template-columns: 58px 1fr auto;
     align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
+    gap: clamp(8px, 2vw, 12px);
+    padding: clamp(12px, 2vh, 14px) clamp(14px, 3vw, 16px);
     border-radius: 14px;
     background: #000000;
 }
@@ -262,7 +274,7 @@
     }
 
     .groups-form-row button {
-        height: 48px;
+        width: 100%;
     }
 
     .groups-leaderboard li {
@@ -272,5 +284,30 @@
     .groups-time {
         grid-column: 2;
         color: #8e8e96;
+    }
+
+    .groups-card-heading {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .groups-copy {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .groups-leaderboard-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .groups-metric-toggle {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .groups-metric-toggle button {
+        flex: 1;
     }
 }

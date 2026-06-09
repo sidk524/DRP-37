@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import useCssVarNumber from "../hooks/useCssVarNumber";
 import "../styles/DurationScrollPicker.css";
 
-const ROW_HEIGHT = 56;
-
-function DurationWheel({ value, min, max, onChange, locked }) {
+function DurationWheel({ value, min, max, onChange, locked, rowHeight }) {
     const items = useMemo(
         () => Array.from({ length: max - min + 1 }, (_, index) => min + index),
         [min, max],
@@ -19,14 +18,14 @@ function DurationWheel({ value, min, max, onChange, locked }) {
             const index = Math.min(Math.max(nextValue - min, 0), items.length - 1);
             syncingRef.current = true;
             list.scrollTo({
-                top: index * ROW_HEIGHT,
+                top: index * rowHeight,
                 behavior,
             });
             requestAnimationFrame(() => {
                 syncingRef.current = false;
             });
         },
-        [items.length, min],
+        [items.length, min, rowHeight],
     );
 
     useEffect(() => {
@@ -59,7 +58,7 @@ function DurationWheel({ value, min, max, onChange, locked }) {
         const list = listRef.current;
         if (!list) return;
 
-        const index = Math.round(list.scrollTop / ROW_HEIGHT);
+        const index = Math.round(list.scrollTop / rowHeight);
         const next = min + Math.min(Math.max(index, 0), items.length - 1);
         if (next !== value) {
             onChange(next);
@@ -98,6 +97,8 @@ function DurationScrollPicker({
     onSecondsChange,
     locked = false,
 }) {
+    const rowHeight = useCssVarNumber("--duration-row-height", 56);
+
     return (
         <div className="duration-picker">
             <div className="duration-picker-frame">
@@ -108,6 +109,7 @@ function DurationScrollPicker({
                         min={0}
                         max={23}
                         locked={locked}
+                        rowHeight={rowHeight}
                         onChange={onHoursChange}
                     />
                     <DurationWheel
@@ -115,6 +117,7 @@ function DurationScrollPicker({
                         min={0}
                         max={59}
                         locked={locked}
+                        rowHeight={rowHeight}
                         onChange={onMinutesChange}
                     />
                     <DurationWheel
@@ -122,6 +125,7 @@ function DurationScrollPicker({
                         min={0}
                         max={59}
                         locked={locked}
+                        rowHeight={rowHeight}
                         onChange={onSecondsChange}
                     />
                 </div>
