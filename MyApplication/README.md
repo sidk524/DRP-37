@@ -20,6 +20,18 @@ drp37://auth-callback
 
 Google and email login are wired from the login screen. When Supabase reports an authenticated session, the app switches to the blocker setup screen.
 
+## Architecture
+
+| Layer | Package | Role |
+| --- | --- | --- |
+| Auth | `auth/` | Supabase sign-in/out and OAuth deep links only |
+| Remote | `remote/webserver/` | All HTTP to the EC2 web server (sessions, onboarding) |
+| Local | `local/` | Unified on-device state in `TetherLocalStore` |
+| Blocking | `blocking/` | Accessibility service and settings helpers |
+| UI | `ui/` | Compose screens; no direct HTTP |
+
+Onboarding settings are loaded and saved through the web server (`GET/PUT /api/onboarding`), not direct Supabase REST from the app.
+
 ## App Blocking
 
 Active app blocking uses the Tether accessibility service. Before starting a block session, enable Tether in Android Accessibility settings. If the service is not enabled, the app opens Accessibility settings instead of recording a session.

@@ -1,7 +1,7 @@
-package com.drp37.blocker.data
+package com.drp37.blocker.remote.webserver
 
 import com.drp37.blocker.BuildConfig
-import io.github.jan.supabase.auth.auth
+import com.drp37.blocker.auth.AuthService
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -11,25 +11,9 @@ import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-data class BlockSessionRecord(
-    val id: String,
-    val userId: String,
-    val canonicalTargets: List<String>,
-    val appsBlocked: List<String>,
-    val domainsBlocked: List<String>,
-    val processTokens: List<String>,
-    val totalDurationSeconds: Int,
-    val startedAt: String,
-    val endedAt: String? = null
-)
-
-object BlockSessionRepository {
-    suspend fun loadActiveSession(): BlockSessionRecord? {
-        val response = request(
-            method = "GET",
-            path = "/api/session/current"
-        )
-
+object WebServerService {
+    suspend fun getCurrentSession(): BlockSessionRecord? {
+        val response = request(method = "GET", path = "/api/session/current")
         val session = response.optJSONObject("session") ?: return null
         return session.toBlockSessionRecord()
     }
@@ -43,30 +27,37 @@ object BlockSessionRepository {
             .put("appsBlocked", JSONArray(appsBlocked.sorted()))
             .put("totalDurationSeconds", totalDurationSeconds)
 
-        val response = request(
-            method = "PUT",
-            path = "/api/session/current",
-            body = body
-        )
-
+        val response = request(method = "PUT", path = "/api/session/current", body = body)
         val session = response.optJSONObject("session")
             ?: throw IOException("Server did not return a block session.")
         return session.toBlockSessionRecord()
     }
 
     suspend fun endSession(sessionId: String?) {
-        val body = JSONObject()
-            .put("active", false)
-
+        val body = JSONObject().put("active", false)
         if (!sessionId.isNullOrBlank()) {
             body.put("sessionId", sessionId)
         }
+        request(method = "PUT", path = "/api/session/current", body = body)
+    }
 
-        request(
-            method = "PUT",
-            path = "/api/session/current",
-            body = body
-        )
+    suspend fun loadOnboarding(): OnboardingSettings? {
+        val response = request(method = "GET", path = "/api/onboarding")
+        val onboarding = response.optJSONObject("onboarding") ?: return null
+        return onboarding.toOnboardingSettings()
+    }
+
+    suspend fun saveOnboarding(settings: OnboardingSettings): OnboardingSettings {
+        val body = JSONObject()
+            .put("doMoreOf", JSONArray(settings.goals))
+            .put("scrollingWorst", JSONArray(settings.scrollingWorst))
+            .put("futureMessage", settings.futureMessage.trim())
+            .put("strictness", normalizeStrictness(settings.strictness))
+
+        val response = request(method = "PUT", path = "/api/onboarding", body = body)
+        val onboarding = response.optJSONObject("onboarding")
+            ?: throw IOException("Server did not return onboarding settings.")
+        return onboarding.toOnboardingSettings()
     }
 
     private suspend fun request(
@@ -77,7 +68,7 @@ object BlockSessionRepository {
         val baseUrl = BuildConfig.WEB_SERVER_URL.trimEnd('/')
         if (baseUrl.isBlank()) throw IOException("WEB_SERVER_URL is not configured.")
 
-        val accessToken = SupabaseAuthClient.client.auth.currentAccessTokenOrNull()
+        val accessToken = AuthService.currentAccessToken()
             ?: throw IOException("No active Supabase session.")
         val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
             requestMethod = method
@@ -119,6 +110,15 @@ object BlockSessionRepository {
     }
 }
 
+private fun normalizeStrictness(strictness: String): String {
+    return when (strictness) {
+        "gentle" -> "gentle"
+        "moderate" -> "moderate"
+        "hard" -> "hard"
+        else -> "moderate"
+    }
+}
+
 private fun JSONObject.toBlockSessionRecord(): BlockSessionRecord {
     return BlockSessionRecord(
         id = getString("id"),
@@ -130,6 +130,15 @@ private fun JSONObject.toBlockSessionRecord(): BlockSessionRecord {
         totalDurationSeconds = getInt("total_duration_seconds"),
         startedAt = getString("started_at"),
         endedAt = optString("ended_at").takeUnless { it.isBlank() || it == "null" }
+    )
+}
+
+private fun JSONObject.toOnboardingSettings(): OnboardingSettings {
+    return OnboardingSettings(
+        goals = optJSONArray("doMoreOf")?.toStringList().orEmpty(),
+        scrollingWorst = optJSONArray("scrollingWorst")?.toStringList().orEmpty(),
+        futureMessage = optString("futureMessage").orEmpty(),
+        strictness = normalizeStrictness(optString("strictness"))
     )
 }
 

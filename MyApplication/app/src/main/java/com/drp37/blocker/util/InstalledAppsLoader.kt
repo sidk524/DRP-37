@@ -1,4 +1,4 @@
-package com.drp37.blocker.data
+package com.drp37.blocker.util
 
 import android.content.Context
 import android.content.Intent

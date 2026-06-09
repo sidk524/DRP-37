@@ -27,6 +27,8 @@ The server listens on `http://localhost:3000` by default.
 - `GET /health` returns a health check response for load balancers or uptime checks.
 - `GET /api/session/current` returns the authenticated user's active block session, or `null`.
 - `PUT /api/session/current` starts or ends the authenticated user's active block session.
+- `GET /api/onboarding` returns the authenticated user's onboarding settings, or `null`.
+- `PUT /api/onboarding` upserts the authenticated user's onboarding settings.
 
 ## Block Session Sync
 

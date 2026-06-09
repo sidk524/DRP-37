@@ -7,8 +7,3 @@ data class InstalledApp(
     val packageName: String,
     val icon: Bitmap
 )
-
-data class BlockList(
-    val packages: Set<String>,
-    val durationMinutes: Int
-)

@@ -11,6 +11,7 @@
     </queries>
 
     <application
+        android:name=".TetherApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -21,7 +22,7 @@
         android:theme="@style/Theme.MyApplication"
         android:usesCleartextTraffic="true">
         <service
-            android:name=".data.AppBlockingAccessibilityService"
+            android:name=".blocking.AppBlockingAccessibilityService"
             android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

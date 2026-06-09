@@ -1,29 +1,18 @@
-import { request } from "./WebServerClient";
+function requireTether() {
+    if (!window.tether) {
+        throw new Error("Tether desktop API is not available.");
+    }
+    return window.tether;
+}
 
 export async function loadActiveSession() {
-    const data = await request("/api/session/current");
-    return data.session || null;
+    return requireTether().getCurrentSession();
 }
 
 export async function createSession({ domainsBlocked, totalDurationSeconds }) {
-    const data = await request("/api/session/current", {
-        method: "PUT",
-        body: {
-            active: true,
-            domainsBlocked,
-            totalDurationSeconds,
-        },
-    });
-    return data.session;
+    return requireTether().createSession({ domainsBlocked, totalDurationSeconds });
 }
 
 export async function endSession(sessionId) {
-    const data = await request("/api/session/current", {
-        method: "PUT",
-        body: {
-            active: false,
-            sessionId,
-        },
-    });
-    return data.sessions || [];
+    return requireTether().endSession(sessionId);
 }

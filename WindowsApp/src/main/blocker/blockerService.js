@@ -1,6 +1,5 @@
-const { ipcMain, BrowserWindow } = require("electron");
-const extensionBridge = require("../extension/extensionBridge");
-
+let extensionBridge = null;
+let onSessionChange = null;
 let expiryTimer = null;
 
 let session = {
@@ -57,10 +56,12 @@ function normalizeFriction(friction = {}) {
 
 function broadcast() {
     const view = sessionView();
-    for (const win of BrowserWindow.getAllWindows()) {
-        win.webContents.send("session:update", view);
+    if (onSessionChange) {
+        onSessionChange(view);
     }
-    extensionBridge.notifyStateChange();
+    if (extensionBridge) {
+        extensionBridge.notifyStateChange();
+    }
 }
 
 function startSession({
@@ -132,6 +133,10 @@ function updateSession({ mode, friction } = {}) {
 }
 
 function stopSession(reason = "manual") {
+    if (reason === "manual" && session.active && session.mode === "hard") {
+        return { ok: false, error: "Hard sessions can't be ended early." };
+    }
+
     const endedAt = Date.now();
     const startedAt = session.startedAt || endedAt;
     const plannedMs = Math.max(0, (session.durationMinutes || 0) * 60 * 1000);
@@ -169,22 +174,13 @@ function stopSession(reason = "manual") {
     return { ok: true, session: sessionView() };
 }
 
-function registerIpc() {
-    ipcMain.handle("session:start", (_e, cfg) => startSession(cfg));
-    ipcMain.handle("session:update", (_e, cfg) => updateSession(cfg));
-    ipcMain.handle("session:get", () => sessionView());
-    ipcMain.handle("extension:status", () => extensionBridge.status());
-
-    ipcMain.handle("session:stop", () => {
-        if (session.active && session.mode === "hard") {
-            return { ok: false, error: "Hard sessions can't be ended early." };
-        }
-        return stopSession("manual");
-    });
+function getSession() {
+    return sessionView();
 }
 
-function start() {
-    registerIpc();
+function initialize({ onSessionChange: callback, extensionBridge: bridge }) {
+    onSessionChange = callback;
+    extensionBridge = bridge;
     extensionBridge.setStateProvider(extensionBlockState);
     extensionBridge.start();
     console.log("[blocker] ready — waiting for a session to start.");
@@ -193,7 +189,16 @@ function start() {
 function stop() {
     if (expiryTimer) clearTimeout(expiryTimer);
     expiryTimer = null;
-    extensionBridge.stop();
+    if (extensionBridge) {
+        extensionBridge.stop();
+    }
 }
 
-module.exports = { start, stop };
+module.exports = {
+    initialize,
+    stop,
+    startSession,
+    updateSession,
+    stopSession,
+    getSession,
+};

@@ -1,35 +1,26 @@
-import { request } from "./WebServerClient";
+function requireTether() {
+    if (!window.tether) {
+        throw new Error("Tether desktop API is not available.");
+    }
+    return window.tether;
+}
 
 export async function listGroups() {
-    const data = await request("/api/groups");
-    return data.groups || [];
+    return requireTether().listGroups();
 }
 
 export async function createGroup({ name }) {
-    const data = await request("/api/groups", {
-        method: "POST",
-        body: { name },
-    });
-    return data.group;
+    return requireTether().createGroup({ name });
 }
 
 export async function joinGroup({ inviteCode }) {
-    const data = await request("/api/groups/join", {
-        method: "POST",
-        body: { inviteCode },
-    });
-    return data.group;
+    return requireTether().joinGroup({ inviteCode });
 }
 
 export async function getGroupLeaderboard(groupId) {
-    const data = await request(`/api/groups/${encodeURIComponent(groupId)}/leaderboard`);
-    return data.leaderboard || [];
+    return requireTether().getGroupLeaderboard(groupId);
 }
 
 export async function syncDefaultGroups({ scrollingWorst }) {
-    const data = await request("/api/groups/defaults/sync", {
-        method: "POST",
-        body: { scrollingWorst },
-    });
-    return data.groups || [];
+    return requireTether().syncDefaultGroups({ scrollingWorst });
 }

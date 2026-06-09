@@ -1,9 +1,12 @@
-const { app, BrowserWindow } = require("electron");
 const path = require("path");
-const { registerAuthHandlers } = require("./handlers/authHandler");
-const { registerWebServerHandlers } = require("./handlers/webServerHandler");
-const { registerOAuthIpc } = require("./auth/registerOAuthIpc");
+require("dotenv").config({ path: path.join(__dirname, "../../.env") });
+
+const { app, BrowserWindow, ipcMain } = require("electron");
+const CHANNELS = require("./ipc/channels");
+const authService = require("./auth/authService");
+const webServerService = require("./webServer/webServerService");
 const blockerService = require("./blocker/blockerService");
+const extensionBridge = require("./extension/extensionBridge");
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -14,6 +17,62 @@ function focusMainWindow() {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
+}
+
+function broadcastToAllWindows(channel, payload) {
+    for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send(channel, payload);
+    }
+}
+
+function broadcastAuthSession(session) {
+    broadcastToAllWindows(CHANNELS.AUTH_SESSION_UPDATE, session);
+}
+
+function broadcastBlockerSession(view) {
+    broadcastToAllWindows(CHANNELS.SESSION_UPDATE_EVENT, view);
+}
+
+function registerAllIpcHandlers() {
+    ipcMain.handle(CHANNELS.AUTH_SIGN_IN, (_e, payload) => authService.signInWithEmail(payload));
+    ipcMain.handle(CHANNELS.AUTH_SIGN_UP, (_e, payload) => authService.signUpWithEmail(payload));
+    ipcMain.handle(CHANNELS.AUTH_SIGN_OUT, () => authService.signOut());
+    ipcMain.handle(CHANNELS.AUTH_GET_SESSION, () => authService.getSession());
+    ipcMain.handle(CHANNELS.AUTH_SIGN_IN_WITH_GOOGLE, () => authService.signInWithGoogle());
+
+    ipcMain.handle(CHANNELS.DATA_LOAD_ONBOARDING, () => webServerService.loadOnboarding());
+    ipcMain.handle(CHANNELS.DATA_SAVE_ONBOARDING, (_e, payload) =>
+        webServerService.saveOnboarding(payload)
+    );
+
+    ipcMain.handle(CHANNELS.WEBSERVER_GET_CURRENT_SESSION, () =>
+        webServerService.getCurrentSession()
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_CREATE_SESSION, (_e, payload) =>
+        webServerService.createSession(payload)
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_END_SESSION, (_e, sessionId) =>
+        webServerService.endSession(sessionId)
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_LIST_GROUPS, () => webServerService.listGroups());
+    ipcMain.handle(CHANNELS.WEBSERVER_CREATE_GROUP, (_e, payload) =>
+        webServerService.createGroup(payload)
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_JOIN_GROUP, (_e, payload) =>
+        webServerService.joinGroup(payload)
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_GET_GROUP_LEADERBOARD, (_e, groupId) =>
+        webServerService.getGroupLeaderboard(groupId)
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_SYNC_DEFAULT_GROUPS, (_e, payload) =>
+        webServerService.syncDefaultGroups(payload)
+    );
+
+    ipcMain.handle(CHANNELS.SESSION_START, (_e, cfg) => blockerService.startSession(cfg));
+    ipcMain.handle(CHANNELS.SESSION_UPDATE, (_e, cfg) => blockerService.updateSession(cfg));
+    ipcMain.handle(CHANNELS.SESSION_GET, () => blockerService.getSession());
+    ipcMain.handle(CHANNELS.SESSION_STOP, () => blockerService.stopSession("manual"));
+    ipcMain.handle(CHANNELS.EXTENSION_STATUS, () => extensionBridge.status());
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -38,6 +97,7 @@ function createWindow() {
             preload: path.join(__dirname, "preload.js"),
             contextIsolation: true,
             nodeIntegration: false,
+            sandbox: false,
         },
     });
 
@@ -69,14 +129,15 @@ function createWindow() {
     }
 }
 
-registerAuthHandlers();
-registerWebServerHandlers();
-registerOAuthIpc();
-
 if (gotSingleInstanceLock) {
-    app.whenReady().then(() => {
+    app.whenReady().then(async () => {
+        authService.initialize({ onSessionChange: broadcastAuthSession });
+        blockerService.initialize({
+            onSessionChange: broadcastBlockerSession,
+            extensionBridge,
+        });
+        registerAllIpcHandlers();
         createWindow();
-        blockerService.start();
     });
 
     app.on("will-quit", () => {

@@ -1,0 +1,28 @@
+module.exports = {
+    AUTH_SIGN_IN: "auth:signIn",
+    AUTH_SIGN_UP: "auth:signUp",
+    AUTH_SIGN_OUT: "auth:signOut",
+    AUTH_GET_SESSION: "auth:getSession",
+    AUTH_SIGN_IN_WITH_GOOGLE: "auth:signInWithGoogle",
+    AUTH_SESSION_UPDATE: "auth:session-update",
+
+    DATA_LOAD_ONBOARDING: "data:loadOnboarding",
+    DATA_SAVE_ONBOARDING: "data:saveOnboarding",
+
+    WEBSERVER_GET_CURRENT_SESSION: "webserver:getCurrentSession",
+    WEBSERVER_CREATE_SESSION: "webserver:createSession",
+    WEBSERVER_END_SESSION: "webserver:endSession",
+    WEBSERVER_LIST_GROUPS: "webserver:listGroups",
+    WEBSERVER_CREATE_GROUP: "webserver:createGroup",
+    WEBSERVER_JOIN_GROUP: "webserver:joinGroup",
+    WEBSERVER_GET_GROUP_LEADERBOARD: "webserver:getGroupLeaderboard",
+    WEBSERVER_SYNC_DEFAULT_GROUPS: "webserver:syncDefaultGroups",
+
+    SESSION_START: "session:start",
+    SESSION_UPDATE: "session:update",
+    SESSION_STOP: "session:stop",
+    SESSION_GET: "session:get",
+    SESSION_UPDATE_EVENT: "session:update",
+
+    EXTENSION_STATUS: "extension:status",
+};

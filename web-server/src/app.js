@@ -369,6 +369,76 @@ const displayNameForUser = async (userId) => {
         || "User";
 };
 
+const normalizeStrictness = (value) => {
+    return ["gentle", "moderate", "hard"].includes(value) ? value : "moderate";
+};
+
+const publicOnboarding = (row) => ({
+    doMoreOf: row.do_more_of || [],
+    scrollingWorst: row.scrolling_worst || [],
+    futureMessage: row.future_message || "",
+    strictness: normalizeStrictness(row.strictness)
+});
+
+app.get("/api/onboarding", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from("onboarding")
+            .select("do_more_of,scrolling_worst,future_message,strictness")
+            .eq("user_id", req.user.id)
+            .maybeSingle();
+
+        if (error) throw error;
+        if (!data) {
+            res.json({ onboarding: null });
+            return;
+        }
+
+        res.json({ onboarding: publicOnboarding(data) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.put("/api/onboarding", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const safeDoMoreOf = validateStringArray(req.body?.doMoreOf, "doMoreOf");
+        if (safeDoMoreOf.error) {
+            res.status(400).json({ error: safeDoMoreOf.error });
+            return;
+        }
+
+        const safeScrollingWorst = validateStringArray(req.body?.scrollingWorst, "scrollingWorst");
+        if (safeScrollingWorst.error) {
+            res.status(400).json({ error: safeScrollingWorst.error });
+            return;
+        }
+
+        const futureMessage = String(req.body?.futureMessage || "").trim();
+        const strictness = normalizeStrictness(String(req.body?.strictness || "moderate"));
+
+        const { data, error } = await supabaseAdmin
+            .from("onboarding")
+            .upsert(
+                {
+                    user_id: req.user.id,
+                    do_more_of: safeDoMoreOf,
+                    scrolling_worst: safeScrollingWorst,
+                    future_message: futureMessage,
+                    strictness
+                },
+                { onConflict: "user_id" }
+            )
+            .select("do_more_of,scrolling_worst,future_message,strictness")
+            .single();
+
+        if (error) throw error;
+        res.json({ onboarding: publicOnboarding(data) });
+    } catch (error) {
+        next(error);
+    }
+});
+
 app.post("/api/groups", requireSupabase, requireUser, async (req, res, next) => {
     try {
         const name = String(req.body?.name || "").trim();

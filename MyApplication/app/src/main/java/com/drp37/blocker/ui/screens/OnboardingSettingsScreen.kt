@@ -35,8 +35,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.drp37.blocker.data.OnboardingRepository
-import com.drp37.blocker.data.OnboardingSettings
+import com.drp37.blocker.remote.webserver.OnboardingSettings
+import com.drp37.blocker.remote.webserver.WebServerService
 import kotlinx.coroutines.launch
 
 private val goalOptions = listOf("Read more", "Exercise", "Call family", "Creative work")
@@ -71,7 +71,7 @@ fun OnboardingSettingsScreen(onBack: () -> Unit) {
 
     LaunchedEffect(Unit) {
         loading = true
-        runCatching { OnboardingRepository.loadSettings() }
+        runCatching { WebServerService.loadOnboarding() }
             .onSuccess { loaded ->
                 settings = loaded ?: OnboardingSettings(
                     futureMessage = "",
@@ -252,7 +252,7 @@ fun OnboardingSettingsScreen(onBack: () -> Unit) {
                         saved = false
                         runCatching {
                             val normalized = settings.copy(futureMessage = settings.futureMessage.trim())
-                            OnboardingRepository.saveSettings(normalized)
+                            WebServerService.saveOnboarding(normalized)
                             settings = normalized
                         }.onSuccess {
                             saved = true

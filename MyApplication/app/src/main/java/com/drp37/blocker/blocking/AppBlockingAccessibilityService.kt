@@ -1,9 +1,10 @@
-package com.drp37.blocker.data
+package com.drp37.blocker.blocking
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import com.drp37.blocker.MainActivity
+import com.drp37.blocker.local.TetherLocalStore
 
 class AppBlockingAccessibilityService : AccessibilityService() {
     private var lastBlockedPackage: String? = null
@@ -13,9 +14,9 @@ class AppBlockingAccessibilityService : AccessibilityService() {
         val packageName = event?.packageName?.toString() ?: return
         if (packageName == this.packageName) return
 
-        val session = loadActiveBlockSession(this) ?: return
+        val session = TetherLocalStore.getActiveSession() ?: return
         if (packageName !in session.packages) return
-        if (isBlockedPackageTemporarilyAllowed(this, packageName)) return
+        if (TetherLocalStore.isTemporarilyAllowed(packageName)) return
 
         val now = System.currentTimeMillis()
         if (packageName == lastBlockedPackage && now - lastBlockedAtMillis < 1000L) return

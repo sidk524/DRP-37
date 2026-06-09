@@ -68,12 +68,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.drp37.blocker.data.BlockSessionRepository
-import com.drp37.blocker.data.clearActiveBlockSession
-import com.drp37.blocker.data.isAppBlockingServiceEnabled
-import com.drp37.blocker.data.loadLaunchableApps
-import com.drp37.blocker.data.openAppBlockingSettings
-import com.drp37.blocker.data.saveActiveBlockSession
+import com.drp37.blocker.blocking.isAppBlockingServiceEnabled
+import com.drp37.blocker.blocking.openAppBlockingSettings
+import com.drp37.blocker.local.TetherLocalStore
+import com.drp37.blocker.remote.webserver.WebServerService
+import com.drp37.blocker.util.loadLaunchableApps
 import com.drp37.blocker.model.InstalledApp
 import com.drp37.blocker.ui.theme.MyApplicationTheme
 import androidx.lifecycle.Lifecycle
@@ -140,7 +139,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
 
     LaunchedEffect(installedApps) {
         runCatching {
-            val activeSession = BlockSessionRepository.loadActiveSession() ?: return@runCatching
+            val activeSession = WebServerService.getCurrentSession() ?: return@runCatching
             val elapsedSeconds = Duration.between(
                 Instant.parse(activeSession.startedAt),
                 Instant.now()
@@ -148,8 +147,8 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
             val restoredRemainingSeconds = activeSession.totalDurationSeconds - elapsedSeconds
 
             if (restoredRemainingSeconds <= 0) {
-                BlockSessionRepository.endSession(activeSession.id)
-                clearActiveBlockSession(context)
+                WebServerService.endSession(activeSession.id)
+                TetherLocalStore.clearActiveSession()
                 return@runCatching
             }
 
@@ -158,7 +157,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
             }
             activeSessionId = activeSession.id
             remainingSeconds = restoredRemainingSeconds
-            saveActiveBlockSession(context, activeSession)
+            TetherLocalStore.setActiveSession(activeSession)
             sessionRunning = true
         }
     }
@@ -176,10 +175,10 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
             seconds = 0
             sessionRunning = false
             activeSessionId?.let { sessionId ->
-                runCatching { BlockSessionRepository.endSession(sessionId) }
+                runCatching { WebServerService.endSession(sessionId) }
             }
             activeSessionId = null
-            clearActiveBlockSession(context)
+            TetherLocalStore.clearActiveSession()
         }
     }
 
@@ -219,7 +218,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                         sessionError = null
                         coroutineScope.launch {
                             runCatching {
-                                BlockSessionRepository.createSession(
+                                WebServerService.createSession(
                                     appsBlocked = selectedPackageSet,
                                     totalDurationSeconds = totalDurationSeconds
                                 )
@@ -230,7 +229,7 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                                 ).seconds.toInt()
                                 activeSessionId = session.id
                                 remainingSeconds = max(1, session.totalDurationSeconds - elapsedSeconds)
-                                saveActiveBlockSession(context, session)
+                                TetherLocalStore.setActiveSession(session)
                                 sessionRunning = true
                             }.onFailure { error ->
                                 sessionError = error.message ?: "Could not start block session."
@@ -245,10 +244,10 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
                 onLogout = {
                     coroutineScope.launch {
                         activeSessionId?.let { sessionId ->
-                            runCatching { BlockSessionRepository.endSession(sessionId) }
+                            runCatching { WebServerService.endSession(sessionId) }
                         }
                         activeSessionId = null
-                        clearActiveBlockSession(context)
+                        TetherLocalStore.clearActiveSession()
                         sessionRunning = false
                         isStartingSession = false
                         onLogout()

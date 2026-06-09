@@ -10,9 +10,7 @@ import {
     loadActiveSession,
 } from "../services/BlockSessionRepository";
 import {
-    getUserTotalPoints,
     loadOnboarding,
-    saveSessionPoints,
     signOut,
 } from "../services/SupabaseClient";
 
@@ -78,7 +76,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
     const [mode, setMode] = useState(defaultMode);
     const [active, setActive] = useState(null);
     const [now, setNow] = useState(Date.now());
-    const [points, setPoints] = useState(0);
     const [sessionError, setSessionError] = useState("");
     const [remoteSessionId, setRemoteSessionId] = useState(null);
     const [onboardingSettings, setOnboardingSettings] = useState(null);
@@ -94,15 +91,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
     useEffect(() => {
         setMode(defaultMode);
     }, [defaultMode]);
-
-    async function refreshPoints() {
-        try {
-            const totalPoints = await getUserTotalPoints(session.user.id);
-            setPoints(totalPoints);
-        } catch (error) {
-            console.error("Failed to load focus points:", error);
-        }
-    }
 
     async function loadFrictionContext() {
         const settings = onboardingSettings || await loadOnboarding(session.user.id);
@@ -140,10 +128,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
     }
 
     useEffect(() => {
-        refreshPoints();
-    }, [session.user.id]);
-
-    useEffect(() => {
         if (restoredSessionRef.current) return;
         restoredSessionRef.current = true;
 
@@ -160,27 +144,15 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
 
     useEffect(() => {
         let unsub = () => {};
-        if (window.tether?.getSession) {
-            window.tether.getSession().then((s) => setActive(s?.active ? s : null));
+        if (window.tether?.getBlockerSession) {
+            window.tether.getBlockerSession().then((s) => setActive(s?.active ? s : null));
             unsub = window.tether.onSessionUpdate(async (s) => {
                 const wasActive = wasActiveRef.current;
                 const isActive = !!s?.active;
-                const endedByExpiry = s?.lastStop?.reason === "expired";
                 const endedAt = s?.lastStop?.endedAt;
 
                 if (wasActive && !isActive && endedAt && endedAt !== lastAwardedEndedAtRef.current) {
                     try {
-                        if (endedByExpiry) {
-                            await saveSessionPoints({
-                                userId: session.user.id,
-                                mode: s.lastStop.mode,
-                                actualMs: s.lastStop.actualMs,
-                                plannedMs: s.lastStop.plannedMs,
-                                blockedAppsCount: s.lastStop.blockedAppsCount,
-                                endedAt: new Date(endedAt).toISOString(),
-                            });
-                            await refreshPoints();
-                        }
                         if (remoteSessionId) {
                             await endSession(remoteSessionId);
                             setRemoteSessionId(null);
@@ -472,8 +444,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                 >
                     {sessionRunning ? "Session Running" : "Lock-In!"}
                 </button>
-
-                <p className="tether-points">{points} pts</p>
             </div>
         </div>
     );

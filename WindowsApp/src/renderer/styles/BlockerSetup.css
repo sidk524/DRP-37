@@ -159,13 +159,6 @@
     align-self: center;
 }
 
-.tether-points {
-    text-align: center;
-    color: #5e5e66;
-    font-size: 0.85rem;
-    margin-top: 16px;
-}
-
 .tether-topbar {
     display: grid;
     grid-template-columns: 1fr auto 1fr;

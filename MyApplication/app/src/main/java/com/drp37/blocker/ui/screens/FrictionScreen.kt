@@ -42,7 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.drp37.blocker.data.OnboardingSettings
+import com.drp37.blocker.remote.webserver.OnboardingSettings
 import kotlinx.coroutines.delay
 
 private enum class FrictionPhase {
@@ -61,8 +61,8 @@ fun FrictionScreen(
 ) {
     val appName = rememberAppLabel(blockedPackage)
     val firm = settings?.strictness in setOf("moderate", "hard") &&
-        settings.futureMessage.isNotBlank() &&
-        settings.goals.isNotEmpty()
+        !settings?.futureMessage.isNullOrBlank() &&
+        !settings?.goals.isNullOrEmpty()
     var phase by remember(blockedPackage, settings) { mutableStateOf(FrictionPhase.Breathing) }
     var readyVisible by remember(blockedPackage, settings) { mutableStateOf(false) }
 
