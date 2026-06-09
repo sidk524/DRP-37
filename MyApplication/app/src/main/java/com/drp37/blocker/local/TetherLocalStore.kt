@@ -10,6 +10,7 @@ object TetherLocalStore {
     private const val KEY_PACKAGES = "packages"
     private const val KEY_STARTED_AT_EPOCH_MILLIS = "started_at_epoch_millis"
     private const val KEY_DURATION_SECONDS = "duration_seconds"
+    private const val KEY_MODE = "mode"
     private const val KEY_MIGRATED = "migrated"
     private const val LEGACY_SESSION_PREFS = "active_block_session"
     private const val LEGACY_ALLOW_PREFS = "blocked_package_allow_windows"
@@ -34,12 +35,14 @@ object TetherLocalStore {
             .toSet()
         val startedAtEpochMillis = prefs.getLong(KEY_STARTED_AT_EPOCH_MILLIS, 0L)
         val durationSeconds = prefs.getInt(KEY_DURATION_SECONDS, 0)
+        val mode = prefs.getString(KEY_MODE, "reflect").orEmpty().ifBlank { "reflect" }
 
         val session = ActiveBlockSession(
             sessionId = sessionId,
             packages = packages,
             startedAtEpochMillis = startedAtEpochMillis,
-            durationSeconds = durationSeconds
+            durationSeconds = durationSeconds,
+            mode = mode
         )
 
         if (!session.isActive()) {
@@ -50,13 +53,21 @@ object TetherLocalStore {
         return session
     }
 
-    fun setActiveSession(record: BlockSessionRecord) {
+    fun setActiveSession(record: BlockSessionRecord, mode: String = "reflect") {
         appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_SESSION_ID, record.id)
             .putString(KEY_PACKAGES, record.appsBlocked.sorted().joinToString("|"))
             .putLong(KEY_STARTED_AT_EPOCH_MILLIS, Instant.parse(record.startedAt).toEpochMilli())
             .putInt(KEY_DURATION_SECONDS, record.totalDurationSeconds)
+            .putString(KEY_MODE, normalizeMode(mode))
+            .apply()
+    }
+
+    fun updateActiveSessionMode(mode: String) {
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_MODE, normalizeMode(mode))
             .apply()
     }
 
@@ -67,6 +78,7 @@ object TetherLocalStore {
             .remove(KEY_PACKAGES)
             .remove(KEY_STARTED_AT_EPOCH_MILLIS)
             .remove(KEY_DURATION_SECONDS)
+            .remove(KEY_MODE)
             .apply()
     }
 
@@ -92,6 +104,14 @@ object TetherLocalStore {
     }
 
     private fun allowKey(packageName: String): String = "$ALLOW_PREFIX$packageName"
+
+    private fun normalizeMode(mode: String): String {
+        return when (mode) {
+            "breathing" -> "breathing"
+            "hard" -> "hard"
+            else -> "reflect"
+        }
+    }
 
     private fun migrateLegacyPrefsIfNeeded() {
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

@@ -61,7 +61,10 @@ private val strictnessOptions = listOf(
 private const val letterPlaceholder = "You said you wanted to read before bed. Put the phone down. You'll feel better."
 
 @Composable
-fun OnboardingSettingsScreen(onBack: () -> Unit) {
+fun OnboardingSettingsScreen(
+    onBack: () -> Unit,
+    onSaved: (OnboardingSettings) -> Unit = {}
+) {
     val coroutineScope = rememberCoroutineScope()
     var settings by remember { mutableStateOf(OnboardingSettings()) }
     var loading by remember { mutableStateOf(true) }
@@ -253,9 +256,11 @@ fun OnboardingSettingsScreen(onBack: () -> Unit) {
                         runCatching {
                             val normalized = settings.copy(futureMessage = settings.futureMessage.trim())
                             WebServerService.saveOnboarding(normalized)
+                            WebServerService.syncDefaultGroups(normalized.scrollingWorst)
                             settings = normalized
                         }.onSuccess {
                             saved = true
+                            onSaved(settings)
                         }.onFailure { throwable ->
                             error = throwable.message ?: "Could not save settings."
                         }

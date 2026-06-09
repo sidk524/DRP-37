@@ -46,6 +46,13 @@ object AuthService {
         }
     }
 
+    suspend fun signUpWithEmail(email: String, password: String) {
+        client.auth.signUpWith(Email) {
+            this.email = email
+            this.password = password
+        }
+    }
+
     suspend fun signInWithGoogle() {
         client.auth.signInWith(Google)
     }

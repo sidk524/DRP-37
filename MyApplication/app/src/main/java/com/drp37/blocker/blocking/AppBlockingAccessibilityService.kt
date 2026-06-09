@@ -16,7 +16,7 @@ class AppBlockingAccessibilityService : AccessibilityService() {
 
         val session = TetherLocalStore.getActiveSession() ?: return
         if (packageName !in session.packages) return
-        if (TetherLocalStore.isTemporarilyAllowed(packageName)) return
+        if (session.mode != "hard" && TetherLocalStore.isTemporarilyAllowed(packageName)) return
 
         val now = System.currentTimeMillis()
         if (packageName == lastBlockedPackage && now - lastBlockedAtMillis < 1000L) return

@@ -358,9 +358,9 @@ const lockedSecondsForSession = (session) => {
 };
 
 const displayNameForUser = async (userId) => {
-    const getUserById = supabaseAdmin.auth?.admin?.getUserById;
-    if (!getUserById) return "User";
-    const { data, error } = await getUserById(userId);
+    const admin = supabaseAdmin.auth?.admin;
+    if (!admin?.getUserById) return "User";
+    const { data, error } = await admin.getUserById(userId);
     if (error) return "User";
     const user = data?.user;
     return user?.user_metadata?.name

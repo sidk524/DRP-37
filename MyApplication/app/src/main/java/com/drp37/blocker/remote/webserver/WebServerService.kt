@@ -7,7 +7,9 @@ import org.json.JSONObject
 import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.net.URL
+import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -58,6 +60,64 @@ object WebServerService {
         val onboarding = response.optJSONObject("onboarding")
             ?: throw IOException("Server did not return onboarding settings.")
         return onboarding.toOnboardingSettings()
+    }
+
+    suspend fun saveSessionPoints(
+        mode: String,
+        actualMs: Long,
+        plannedMs: Long,
+        blockedAppsCount: Int,
+        endedAt: String
+    ): FocusPointsRecord {
+        val body = JSONObject()
+            .put("mode", normalizeMode(mode))
+            .put("actualMs", actualMs.coerceAtLeast(0L))
+            .put("plannedMs", plannedMs.coerceAtLeast(0L))
+            .put("blockedAppsCount", blockedAppsCount.coerceAtLeast(1))
+            .put("endedAt", endedAt)
+
+        val response = request(method = "POST", path = "/api/focus-points", body = body)
+        val record = response.optJSONObject("record")
+            ?: throw IOException("Server did not return focus points.")
+        return record.toFocusPointsRecord()
+    }
+
+    suspend fun getUserTotalPoints(): Int {
+        val response = request(method = "GET", path = "/api/focus-points/total")
+        return response.optInt("total", 0)
+    }
+
+    suspend fun listGroups(): List<GroupSummary> {
+        val response = request(method = "GET", path = "/api/groups")
+        return response.optJSONArray("groups")?.toObjectList { toGroupSummary() }.orEmpty()
+    }
+
+    suspend fun createGroup(name: String): GroupSummary {
+        val body = JSONObject().put("name", name.trim())
+        val response = request(method = "POST", path = "/api/groups", body = body)
+        val group = response.optJSONObject("group")
+            ?: throw IOException("Server did not return a group.")
+        return group.toGroupSummary()
+    }
+
+    suspend fun joinGroup(inviteCode: String): GroupSummary {
+        val body = JSONObject().put("inviteCode", inviteCode.trim())
+        val response = request(method = "POST", path = "/api/groups/join", body = body)
+        val group = response.optJSONObject("group")
+            ?: throw IOException("Server did not return a group.")
+        return group.toGroupSummary()
+    }
+
+    suspend fun getGroupLeaderboard(groupId: String): List<LeaderboardEntry> {
+        val encodedId = URLEncoder.encode(groupId, StandardCharsets.UTF_8.name())
+        val response = request(method = "GET", path = "/api/groups/$encodedId/leaderboard")
+        return response.optJSONArray("leaderboard")?.toObjectList { toLeaderboardEntry() }.orEmpty()
+    }
+
+    suspend fun syncDefaultGroups(scrollingWorst: List<String>): List<GroupSummary> {
+        val body = JSONObject().put("scrollingWorst", JSONArray(scrollingWorst))
+        val response = request(method = "POST", path = "/api/groups/defaults/sync", body = body)
+        return response.optJSONArray("groups")?.toObjectList { toGroupSummary() }.orEmpty()
     }
 
     private suspend fun request(
@@ -119,6 +179,14 @@ private fun normalizeStrictness(strictness: String): String {
     }
 }
 
+private fun normalizeMode(mode: String): String {
+    return when (mode) {
+        "breathing" -> "breathing"
+        "hard" -> "hard"
+        else -> "reflect"
+    }
+}
+
 private fun JSONObject.toBlockSessionRecord(): BlockSessionRecord {
     return BlockSessionRecord(
         id = getString("id"),
@@ -142,6 +210,45 @@ private fun JSONObject.toOnboardingSettings(): OnboardingSettings {
     )
 }
 
+private fun JSONObject.toFocusPointsRecord(): FocusPointsRecord {
+    return FocusPointsRecord(
+        id = getString("id"),
+        userId = getString("user_id"),
+        mode = normalizeMode(optString("mode")),
+        actualMs = optLong("actual_ms", 0L),
+        plannedMs = optLong("planned_ms", 0L),
+        blockedAppsCount = optInt("blocked_apps_count", 1),
+        points = optInt("points", 0),
+        endedAt = optString("ended_at").orEmpty(),
+        createdAt = optString("created_at").orEmpty()
+    )
+}
+
+private fun JSONObject.toGroupSummary(): GroupSummary {
+    return GroupSummary(
+        id = getString("id"),
+        name = optString("name").orEmpty(),
+        inviteCode = optString("inviteCode").orEmpty(),
+        createdBy = optString("createdBy").takeUnless { it.isBlank() || it == "null" },
+        createdAt = optString("createdAt").orEmpty(),
+        memberCount = optInt("memberCount", 0)
+    )
+}
+
+private fun JSONObject.toLeaderboardEntry(): LeaderboardEntry {
+    return LeaderboardEntry(
+        rank = optInt("rank", 0),
+        userId = optString("userId").orEmpty(),
+        displayName = optString("displayName").ifBlank { "User" },
+        lockedSeconds = optInt("lockedSeconds", 0),
+        isCurrentUser = optBoolean("isCurrentUser", false)
+    )
+}
+
 private fun JSONArray.toStringList(): List<String> {
     return List(length()) { index -> getString(index) }
+}
+
+private fun <T> JSONArray.toObjectList(transform: JSONObject.() -> T): List<T> {
+    return List(length()) { index -> getJSONObject(index).transform() }
 }

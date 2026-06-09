@@ -23,6 +23,7 @@ import com.drp37.blocker.local.TetherLocalStore
 import com.drp37.blocker.ui.screens.BlockerSetupScreen
 import com.drp37.blocker.ui.screens.FrictionScreen
 import com.drp37.blocker.ui.screens.LoginScreen
+import com.drp37.blocker.ui.screens.OnboardingScreen
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.launch
 
@@ -38,6 +39,8 @@ fun AuthGate(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var onboardingSettings by remember { mutableStateOf<OnboardingSettings?>(null) }
     var isLoadingOnboarding by remember { mutableStateOf(false) }
+    var hasLoadedOnboarding by remember { mutableStateOf(false) }
+    var syncedDefaultGroups by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (AuthService.isConfigured) {
@@ -46,6 +49,10 @@ fun AuthGate(
                 if (isAuthenticated) {
                     isLoading = false
                     errorMessage = null
+                } else {
+                    onboardingSettings = null
+                    hasLoadedOnboarding = false
+                    syncedDefaultGroups = false
                 }
             }
         } else {
@@ -53,44 +60,67 @@ fun AuthGate(
         }
     }
 
-    LaunchedEffect(isAuthenticated, pendingFrictionPackage) {
-        val packageName = pendingFrictionPackage
-        if (isAuthenticated && packageName != null) {
+    LaunchedEffect(isAuthenticated) {
+        if (isAuthenticated) {
             isLoadingOnboarding = true
+            hasLoadedOnboarding = false
             onboardingSettings = runCatching { WebServerService.loadOnboarding() }
                 .getOrElse { error ->
                     errorMessage = error.message ?: "Could not load friction settings."
                     null
                 }
+            hasLoadedOnboarding = true
             isLoadingOnboarding = false
+            onboardingSettings?.let { settings ->
+                if (!syncedDefaultGroups) {
+                    runCatching { WebServerService.syncDefaultGroups(settings.scrollingWorst) }
+                    syncedDefaultGroups = true
+                }
+            }
         }
     }
 
     if (isAuthenticated) {
         val packageName = pendingFrictionPackage
         if (packageName != null) {
-            if (isLoadingOnboarding) {
+            if (isLoadingOnboarding || !hasLoadedOnboarding) {
                 LoadingScreen("Loading friction...")
             } else {
                 FrictionScreen(
                     blockedPackage = packageName,
                     settings = onboardingSettings,
+                    mode = TetherLocalStore.getActiveSession()?.mode
+                        ?: com.drp37.blocker.remote.webserver.strictnessToMode(onboardingSettings?.strictness ?: "moderate"),
                     onContinue = {
-                        TetherLocalStore.grantTemporaryAllow(packageName)
-                        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-                        if (launchIntent != null) {
-                            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(launchIntent)
+                        if (TetherLocalStore.getActiveSession()?.mode == "hard") {
+                            onClearFriction()
                         } else {
-                            errorMessage = "Could not reopen that app."
+                            TetherLocalStore.grantTemporaryAllow(packageName)
+                            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+                            if (launchIntent != null) {
+                                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(launchIntent)
+                            } else {
+                                errorMessage = "Could not reopen that app."
+                            }
+                            onClearFriction()
                         }
-                        onClearFriction()
                     },
                     onCancel = onClearFriction
                 )
             }
+        } else if (isLoadingOnboarding || !hasLoadedOnboarding) {
+            LoadingScreen("Loading onboarding...")
+        } else if (onboardingSettings == null) {
+            OnboardingScreen(
+                onComplete = { settings ->
+                    onboardingSettings = settings
+                    syncedDefaultGroups = true
+                }
+            )
         } else {
             BlockerSetupScreen(
+                onboardingSettings = onboardingSettings,
                 onLogout = {
                     coroutineScope.launch {
                         runCatching {
@@ -99,6 +129,9 @@ fun AuthGate(
                             isAuthenticated = false
                             isLoading = false
                             errorMessage = null
+                            onboardingSettings = null
+                            hasLoadedOnboarding = false
+                            syncedDefaultGroups = false
                         }.onFailure { error ->
                             errorMessage = error.message ?: "Logout failed."
                         }
@@ -124,6 +157,28 @@ fun AuthGate(
                     }.onFailure { error ->
                         isLoading = false
                         errorMessage = error.message ?: "Email login failed."
+                    }
+                }
+            },
+            onEmailSignUp = { email, password ->
+                if (!AuthService.isConfigured) {
+                    errorMessage = "Add Supabase URL and publishable key first."
+                    return@LoginScreen
+                }
+
+                isLoading = true
+                errorMessage = null
+                coroutineScope.launch {
+                    runCatching {
+                        AuthService.signUpWithEmail(email, password)
+                    }.onSuccess {
+                        isLoading = false
+                        if (AuthService.currentAccessToken().isNullOrBlank()) {
+                            errorMessage = "Check your email to finish signing up."
+                        }
+                    }.onFailure { error ->
+                        isLoading = false
+                        errorMessage = error.message ?: "Email sign-up failed."
                     }
                 }
             },

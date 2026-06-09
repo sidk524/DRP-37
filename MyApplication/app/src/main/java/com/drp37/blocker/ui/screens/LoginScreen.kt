@@ -54,6 +54,7 @@ fun LoginScreen() {
         isLoading = false,
         errorMessage = null,
         onEmailLogin = { _, _ -> },
+        onEmailSignUp = { _, _ -> },
         onGoogleLogin = {}
     )
 }
@@ -63,6 +64,7 @@ fun LoginScreen(
     isLoading: Boolean,
     errorMessage: String?,
     onEmailLogin: (email: String, password: String) -> Unit,
+    onEmailSignUp: (email: String, password: String) -> Unit,
     onGoogleLogin: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
@@ -151,9 +153,11 @@ fun LoginScreen(
                         onClick = {
                             if (isLogin) {
                                 onEmailLogin(email.trim(), password)
+                            } else {
+                                onEmailSignUp(email.trim(), password)
                             }
                         },
-                        enabled = isLogin && canSubmit,
+                        enabled = canSubmit,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(layout.controlHeight),
@@ -167,7 +171,7 @@ fun LoginScreen(
                     ) {
                         Text(
                             text = when {
-                                isLoading -> "Logging in"
+                                isLoading -> if (isLogin) "Logging in" else "Signing up"
                                 isLogin -> "Log in"
                                 else -> "Continue"
                             },

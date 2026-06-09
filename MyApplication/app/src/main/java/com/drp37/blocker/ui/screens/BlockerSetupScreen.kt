@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,53 +71,47 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drp37.blocker.blocking.isAppBlockingServiceEnabled
 import com.drp37.blocker.blocking.openAppBlockingSettings
-import com.drp37.blocker.local.TetherLocalStore
-import com.drp37.blocker.remote.webserver.WebServerService
+import com.drp37.blocker.remote.webserver.OnboardingSettings
+import com.drp37.blocker.remote.webserver.strictnessToMode
+import com.drp37.blocker.ui.session.BlockerSessionViewModel
 import com.drp37.blocker.util.loadLaunchableApps
 import com.drp37.blocker.model.InstalledApp
 import com.drp37.blocker.ui.theme.MyApplicationTheme
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.max
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private val appPresets = listOf(
+    AppPreset("Instagram", "com.instagram.android"),
+    AppPreset("TikTok", "com.zhiliaoapp.musically"),
+    AppPreset("Facebook", "com.facebook.katana"),
+    AppPreset("YouTube", "com.google.android.youtube")
+)
+
 @Composable
-fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
+fun BlockerSetupScreen(
+    onboardingSettings: OnboardingSettings? = null,
+    onLogout: () -> Unit = {}
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val coroutineScope = rememberCoroutineScope()
     val installedApps = remember { loadLaunchableApps(context) }
-    val selectedPackages = remember(installedApps) {
-        mutableStateMapOf<String, Boolean>().apply {
-            installedApps.forEach { app -> put(app.packageName, false) }
-        }
-    }
-    var hours by remember { mutableStateOf(0) }
-    var minutes by remember { mutableStateOf(0) }
-    var seconds by remember { mutableStateOf(0) }
-    var sessionRunning by remember { mutableStateOf(false) }
-    var remainingSeconds by remember { mutableStateOf(0) }
-    var activeSessionId by remember { mutableStateOf<String?>(null) }
-    var isStartingSession by remember { mutableStateOf(false) }
-    var sessionError by remember { mutableStateOf<String?>(null) }
+    val sessionViewModel: BlockerSessionViewModel = viewModel()
+    val sessionState by sessionViewModel.state.collectAsState()
     var showAccessibilityDialog by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf(BlockerFlowScreen.Duration) }
-    val selectedPackageSet = selectedPackages
-        .filterValues { it }
-        .keys
-        .toSet()
+    val defaultMode = strictnessToMode(onboardingSettings?.strictness ?: "moderate")
 
     fun showAccessibilityPromptIfNeeded() {
         if (isAppBlockingServiceEnabled(context)) {
-            if (sessionError == "Enable Tether in Accessibility settings first.") {
-                sessionError = null
-            }
+            sessionViewModel.clearError()
             showAccessibilityDialog = false
         } else {
-            sessionError = "Enable Tether in Accessibility settings first."
             showAccessibilityDialog = true
         }
     }
@@ -137,123 +132,74 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
         }
     }
 
-    LaunchedEffect(installedApps) {
-        runCatching {
-            val activeSession = WebServerService.getCurrentSession() ?: return@runCatching
-            val elapsedSeconds = Duration.between(
-                Instant.parse(activeSession.startedAt),
-                Instant.now()
-            ).seconds.toInt()
-            val restoredRemainingSeconds = activeSession.totalDurationSeconds - elapsedSeconds
-
-            if (restoredRemainingSeconds <= 0) {
-                WebServerService.endSession(activeSession.id)
-                TetherLocalStore.clearActiveSession()
-                return@runCatching
-            }
-
-            selectedPackages.keys.forEach { packageName ->
-                selectedPackages[packageName] = packageName in activeSession.appsBlocked
-            }
-            activeSessionId = activeSession.id
-            remainingSeconds = restoredRemainingSeconds
-            TetherLocalStore.setActiveSession(activeSession)
-            sessionRunning = true
-        }
+    LaunchedEffect(defaultMode) {
+        sessionViewModel.restore(defaultMode)
     }
 
-    LaunchedEffect(sessionRunning) {
-        if (sessionRunning) {
-            while (remainingSeconds > 0) {
-                delay(1000)
-                remainingSeconds -= 1
-            }
-            remainingSeconds = 0
-            delay(650)
-            hours = 0
-            minutes = 0
-            seconds = 0
-            sessionRunning = false
-            activeSessionId?.let { sessionId ->
-                runCatching { WebServerService.endSession(sessionId) }
-            }
-            activeSessionId = null
-            TetherLocalStore.clearActiveSession()
+    LaunchedEffect(defaultMode, sessionState.sessionRunning) {
+        if (!sessionState.sessionRunning) {
+            sessionViewModel.setMode(defaultMode)
         }
     }
 
     when (screen) {
         BlockerFlowScreen.Settings -> {
             OnboardingSettingsScreen(
-                onBack = { screen = BlockerFlowScreen.Duration }
+                onBack = { screen = BlockerFlowScreen.Duration },
+                onSaved = { settings ->
+                    sessionViewModel.setMode(strictnessToMode(settings.strictness))
+                }
             )
         }
         BlockerFlowScreen.AppSelection -> {
             AppSelectionScreen(
                 installedApps = installedApps,
-                selectedPackages = selectedPackages,
-                locked = sessionRunning,
+                selectedPackages = sessionState.selectedPackages,
+                locked = sessionState.sessionRunning,
+                onTogglePackage = sessionViewModel::togglePackage,
+                onSelectPackage = sessionViewModel::selectPackage,
                 onDone = { screen = BlockerFlowScreen.Duration }
             )
         }
+        BlockerFlowScreen.Groups -> {
+            GroupsScreen(onBack = { screen = BlockerFlowScreen.Duration })
+        }
         BlockerFlowScreen.Duration -> {
-            DurationLockScreen(
-                selectedAppCount = selectedPackages.count { it.value },
-                hours = hours,
-                minutes = minutes,
-                seconds = seconds,
-                sessionRunning = sessionRunning,
-                isStartingSession = isStartingSession,
-                remainingSeconds = remainingSeconds,
-                errorMessage = sessionError,
-                onHoursChange = { hours = it },
-                onMinutesChange = { minutes = it },
-                onSecondsChange = { seconds = it },
-                onStartSession = {
-                    if (!isAppBlockingServiceEnabled(context)) {
-                        showAccessibilityPromptIfNeeded()
-                    } else {
-                        val totalDurationSeconds = (hours * 3600 + minutes * 60 + seconds).takeIf { it > 0 } ?: 5
-                        isStartingSession = true
-                        sessionError = null
-                        coroutineScope.launch {
-                            runCatching {
-                                WebServerService.createSession(
-                                    appsBlocked = selectedPackageSet,
-                                    totalDurationSeconds = totalDurationSeconds
-                                )
-                            }.onSuccess { session ->
-                                val elapsedSeconds = Duration.between(
-                                    Instant.parse(session.startedAt),
-                                    Instant.now()
-                                ).seconds.toInt()
-                                activeSessionId = session.id
-                                remainingSeconds = max(1, session.totalDurationSeconds - elapsedSeconds)
-                                TetherLocalStore.setActiveSession(session)
-                                sessionRunning = true
-                            }.onFailure { error ->
-                                sessionError = error.message ?: "Could not start block session."
-                            }.also {
-                                isStartingSession = false
-                            }
+            val completedSession = sessionState.lastCompletedSession
+            if (completedSession != null) {
+                SessionCompleteScreen(
+                    session = completedSession,
+                    onDone = sessionViewModel::clearCompletedSession
+                )
+            } else {
+                DurationLockScreen(
+                    selectedAppCount = sessionState.selectedPackages.size,
+                    hours = sessionState.hours,
+                    minutes = sessionState.minutes,
+                    seconds = sessionState.seconds,
+                    sessionRunning = sessionState.sessionRunning,
+                    isStartingSession = sessionState.isStartingSession,
+                    remainingSeconds = sessionState.remainingSeconds,
+                    errorMessage = sessionState.errorMessage,
+                    totalPoints = sessionState.totalPoints,
+                    mode = sessionState.mode,
+                    onHoursChange = sessionViewModel::setHours,
+                    onMinutesChange = sessionViewModel::setMinutes,
+                    onSecondsChange = sessionViewModel::setSeconds,
+                    onStartSession = {
+                        if (!isAppBlockingServiceEnabled(context)) {
+                            showAccessibilityPromptIfNeeded()
+                        } else {
+                            sessionViewModel.startSession()
                         }
-                    }
-                },
-                onSelectApps = { screen = BlockerFlowScreen.AppSelection },
-                onSettings = { screen = BlockerFlowScreen.Settings },
-                onLogout = {
-                    coroutineScope.launch {
-                        activeSessionId?.let { sessionId ->
-                            runCatching { WebServerService.endSession(sessionId) }
-                        }
-                        activeSessionId = null
-                        TetherLocalStore.clearActiveSession()
-                        sessionRunning = false
-                        isStartingSession = false
-                        onLogout()
-                    }
-                }
-            )
+                    },
+                    onSelectApps = { screen = BlockerFlowScreen.AppSelection },
+                    onGroups = { screen = BlockerFlowScreen.Groups },
+                    onSettings = { screen = BlockerFlowScreen.Settings },
+                    onStopSession = { sessionViewModel.stopSessionManually() },
+                    onLogout = { sessionViewModel.stopSessionManually(onLogout) }
+                )
+            }
         }
     }
 
@@ -292,15 +238,18 @@ fun BlockerSetupScreen(onLogout: () -> Unit = {}) {
 @Composable
 private fun AppSelectionScreen(
     installedApps: List<InstalledApp>,
-    selectedPackages: MutableMap<String, Boolean>,
+    selectedPackages: Set<String>,
     locked: Boolean,
+    onTogglePackage: (String) -> Unit,
+    onSelectPackage: (String) -> Unit,
     onDone: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var showLockedWarning by remember { mutableStateOf(false) }
     var lockedWarningNonce by remember { mutableStateOf(0) }
+    val installedByPackage = remember(installedApps) { installedApps.associateBy { it.packageName } }
 
-    val selectedCount = selectedPackages.count { it.value }
+    val selectedCount = selectedPackages.size
     val visibleApps = sortAppsForSelection(
         apps = filterApps(installedApps, query),
         selectedPackages = selectedPackages
@@ -382,6 +331,30 @@ private fun AppSelectionScreen(
 
                 Spacer(modifier = Modifier.height(layout.countToSearchGap))
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    appPresets.forEach { preset ->
+                        val installed = installedByPackage[preset.packageName] != null
+                        val selected = preset.packageName in selectedPackages
+                        PresetChip(
+                            label = preset.label,
+                            selected = selected,
+                            installed = installed,
+                            onClick = {
+                                if (locked) {
+                                    lockedWarningNonce += 1
+                                } else if (installed) {
+                                    onSelectPackage(preset.packageName)
+                                }
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(layout.countToSearchGap))
+
                 SearchField(
                     value = query,
                     layout = layout,
@@ -400,7 +373,7 @@ private fun AppSelectionScreen(
                     verticalArrangement = Arrangement.spacedBy(layout.gridRowGap)
                 ) {
                     items(visibleApps, key = { it.packageName }) { app ->
-                        val selected = selectedPackages[app.packageName] == true
+                        val selected = app.packageName in selectedPackages
                         AppGridItem(
                             app = app,
                             selected = selected,
@@ -409,7 +382,7 @@ private fun AppSelectionScreen(
                                 if (locked) {
                                     lockedWarningNonce += 1
                                 } else {
-                                    selectedPackages[app.packageName] = !selected
+                                    onTogglePackage(app.packageName)
                                 }
                             }
                         )
@@ -441,6 +414,41 @@ private fun AppSelectionScreen(
     }
 }
 
+private data class AppPreset(
+    val label: String,
+    val packageName: String
+)
+
+@Composable
+private fun PresetChip(
+    label: String,
+    selected: Boolean,
+    installed: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                when {
+                    selected -> Color(0xFF0A84FF)
+                    installed -> Color(0xFF1F1F22)
+                    else -> Color(0xFF101014)
+                }
+            )
+            .clickable(enabled = installed, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 9.dp)
+    ) {
+        Text(
+            text = label,
+            color = if (installed) Color.White else Color(0xFF5F5F65),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+    }
+}
+
 @Composable
 private fun DurationLockScreen(
     selectedAppCount: Int,
@@ -451,12 +459,16 @@ private fun DurationLockScreen(
     isStartingSession: Boolean,
     remainingSeconds: Int,
     errorMessage: String?,
+    totalPoints: Int,
+    mode: String,
     onHoursChange: (Int) -> Unit,
     onMinutesChange: (Int) -> Unit,
     onSecondsChange: (Int) -> Unit,
     onStartSession: () -> Unit,
     onSelectApps: () -> Unit,
+    onGroups: () -> Unit,
     onSettings: () -> Unit,
+    onStopSession: () -> Unit,
     onLogout: () -> Unit
 ) {
     val selectedDurationSeconds = hours * 3600 + minutes * 60 + seconds
@@ -502,6 +514,19 @@ private fun DurationLockScreen(
                     }
                     Box(
                         modifier = Modifier
+                            .align(Alignment.Center)
+                            .clickable(onClick = onGroups)
+                    ) {
+                        Text(
+                            text = "Groups",
+                            color = Color(0xFF0A84FF),
+                            fontSize = layout.logoutTextSize.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .clickable(onClick = onLogout)
                     ) {
@@ -536,6 +561,15 @@ private fun DurationLockScreen(
                     },
                     color = Color(0xFF8E8E96),
                     fontSize = layout.subtitleTextSize.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "$totalPoints focus points · ${modeLabel(mode)}",
+                    color = Color(0xFF8E8E96),
+                    fontSize = layout.errorTextSize.sp,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -612,8 +646,32 @@ private fun DurationLockScreen(
                         letterSpacing = 0.sp
                     )
                 }
+
+                if (sessionRunning) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    if (mode == "hard") {
+                        Text(
+                            text = "Hard sessions cannot be ended early.",
+                            color = Color(0xFF8E8E96),
+                            fontSize = layout.errorTextSize.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        TextButton(onClick = onStopSession) {
+                            Text(text = "End session early", color = Color(0xFF8E8E96))
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+private fun modeLabel(mode: String): String {
+    return when (mode) {
+        "breathing" -> "Breathing"
+        "hard" -> "Hard"
+        else -> "Reflection"
     }
 }
 
@@ -1017,10 +1075,10 @@ private fun filterApps(apps: List<InstalledApp>, query: String): List<InstalledA
 
 private fun sortAppsForSelection(
     apps: List<InstalledApp>,
-    selectedPackages: Map<String, Boolean>
+    selectedPackages: Set<String>
 ): List<InstalledApp> {
     return apps.sortedWith(
-        compareByDescending<InstalledApp> { selectedPackages[it.packageName] == true }
+        compareByDescending<InstalledApp> { it.packageName in selectedPackages }
             .thenBy { it.label.lowercase() }
     )
 }
@@ -1320,6 +1378,7 @@ private data class DurationLockLayoutMetrics(
 
 private enum class BlockerFlowScreen {
     AppSelection,
+    Groups,
     Settings,
     Duration
 }

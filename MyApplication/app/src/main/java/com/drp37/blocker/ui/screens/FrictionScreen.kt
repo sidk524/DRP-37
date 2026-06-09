@@ -43,30 +43,41 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drp37.blocker.remote.webserver.OnboardingSettings
+import com.drp37.blocker.remote.webserver.strictnessToMode
 import kotlinx.coroutines.delay
 
 private enum class FrictionPhase {
     Breathing,
     Intention,
     Message,
-    Goal
+    Goal,
+    Exercise,
+    HardBlock
 }
+
+private val exerciseTasks = listOf("Run 1 km", "Do 50 pushups", "Do 50 sit-ups")
 
 @Composable
 fun FrictionScreen(
     blockedPackage: String,
     settings: OnboardingSettings?,
+    mode: String = strictnessToMode(settings?.strictness ?: "moderate"),
     onContinue: () -> Unit,
     onCancel: () -> Unit
 ) {
     val appName = rememberAppLabel(blockedPackage)
-    val firm = settings?.strictness in setOf("moderate", "hard") &&
+    val effectiveMode = normalizeMode(mode)
+    val firm = effectiveMode == "reflect" &&
         !settings?.futureMessage.isNullOrBlank() &&
         !settings?.goals.isNullOrEmpty()
-    var phase by remember(blockedPackage, settings) { mutableStateOf(FrictionPhase.Breathing) }
+    val hasExerciseGoal = settings?.goals.orEmpty().any { it.trim().equals("exercise", ignoreCase = true) }
+    var phase by remember(blockedPackage, settings, effectiveMode) {
+        mutableStateOf(if (effectiveMode == "hard") FrictionPhase.HardBlock else FrictionPhase.Breathing)
+    }
     var readyVisible by remember(blockedPackage, settings) { mutableStateOf(false) }
 
-    LaunchedEffect(blockedPackage, settings) {
+    LaunchedEffect(blockedPackage, settings, effectiveMode) {
+        if (effectiveMode == "hard") return@LaunchedEffect
         readyVisible = false
         delay(8_000)
         readyVisible = true
@@ -99,13 +110,22 @@ fun FrictionScreen(
                 FrictionPhase.Message -> MessageStep(
                     appName = appName,
                     message = settings?.futureMessage.orEmpty(),
-                    onMatched = { phase = FrictionPhase.Goal },
+                    onMatched = { phase = if (hasExerciseGoal) FrictionPhase.Exercise else FrictionPhase.Goal },
                     onCancel = onCancel
                 )
                 FrictionPhase.Goal -> GoalStep(
                     appName = appName,
                     goals = settings?.goals.orEmpty(),
                     onContinue = onContinue,
+                    onCancel = onCancel
+                )
+                FrictionPhase.Exercise -> ExerciseStep(
+                    appName = appName,
+                    onContinue = onContinue,
+                    onCancel = onCancel
+                )
+                FrictionPhase.HardBlock -> HardBlockStep(
+                    appName = appName,
                     onCancel = onCancel
                 )
             }
@@ -307,6 +327,78 @@ private fun GoalStep(
 }
 
 @Composable
+private fun ExerciseStep(
+    appName: String,
+    onContinue: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val task = remember(appName) { exerciseTasks.random() }
+    FrictionColumn {
+        Text(
+            text = "Exercise first",
+            color = Color.White,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "You wanted to exercise more. Before opening $appName, finish this:",
+            color = Color(0xFF8A8A93),
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0x1A4A9EFF))
+                .padding(18.dp)
+        ) {
+            Text(
+                text = task,
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        PrimaryButton(text = "I've completed this", onClick = onContinue)
+        TextButton(onClick = onCancel) {
+            Text(text = "Go back", color = Color(0xFF8A8A93))
+        }
+    }
+}
+
+@Composable
+private fun HardBlockStep(
+    appName: String,
+    onCancel: () -> Unit
+) {
+    FrictionColumn {
+        Text(
+            text = "Hard block active",
+            color = Color.White,
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = "$appName is blocked until your focus session ends.",
+            color = Color(0xFF8A8A93),
+            fontSize = 17.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(22.dp))
+        PrimaryButton(text = "Go back", onClick = onCancel)
+    }
+}
+
+@Composable
 private fun FrictionColumn(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -369,4 +461,12 @@ private fun appLabel(context: Context, packageName: String): String {
 
 private fun normalizeTypedText(value: String): String {
     return value.trim().replace(Regex("\\s+"), " ")
+}
+
+private fun normalizeMode(mode: String): String {
+    return when (mode) {
+        "breathing" -> "breathing"
+        "hard" -> "hard"
+        else -> "reflect"
+    }
 }
