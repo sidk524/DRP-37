@@ -215,7 +215,7 @@ class BlockerSessionViewModel : ViewModel() {
         if (sessionId != null) {
             runCatching { WebServerService.endSession(sessionId) }
         }
-        val points = runCatching {
+        val pointsResult = runCatching {
             WebServerService.saveSessionPoints(
                 mode = current.mode,
                 actualMs = actualMs,
@@ -223,14 +223,17 @@ class BlockerSessionViewModel : ViewModel() {
                 blockedAppsCount = current.selectedPackages.size.coerceAtLeast(1),
                 endedAt = endedAt.toString()
             )
-        }.getOrNull()
+        }
+        val points = pointsResult.getOrNull()
+        val pointsError = pointsResult.exceptionOrNull()?.message
         clearActiveSessionState()
         _state.update {
             it.copy(
                 hours = 0,
                 minutes = 0,
                 seconds = 0,
-                lastCompletedSession = points
+                lastCompletedSession = points,
+                errorMessage = pointsError ?: it.errorMessage
             )
         }
         refreshTotalPoints()

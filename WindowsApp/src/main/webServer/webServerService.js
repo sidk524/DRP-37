@@ -96,7 +96,10 @@ async function joinGroup({ inviteCode }) {
 
 async function getGroupLeaderboard(groupId) {
     const data = await request(`/api/groups/${encodeURIComponent(groupId)}/leaderboard`);
-    return data.leaderboard || [];
+    return {
+        leaderboard: data.leaderboard || [],
+        focusPointsAvailable: data.focusPointsAvailable !== false,
+    };
 }
 
 async function syncDefaultGroups({ scrollingWorst }) {

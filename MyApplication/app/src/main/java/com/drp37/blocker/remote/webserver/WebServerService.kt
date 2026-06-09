@@ -108,10 +108,15 @@ object WebServerService {
         return group.toGroupSummary()
     }
 
-    suspend fun getGroupLeaderboard(groupId: String): List<LeaderboardEntry> {
+    suspend fun getGroupLeaderboard(groupId: String): GroupLeaderboard {
         val encodedId = URLEncoder.encode(groupId, StandardCharsets.UTF_8.name())
         val response = request(method = "GET", path = "/api/groups/$encodedId/leaderboard")
-        return response.optJSONArray("leaderboard")?.toObjectList { toLeaderboardEntry() }.orEmpty()
+        val entries = response.optJSONArray("leaderboard")?.toObjectList { toLeaderboardEntry() }.orEmpty()
+        val focusPointsAvailable = when {
+            response.has("focusPointsAvailable") -> response.optBoolean("focusPointsAvailable", true)
+            else -> true
+        }
+        return GroupLeaderboard(entries = entries, focusPointsAvailable = focusPointsAvailable)
     }
 
     suspend fun syncDefaultGroups(scrollingWorst: List<String>): List<GroupSummary> {
@@ -236,11 +241,17 @@ private fun JSONObject.toGroupSummary(): GroupSummary {
 }
 
 private fun JSONObject.toLeaderboardEntry(): LeaderboardEntry {
+    val focusPoints = when {
+        has("focusPoints") -> optInt("focusPoints", 0)
+        has("focus_points") -> optInt("focus_points", 0)
+        else -> 0
+    }
     return LeaderboardEntry(
         rank = optInt("rank", 0),
         userId = optString("userId").orEmpty(),
         displayName = optString("displayName").ifBlank { "User" },
         lockedSeconds = optInt("lockedSeconds", 0),
+        focusPoints = focusPoints,
         isCurrentUser = optBoolean("isCurrentUser", false)
     )
 }

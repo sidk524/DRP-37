@@ -357,6 +357,16 @@ const lockedSecondsForSession = (session) => {
     return Math.max(0, Math.min(elapsedSeconds, plannedSeconds));
 };
 
+const FOCUS_POINTS_ROW_LIMIT = 10000;
+
+const sumFocusPointsByUser = (memberIds, rows) => {
+    const pointTotals = new Map(memberIds.map((userId) => [userId, 0]));
+    for (const row of rows || []) {
+        pointTotals.set(row.user_id, (pointTotals.get(row.user_id) || 0) + (row.points || 0));
+    }
+    return pointTotals;
+};
+
 const displayNameForUser = async (userId) => {
     const admin = supabaseAdmin.auth?.admin;
     if (!admin?.getUserById) return "User";
@@ -609,7 +619,7 @@ app.get("/api/groups/:groupId/leaderboard", requireSupabase, requireUser, async 
 
         const memberIds = [...new Set((members || []).map((member) => member.user_id).filter(Boolean))];
         if (!memberIds.length) {
-            res.json({ leaderboard: [] });
+            res.json({ focusPointsAvailable: true, leaderboard: [] });
             return;
         }
 
@@ -626,6 +636,28 @@ app.get("/api/groups/:groupId/leaderboard", requireSupabase, requireUser, async 
             totals.set(session.user_id, (totals.get(session.user_id) || 0) + lockedSecondsForSession(session));
         }
 
+        let focusPointsAvailable = true;
+        let pointRows = [];
+        const { data: fetchedPointRows, error: pointsError } = await supabaseAdmin
+            .from("focus_session_points")
+            .select("user_id,points")
+            .in("user_id", memberIds)
+            .limit(FOCUS_POINTS_ROW_LIMIT);
+
+        if (pointsError) {
+            const missingPointsTable = pointsError.code === "PGRST205"
+                && /focus_session_points/i.test(String(pointsError.message || ""));
+            if (missingPointsTable) {
+                focusPointsAvailable = false;
+            } else {
+                throw pointsError;
+            }
+        } else {
+            pointRows = fetchedPointRows || [];
+        }
+
+        const pointTotals = sumFocusPointsByUser(memberIds, pointRows);
+
         const names = new Map(await Promise.all(memberIds.map(async (userId) => [
             userId,
             await displayNameForUser(userId)
@@ -636,6 +668,7 @@ app.get("/api/groups/:groupId/leaderboard", requireSupabase, requireUser, async 
                 userId,
                 displayName: names.get(userId) || "User",
                 lockedSeconds: totals.get(userId) || 0,
+                focusPoints: pointTotals.get(userId) || 0,
                 isCurrentUser: userId === req.user.id
             }))
             .sort((left, right) => right.lockedSeconds - left.lockedSeconds || left.displayName.localeCompare(right.displayName))
@@ -644,7 +677,7 @@ app.get("/api/groups/:groupId/leaderboard", requireSupabase, requireUser, async 
                 ...entry
             }));
 
-        res.json({ leaderboard });
+        res.json({ focusPointsAvailable, leaderboard });
     } catch (error) {
         next(error);
     }

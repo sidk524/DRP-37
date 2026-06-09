@@ -9,6 +9,7 @@ const makeQuery = (result) => {
         "delete",
         "in",
         "insert",
+        "limit",
         "not",
         "select"
     ].forEach((method) => {
@@ -187,8 +188,15 @@ describe("group leaderboard API", () => {
             ],
             error: null
         });
+        const pointsQuery = makeQuery({
+            data: [
+                { user_id: "user-1", points: 40 },
+                { user_id: "user-2", points: 90 }
+            ],
+            error: null
+        });
         const { app } = loadApp({
-            adminQueries: [membershipQuery, membersQuery, sessionsQuery],
+            adminQueries: [membershipQuery, membersQuery, sessionsQuery, pointsQuery],
             usersById: {
                 "user-1": { id: "user-1", email: "alice@example.com" },
                 "user-2": { id: "user-2", email: "bob@example.com" }
@@ -199,12 +207,14 @@ describe("group leaderboard API", () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({
+            focusPointsAvailable: true,
             leaderboard: [
                 {
                     rank: 1,
                     userId: "user-1",
                     displayName: "alice",
                     lockedSeconds: 60,
+                    focusPoints: 40,
                     isCurrentUser: true
                 },
                 {
@@ -212,11 +222,91 @@ describe("group leaderboard API", () => {
                     userId: "user-2",
                     displayName: "bob",
                     lockedSeconds: 60,
+                    focusPoints: 90,
                     isCurrentUser: false
                 }
             ]
         });
         expect(sessionsQuery.not).toHaveBeenCalledWith("ended_at", "is", null);
+        expect(pointsQuery.limit).toHaveBeenCalledWith(10000);
+    });
+
+    it("sums multiple focus point rows per user for the leaderboard", async () => {
+        const membershipQuery = makeQuery({ data: { id: "member-1" }, error: null });
+        const membersQuery = makeQuery({
+            data: [{ user_id: "user-1" }, { user_id: "user-2" }],
+            error: null
+        });
+        const sessionsQuery = makeQuery({ data: [], error: null });
+        const pointsQuery = makeQuery({
+            data: [
+                { user_id: "user-1", points: 10 },
+                { user_id: "user-1", points: 30 },
+                { user_id: "user-2", points: 90 }
+            ],
+            error: null
+        });
+        const { app } = loadApp({
+            adminQueries: [membershipQuery, membersQuery, sessionsQuery, pointsQuery],
+            usersById: {
+                "user-1": { id: "user-1", email: "alice@example.com" },
+                "user-2": { id: "user-2", email: "bob@example.com" }
+            }
+        });
+
+        const response = await authorizedGet(app, "/api/groups/group-1/leaderboard");
+
+        expect(response.status).toBe(200);
+        expect(response.body.focusPointsAvailable).toBe(true);
+        const byUserId = Object.fromEntries(
+            response.body.leaderboard.map((entry) => [entry.userId, entry.focusPoints])
+        );
+        expect(byUserId).toEqual({
+            "user-1": 40,
+            "user-2": 90
+        });
+        const pointsRanked = [...response.body.leaderboard].sort(
+            (left, right) => right.focusPoints - left.focusPoints
+        );
+        expect(pointsRanked[0].userId).toBe("user-2");
+        expect(pointsRanked[1].userId).toBe("user-1");
+    });
+
+    it("marks focus points unavailable when the points table is missing", async () => {
+        const membershipQuery = makeQuery({ data: { id: "member-1" }, error: null });
+        const membersQuery = makeQuery({
+            data: [{ user_id: "user-1" }],
+            error: null
+        });
+        const sessionsQuery = makeQuery({ data: [], error: null });
+        const pointsQuery = makeQuery({
+            data: null,
+            error: {
+                code: "PGRST205",
+                message: "Could not find the table 'public.focus_session_points' in the schema cache"
+            }
+        });
+        const { app } = loadApp({
+            adminQueries: [membershipQuery, membersQuery, sessionsQuery, pointsQuery],
+            usersById: {
+                "user-1": { id: "user-1", email: "alice@example.com" }
+            }
+        });
+
+        const response = await authorizedGet(app, "/api/groups/group-1/leaderboard");
+
+        expect(response.status).toBe(200);
+        expect(response.body.focusPointsAvailable).toBe(false);
+        expect(response.body.leaderboard).toEqual([
+            {
+                rank: 1,
+                userId: "user-1",
+                displayName: "alice",
+                lockedSeconds: 0,
+                focusPoints: 0,
+                isCurrentUser: true
+            }
+        ]);
     });
 
     it("returns an actionable error when group tables are missing", async () => {

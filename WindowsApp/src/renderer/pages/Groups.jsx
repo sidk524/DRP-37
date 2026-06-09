@@ -17,6 +17,31 @@ function formatLockedTime(totalSeconds) {
     return `${seconds}s`;
 }
 
+const METRIC_TIME = "time";
+const METRIC_POINTS = "points";
+
+function rankLeaderboard(entries, metric) {
+    const scoreFor = metric === METRIC_POINTS
+        ? (entry) => entry.focusPoints || 0
+        : (entry) => entry.lockedSeconds || 0;
+
+    return [...entries]
+        .sort((left, right) => {
+            const diff = scoreFor(right) - scoreFor(left);
+            if (diff !== 0) return diff;
+            return left.displayName.localeCompare(right.displayName);
+        })
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
+}
+
+function formatLeaderboardScore(entry, metric) {
+    if (metric === METRIC_POINTS) {
+        const points = Math.max(0, entry.focusPoints || 0);
+        return `${points} pt${points === 1 ? "" : "s"}`;
+    }
+    return formatLockedTime(entry.lockedSeconds);
+}
+
 function normalizeInviteCode(value) {
     return value.trim().toUpperCase().replace(/\s+/g, "");
 }
@@ -37,12 +62,18 @@ function Groups({ onBack }) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [copied, setCopied] = useState(false);
+    const [leaderboardMetric, setLeaderboardMetric] = useState(METRIC_TIME);
+    const [focusPointsAvailable, setFocusPointsAvailable] = useState(true);
 
     const selectedGroup = useMemo(
         () => groups.find((group) => group.id === selectedGroupId) || null,
         [groups, selectedGroupId]
     );
     const visibleError = visibleErrorMessage(error);
+    const rankedLeaderboard = useMemo(
+        () => rankLeaderboard(leaderboard, leaderboardMetric),
+        [leaderboard, leaderboardMetric]
+    );
 
     async function refreshGroups(preferredGroupId = selectedGroupId) {
         setLoadingGroups(true);
@@ -62,12 +93,19 @@ function Groups({ onBack }) {
     async function refreshLeaderboard(groupId) {
         if (!groupId) {
             setLeaderboard([]);
+            setFocusPointsAvailable(true);
             return;
         }
         setLoadingLeaderboard(true);
         setError("");
         try {
-            setLeaderboard(await getGroupLeaderboard(groupId));
+            const result = await getGroupLeaderboard(groupId);
+            setLeaderboard(result.leaderboard || []);
+            const pointsAvailable = result.focusPointsAvailable !== false;
+            setFocusPointsAvailable(pointsAvailable);
+            if (!pointsAvailable) {
+                setLeaderboardMetric(METRIC_TIME);
+            }
         } catch (err) {
             setError(err.message || "Could not load leaderboard.");
         } finally {
@@ -136,7 +174,7 @@ function Groups({ onBack }) {
 
                 <h1 className="groups-title">Friend leaderboards</h1>
                 <p className="groups-subtitle">
-                    Compete on all-time locked-in time from completed blocking sessions.
+                    Compare all-time locked-in time or focus points from completed sessions.
                 </p>
 
                 {visibleError && <p className="tether-error groups-error">{visibleError}</p>}
@@ -221,23 +259,53 @@ function Groups({ onBack }) {
                     )}
 
                     <section className="groups-card groups-leaderboard-card">
-                        <p className="onboarding-section">Leaderboard</p>
+                        <div className="groups-leaderboard-header">
+                            <p className="onboarding-section">Leaderboard</p>
+                            <div className="groups-metric-toggle" role="tablist" aria-label="Leaderboard ranking">
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={leaderboardMetric === METRIC_TIME}
+                                    className={leaderboardMetric === METRIC_TIME ? "selected" : ""}
+                                    onClick={() => setLeaderboardMetric(METRIC_TIME)}
+                                >
+                                    Time
+                                </button>
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={leaderboardMetric === METRIC_POINTS}
+                                    className={leaderboardMetric === METRIC_POINTS ? "selected" : ""}
+                                    disabled={!focusPointsAvailable}
+                                    onClick={() => setLeaderboardMetric(METRIC_POINTS)}
+                                >
+                                    Points
+                                </button>
+                            </div>
+                        </div>
+                        {!focusPointsAvailable && (
+                            <p className="groups-muted groups-points-unavailable">
+                                Points ranking is unavailable until the focus_session_points database table is set up.
+                            </p>
+                        )}
                         {!selectedGroup ? (
                             <p className="groups-muted">Select or create a group to see the leaderboard.</p>
                         ) : loadingLeaderboard ? (
                             <p className="groups-muted">Loading leaderboard...</p>
-                        ) : leaderboard.length === 0 ? (
+                        ) : rankedLeaderboard.length === 0 ? (
                             <p className="groups-muted">No completed sessions yet.</p>
                         ) : (
                             <ol className="groups-leaderboard">
-                                {leaderboard.map((entry) => (
+                                {rankedLeaderboard.map((entry) => (
                                     <li
                                         key={entry.userId}
                                         className={entry.isCurrentUser ? "current-user" : ""}
                                     >
                                         <span className="groups-rank">#{entry.rank}</span>
                                         <span className="groups-name">{entry.displayName}</span>
-                                        <span className="groups-time">{formatLockedTime(entry.lockedSeconds)}</span>
+                                        <span className="groups-time">
+                                            {formatLeaderboardScore(entry, leaderboardMetric)}
+                                        </span>
                                     </li>
                                 ))}
                             </ol>

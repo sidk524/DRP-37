@@ -42,6 +42,11 @@ import com.drp37.blocker.remote.webserver.LeaderboardEntry
 import com.drp37.blocker.remote.webserver.WebServerService
 import kotlinx.coroutines.launch
 
+private enum class LeaderboardMetric {
+    Time,
+    Points
+}
+
 @Composable
 fun GroupsScreen(onBack: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
@@ -53,6 +58,12 @@ fun GroupsScreen(onBack: () -> Unit) {
     var inviteCode by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var leaderboardMetric by remember { mutableStateOf(LeaderboardMetric.Time) }
+    var focusPointsAvailable by remember { mutableStateOf(true) }
+
+    val rankedLeaderboard = remember(leaderboard, leaderboardMetric) {
+        rankLeaderboard(leaderboard, leaderboardMetric)
+    }
 
     fun refreshGroups(preferredGroupId: String? = selectedGroupId) {
         coroutineScope.launch {
@@ -74,11 +85,18 @@ fun GroupsScreen(onBack: () -> Unit) {
     fun refreshLeaderboard(groupId: String?) {
         if (groupId == null) {
             leaderboard = emptyList()
+            focusPointsAvailable = true
             return
         }
         coroutineScope.launch {
             runCatching { WebServerService.getGroupLeaderboard(groupId) }
-                .onSuccess { leaderboard = it }
+                .onSuccess { result ->
+                    leaderboard = result.entries
+                    focusPointsAvailable = result.focusPointsAvailable
+                    if (!result.focusPointsAvailable && leaderboardMetric == LeaderboardMetric.Points) {
+                        leaderboardMetric = LeaderboardMetric.Time
+                    }
+                }
                 .onFailure { throwable ->
                     error = throwable.message ?: "Could not load leaderboard."
                 }
@@ -116,7 +134,7 @@ fun GroupsScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(18.dp))
             Text(text = "Leaderboards", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
             Text(
-                text = "Join friends and compare completed focus time.",
+                text = "Compare locked-in time or focus points from completed sessions.",
                 color = Color(0xFF8E8E96),
                 fontSize = 16.sp,
                 modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
@@ -190,12 +208,97 @@ fun GroupsScreen(onBack: () -> Unit) {
                             )
                         }
                     }
-                    items(leaderboard, key = { it.userId }) { entry ->
-                        LeaderboardRow(entry = entry)
+                    item {
+                        LeaderboardMetricToggle(
+                            metric = leaderboardMetric,
+                            focusPointsAvailable = focusPointsAvailable,
+                            onMetricChange = { leaderboardMetric = it }
+                        )
+                    }
+                    if (!focusPointsAvailable) {
+                        item {
+                            Text(
+                                text = "Points ranking is unavailable until the focus_session_points database table is set up.",
+                                color = Color(0xFF8E8E96),
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                    if (rankedLeaderboard.isEmpty()) {
+                        item {
+                            Text(
+                                text = if (selectedGroup == null) {
+                                    "Select or create a group to see the leaderboard."
+                                } else {
+                                    "No completed sessions yet."
+                                },
+                                color = Color(0xFF8E8E96),
+                                fontSize = 14.sp
+                            )
+                        }
+                    } else {
+                        items(rankedLeaderboard, key = { it.userId }) { entry ->
+                            LeaderboardRow(entry = entry, metric = leaderboardMetric)
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LeaderboardMetricToggle(
+    metric: LeaderboardMetric,
+    focusPointsAvailable: Boolean,
+    onMetricChange: (LeaderboardMetric) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFF111114))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        LeaderboardMetricChip(
+            label = "Time",
+            selected = metric == LeaderboardMetric.Time,
+            enabled = true,
+            onClick = { onMetricChange(LeaderboardMetric.Time) }
+        )
+        LeaderboardMetricChip(
+            label = "Points",
+            selected = metric == LeaderboardMetric.Points,
+            enabled = focusPointsAvailable,
+            onClick = { onMetricChange(LeaderboardMetric.Points) }
+        )
+    }
+}
+
+@Composable
+private fun LeaderboardMetricChip(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Color(0xFF0A84FF) else Color.Transparent)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = label,
+            color = when {
+                !enabled -> Color(0xFF5F5F65)
+                selected -> Color.White
+                else -> Color(0xFF8E8E96)
+            },
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -282,7 +385,7 @@ private fun InviteCard(
 }
 
 @Composable
-private fun LeaderboardRow(entry: LeaderboardEntry) {
+private fun LeaderboardRow(entry: LeaderboardEntry, metric: LeaderboardMetric) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -295,10 +398,40 @@ private fun LeaderboardRow(entry: LeaderboardEntry) {
         Spacer(modifier = Modifier.padding(horizontal = 8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = entry.displayName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(text = formatLockedTime(entry.lockedSeconds), color = Color(0xFF8E8E96), fontSize = 13.sp)
+            Text(
+                text = formatLeaderboardScore(entry, metric),
+                color = Color(0xFF8E8E96),
+                fontSize = 13.sp
+            )
         }
         if (entry.isCurrentUser) {
             Text(text = "You", color = Color(0xFF0A84FF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+private fun rankLeaderboard(
+    entries: List<LeaderboardEntry>,
+    metric: LeaderboardMetric
+): List<LeaderboardEntry> {
+    return entries
+        .sortedWith(
+            compareByDescending<LeaderboardEntry> { entry ->
+                when (metric) {
+                    LeaderboardMetric.Time -> entry.lockedSeconds
+                    LeaderboardMetric.Points -> entry.focusPoints
+                }
+            }.thenBy { it.displayName }
+        )
+        .mapIndexed { index, entry -> entry.copy(rank = index + 1) }
+}
+
+private fun formatLeaderboardScore(entry: LeaderboardEntry, metric: LeaderboardMetric): String {
+    return when (metric) {
+        LeaderboardMetric.Time -> formatLockedTime(entry.lockedSeconds)
+        LeaderboardMetric.Points -> {
+            val points = entry.focusPoints.coerceAtLeast(0)
+            if (points == 1) "1 pt" else "$points pts"
         }
     }
 }

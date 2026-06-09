@@ -31,7 +31,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         minutes,
         seconds,
         active,
-        points,
         sessionError,
         sessionRunning,
         selectedCount,
@@ -285,8 +284,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                 >
                     {sessionRunning ? "Session Running" : "Lock-In!"}
                 </button>
-
-                <p className="tether-points">{points} pts</p>
             </div>
         </div>
     );

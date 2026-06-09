@@ -45,7 +45,13 @@ data class LeaderboardEntry(
     val userId: String,
     val displayName: String,
     val lockedSeconds: Int,
+    val focusPoints: Int = 0,
     val isCurrentUser: Boolean
+)
+
+data class GroupLeaderboard(
+    val entries: List<LeaderboardEntry>,
+    val focusPointsAvailable: Boolean = true
 )
 
 fun strictnessToMode(strictness: String): String {

@@ -180,6 +180,9 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
                             }
                         } catch (err) {
                             console.error("Failed to save session points:", err);
+                            setSessionError(
+                                err?.message || "Session ended, but focus points could not be saved."
+                            );
                         }
                     }
                     if (remoteSessionId) {

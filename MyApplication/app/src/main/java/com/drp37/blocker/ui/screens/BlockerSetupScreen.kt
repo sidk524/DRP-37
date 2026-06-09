@@ -181,7 +181,6 @@ fun BlockerSetupScreen(
                     isStartingSession = sessionState.isStartingSession,
                     remainingSeconds = sessionState.remainingSeconds,
                     errorMessage = sessionState.errorMessage,
-                    totalPoints = sessionState.totalPoints,
                     mode = sessionState.mode,
                     onHoursChange = sessionViewModel::setHours,
                     onMinutesChange = sessionViewModel::setMinutes,
@@ -459,7 +458,6 @@ private fun DurationLockScreen(
     isStartingSession: Boolean,
     remainingSeconds: Int,
     errorMessage: String?,
-    totalPoints: Int,
     mode: String,
     onHoursChange: (Int) -> Unit,
     onMinutesChange: (Int) -> Unit,
@@ -564,15 +562,6 @@ private fun DurationLockScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "$totalPoints focus points · ${modeLabel(mode)}",
-                    color = Color(0xFF8E8E96),
-                    fontSize = layout.errorTextSize.sp,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
                 Spacer(modifier = Modifier.height(layout.subtitleToPickerGap))
 
                 DurationPicker(
@@ -664,14 +653,6 @@ private fun DurationLockScreen(
                 }
             }
         }
-    }
-}
-
-private fun modeLabel(mode: String): String {
-    return when (mode) {
-        "breathing" -> "Breathing"
-        "hard" -> "Hard"
-        else -> "Reflection"
     }
 }
 
