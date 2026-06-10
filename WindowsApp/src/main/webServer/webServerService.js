@@ -102,10 +102,11 @@ async function getGroupLeaderboard(groupId) {
     };
 }
 
-async function syncDefaultGroups({ scrollingWorst }) {
+async function syncDefaultGroups({ scrollingWorst } = {}) {
+    const normalizedScrollingWorst = normalizeNonEmptyStringArray(scrollingWorst);
     const data = await request("/api/groups/defaults/sync", {
         method: "POST",
-        body: { scrollingWorst },
+        body: { scrollingWorst: normalizedScrollingWorst },
     });
     return data.groups || [];
 }
@@ -115,10 +116,28 @@ async function loadOnboarding() {
     return data.onboarding || null;
 }
 
+function normalizeNonEmptyStringArray(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean);
+}
+
+function normalizeOnboardingResponses(responses) {
+    const source = responses && typeof responses === "object" ? responses : {};
+    return {
+        ...source,
+        doMoreOf: normalizeNonEmptyStringArray(source.doMoreOf),
+        scrollingWorst: normalizeNonEmptyStringArray(source.scrollingWorst),
+        futureMessage: String(source.futureMessage || "").trim(),
+    };
+}
+
 async function saveOnboarding(responses) {
+    const normalizedResponses = normalizeOnboardingResponses(responses);
     const data = await request("/api/onboarding", {
         method: "PUT",
-        body: responses,
+        body: normalizedResponses,
     });
     return data.onboarding;
 }

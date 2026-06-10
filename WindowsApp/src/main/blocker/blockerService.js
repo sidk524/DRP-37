@@ -132,7 +132,7 @@ function stopSession(reason = "manual") {
     const plannedMs = Math.max(0, (session.durationMinutes || 0) * 60 * 1000);
     const elapsedMs = Math.max(0, endedAt - startedAt);
     const actualMs = plannedMs > 0 ? Math.min(elapsedMs, plannedMs) : elapsedMs;
-    const blockedAppsCount = session.domains.length;
+    const blockedAppsCount = Math.max(1, (session.appLabels || []).length);
 
     lastStop = {
         reason,

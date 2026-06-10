@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { createSession, endSession, loadActiveSession } from "../services/BlockSessionRepository";
+import {
+    createSession,
+    endSession,
+    loadActiveSession,
+    loadSavedBlockSelections,
+    saveBlockSelections,
+} from "../services/BlockSessionRepository";
 import { getUserTotalPoints, loadOnboarding, saveSessionPoints, signOut } from "../services/SupabaseClient";
 import {
     getTetherSession,
@@ -13,8 +19,9 @@ import {
 function normalizeWebsite(input) {
     let value = input.trim().toLowerCase();
     if (!value) return null;
-    value = value.replace(/^https?:\/\//, "").replace(/^www\./, "");
+    value = value.replace(/^https?:\/\//, "");
     value = value.split("/")[0].split("?")[0];
+    value = value.replace(/^(www|m|mobile)\./, "");
     if (!value || !value.includes(".")) return null;
     return value;
 }
@@ -72,6 +79,18 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
     useEffect(() => {
         setMode(defaultMode);
     }, [defaultMode]);
+
+    useEffect(() => {
+        if (sessionRunning) return;
+        const restoredSelections = displayDomains(loadSavedBlockSelections());
+        if (restoredSelections.length > 0) {
+            setWebsites(restoredSelections);
+        }
+    }, [sessionRunning]);
+
+    useEffect(() => {
+        saveBlockSelections(displayDomains(websites));
+    }, [websites]);
 
     async function refreshPoints() {
         try {

@@ -203,61 +203,6 @@ function Groups({ onBack }) {
                         )}
                     </section>
 
-                    <section className="groups-card">
-                        <p className="onboarding-section">Create</p>
-                        <div className="groups-form-row">
-                            <input
-                                type="text"
-                                value={groupName}
-                                onChange={(event) => setGroupName(event.target.value)}
-                                placeholder="Group name"
-                                maxLength={80}
-                            />
-                            <button
-                                type="button"
-                                onClick={handleCreateGroup}
-                                disabled={!groupName.trim() || saving}
-                            >
-                                Create
-                            </button>
-                        </div>
-                    </section>
-
-                    <section className="groups-card">
-                        <p className="onboarding-section">Join</p>
-                        <div className="groups-form-row">
-                            <input
-                                type="text"
-                                value={inviteCode}
-                                onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
-                                placeholder="Invite code"
-                                maxLength={16}
-                            />
-                            <button
-                                type="button"
-                                onClick={handleJoinGroup}
-                                disabled={!normalizeInviteCode(inviteCode) || saving}
-                            >
-                                Join
-                            </button>
-                        </div>
-                    </section>
-
-                    {selectedGroup && (
-                        <section className="groups-card">
-                            <div className="groups-card-heading">
-                                <div>
-                                    <p className="onboarding-section">Invite</p>
-                                    <h2>{selectedGroup.name}</h2>
-                                </div>
-                                <button type="button" className="groups-copy" onClick={handleCopyInvite}>
-                                    {copied ? "Copied" : "Copy code"}
-                                </button>
-                            </div>
-                            <div className="groups-invite-code">{selectedGroup.inviteCode}</div>
-                        </section>
-                    )}
-
                     <section className="groups-card groups-leaderboard-card">
                         <div className="groups-leaderboard-header">
                             <p className="onboarding-section">Leaderboard</p>
@@ -310,6 +255,61 @@ function Groups({ onBack }) {
                                 ))}
                             </ol>
                         )}
+                    </section>
+
+                    {selectedGroup && (
+                        <section className="groups-card">
+                            <div className="groups-card-heading">
+                                <div>
+                                    <p className="onboarding-section">Invite</p>
+                                    <h2>{selectedGroup.name}</h2>
+                                </div>
+                                <button type="button" className="groups-copy" onClick={handleCopyInvite}>
+                                    {copied ? "Copied" : "Copy code"}
+                                </button>
+                            </div>
+                            <div className="groups-invite-code">{selectedGroup.inviteCode}</div>
+                        </section>
+                    )}
+
+                    <section className="groups-card">
+                        <p className="onboarding-section">Create</p>
+                        <div className="groups-form-row">
+                            <input
+                                type="text"
+                                value={groupName}
+                                onChange={(event) => setGroupName(event.target.value)}
+                                placeholder="Group name"
+                                maxLength={80}
+                            />
+                            <button
+                                type="button"
+                                onClick={handleCreateGroup}
+                                disabled={!groupName.trim() || saving}
+                            >
+                                Create
+                            </button>
+                        </div>
+                    </section>
+
+                    <section className="groups-card">
+                        <p className="onboarding-section">Join</p>
+                        <div className="groups-form-row">
+                            <input
+                                type="text"
+                                value={inviteCode}
+                                onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                                placeholder="Invite code"
+                                maxLength={16}
+                            />
+                            <button
+                                type="button"
+                                onClick={handleJoinGroup}
+                                disabled={!normalizeInviteCode(inviteCode) || saving}
+                            >
+                                Join
+                            </button>
+                        </div>
                     </section>
                 </div>
             </div>

@@ -5,6 +5,28 @@ function requireTether() {
     return window.tether;
 }
 
+const VALID_STRICTNESS = new Set(["gentle", "moderate", "hard"]);
+
+function normalizeNonEmptyStringArray(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean);
+}
+
+function normalizeOnboarding(settings) {
+    if (!settings || typeof settings !== "object") return null;
+    const strictness = VALID_STRICTNESS.has(settings.strictness)
+        ? settings.strictness
+        : "moderate";
+    return {
+        doMoreOf: normalizeNonEmptyStringArray(settings.doMoreOf),
+        scrollingWorst: normalizeNonEmptyStringArray(settings.scrollingWorst),
+        futureMessage: String(settings.futureMessage || "").trim(),
+        strictness,
+    };
+}
+
 export async function signUpWithEmail(email, password) {
     return requireTether().signUpWithEmail(email, password);
 }
@@ -38,11 +60,13 @@ export async function checkOnboardingComplete(_userId) {
 }
 
 export async function loadOnboarding(_userId) {
-    return requireTether().loadOnboarding();
+    const settings = await requireTether().loadOnboarding();
+    return normalizeOnboarding(settings);
 }
 
 export async function saveOnboarding(_userId, responses) {
-    return requireTether().saveOnboarding(responses);
+    const saved = await requireTether().saveOnboarding(responses);
+    return normalizeOnboarding(saved);
 }
 
 export async function saveSessionPoints(payload) {

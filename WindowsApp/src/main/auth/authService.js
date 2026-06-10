@@ -1,9 +1,48 @@
 const { createClient } = require("@supabase/supabase-js");
+const fs = require("fs");
+const path = require("path");
+const { app } = require("electron");
 const { getOAuthRedirectUrl } = require("./oauthConfig");
 const { startBrowserOAuth } = require("./oauthBrowser");
 
 let supabase = null;
 let onSessionChange = null;
+
+function getAuthStoragePath() {
+    return path.join(app.getPath("userData"), "supabase-auth.json");
+}
+
+function readStorage() {
+    try {
+        const raw = fs.readFileSync(getAuthStoragePath(), "utf8");
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function writeStorage(data) {
+    fs.mkdirSync(path.dirname(getAuthStoragePath()), { recursive: true });
+    fs.writeFileSync(getAuthStoragePath(), JSON.stringify(data), "utf8");
+}
+
+const authStorage = {
+    async getItem(key) {
+        const storage = readStorage();
+        return Object.prototype.hasOwnProperty.call(storage, key) ? storage[key] : null;
+    },
+    async setItem(key, value) {
+        const storage = readStorage();
+        storage[key] = value;
+        writeStorage(storage);
+    },
+    async removeItem(key) {
+        const storage = readStorage();
+        delete storage[key];
+        writeStorage(storage);
+    },
+};
 
 function getSupabaseUrl() {
     return process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
@@ -45,6 +84,8 @@ function initialize({ onSessionChange: callback }) {
             flowType: "pkce",
             detectSessionInUrl: false,
             autoRefreshToken: true,
+            persistSession: true,
+            storage: authStorage,
         },
     });
 
