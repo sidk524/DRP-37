@@ -1,7 +1,35 @@
 import "../styles/BlockerSetup.css";
+import { useEffect, useState } from "react";
+
+// Counts up from 0 to the final score in sync with the entrance animation.
+function useCountUp(target, durationMs = 900, delayMs = 250) {
+    const [value, setValue] = useState(0);
+
+    useEffect(() => {
+        let frame;
+        let start;
+        const timer = window.setTimeout(() => {
+            const tick = (now) => {
+                if (start === undefined) start = now;
+                const progress = Math.min((now - start) / durationMs, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                setValue(Math.round(target * eased));
+                if (progress < 1) frame = requestAnimationFrame(tick);
+            };
+            frame = requestAnimationFrame(tick);
+        }, delayMs);
+        return () => {
+            window.clearTimeout(timer);
+            if (frame) cancelAnimationFrame(frame);
+        };
+    }, [target, durationMs, delayMs]);
+
+    return value;
+}
 
 function SessionComplete({ session, onDone }) {
     const { mode, actual_ms, blocked_apps_count, points } = session;
+    const animatedPoints = useCountUp(points);
 
     const minutes = Math.floor(actual_ms / 60000);
     const seconds = Math.floor((actual_ms % 60000) / 1000);
@@ -40,12 +68,15 @@ function SessionComplete({ session, onDone }) {
     return (
         <div className="tether-screen">
             <div className="tether-frame tether-complete">
-                <div className="tether-complete-icon">🎉</div>
+                <svg className="tether-complete-check" viewBox="0 0 100 100" aria-hidden>
+                    <circle className="check-ring" cx="50" cy="50" r="44" />
+                    <path className="check-mark" d="M 30 52 L 44 66 L 71 37" />
+                </svg>
                 <h1 className="tether-title">Session Complete!</h1>
                 <p className="tether-subtitle">Well done! You stayed focused.</p>
 
                 <div className="tether-points-large">
-                    <span className="tether-points-value">{points}</span>
+                    <span className="tether-points-value">{animatedPoints}</span>
                     <span className="tether-points-label">points earned</span>
                 </div>
 

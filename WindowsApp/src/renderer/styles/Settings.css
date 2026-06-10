@@ -1,3 +1,5 @@
+/* Settings — reuses onboarding cards/options, adds its own frame chrome. */
+
 .settings-screen {
     width: 100%;
     height: 100%;
@@ -13,26 +15,29 @@
     flex-direction: column;
     min-height: min-content;
     padding-bottom: var(--frame-padding-y);
+    animation: screenIn 0.45s var(--ease-out) both;
 }
 
 .settings-title {
     font-size: var(--title-size);
     font-weight: 700;
-    color: #ffffff;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
     margin-bottom: clamp(8px, 1.5vh, 10px);
 }
 
 .settings-subtitle {
-    color: #8e8e96;
+    color: var(--text-secondary);
     font-size: clamp(0.92rem, 2.5vw, 1rem);
     line-height: 1.45;
     margin-bottom: clamp(16px, 3vh, 22px);
 }
 
 .settings-status {
-    color: #8e8e96;
+    color: var(--text-secondary);
     font-size: 1rem;
     padding: clamp(16px, 3vh, 24px) 0;
+    animation: fadeIn 0.4s var(--ease-out) both;
 }
 
 .settings-stack {
@@ -47,14 +52,16 @@
     gap: clamp(12px, 2vh, 16px);
     width: 100%;
     padding: clamp(16px, 3vh, 20px);
-    background: #1f1f22;
-    border: 1px solid #2c2c30;
-    border-radius: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
 }
 
 .settings-card-title {
-    color: #ffffff;
+    color: var(--text-primary);
     font-size: clamp(1.05rem, 2.5vw, 1.15rem);
+    letter-spacing: -0.015em;
     line-height: 1.35;
     margin: 0;
 }
@@ -64,9 +71,10 @@
 }
 
 .settings-saved {
-    color: #30d158;
+    color: var(--success);
     font-size: 0.95rem;
     margin-top: clamp(12px, 2vh, 16px);
+    animation: fadeIn 0.3s var(--ease-out) both;
 }
 
 .settings-save {
@@ -75,6 +83,7 @@
 }
 
 .settings-save.btn-continue:not(:disabled) {
-    background: #0a84ff;
+    background: var(--accent-gradient);
     color: #ffffff;
+    box-shadow: var(--shadow-cta);
 }

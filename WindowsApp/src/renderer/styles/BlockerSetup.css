@@ -1,18 +1,21 @@
+/* Main timer screen, website picker, and session-complete celebration. */
+
 .tether-screen {
     width: 100%;
     height: 100%;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    background: #000000;
-    color: #ffffff;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    background:
+        radial-gradient(ellipse 90% 55% at 50% -15%, rgba(10, 132, 255, 0.12), transparent 70%),
+        var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font);
     -webkit-font-smoothing: antialiased;
     display: flex;
     justify-content: center;
     align-items: flex-start;
     padding: var(--frame-padding-y) var(--frame-padding-x);
-    box-sizing: border-box;
 }
 
 .tether-frame {
@@ -23,6 +26,7 @@
     flex-direction: column;
     flex: 1 0 auto;
     padding-bottom: var(--frame-padding-y);
+    animation: screenIn 0.45s var(--ease-out) both;
 }
 
 .tether-screen-duration {
@@ -34,46 +38,56 @@
     min-height: min-content;
 }
 
+/* --- Header --- */
+
 .tether-header-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--section-gap);
-    gap: 12px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 .tether-header-action,
 .tether-logout {
-    background: none;
-    border: none;
-    color: #0a84ff;
-    font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+    background: var(--surface);
+    border: 1px solid transparent;
+    border-radius: 99px;
+    color: var(--text-secondary);
+    font-size: clamp(0.82rem, 2.5vw, 0.9rem);
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    padding: 0;
+    padding: clamp(7px, 1.2vh, 9px) clamp(13px, 2.5vw, 16px);
+}
+
+.tether-header-action:hover {
+    background: var(--surface-raised);
+    color: var(--text-primary);
 }
 
 .tether-brand {
     font-size: var(--title-size-lg);
     font-weight: 700;
-    letter-spacing: 0;
-    margin-bottom: clamp(8px, 1.5vh, 14px);
+    letter-spacing: -0.03em;
+    margin-bottom: clamp(6px, 1.2vh, 10px);
 }
 
 .tether-subtitle {
-    color: #8e8e96;
-    font-size: clamp(1rem, 2.5vw, 1.15rem);
+    color: var(--text-secondary);
+    font-size: clamp(0.95rem, 2.5vw, 1.1rem);
     margin-bottom: var(--section-gap);
 }
 
 .tether-subtitle-count {
-    color: #92929a;
-    font-size: clamp(1rem, 2.5vw, 1.15rem);
+    color: var(--text-secondary);
+    font-size: clamp(0.95rem, 2.5vw, 1.1rem);
     margin-top: 8px;
     margin-bottom: clamp(16px, 3vh, 24px);
 }
+
+/* --- Lock graphic stage --- */
 
 .tether-lock-wrap {
     flex: 0 1 auto;
@@ -84,25 +98,43 @@
     margin: clamp(12px, 2vh, 20px) 0;
 }
 
+/* --- Selected websites pill --- */
+
 .tether-selected-pill {
     display: inline-flex;
     align-items: center;
     gap: 10px;
     align-self: center;
-    padding: clamp(8px, 1.5vh, 10px) clamp(14px, 3vw, 18px);
-    background: #1f1f22;
-    border: none;
-    border-radius: 18px;
-    color: #ffffff;
-    font-size: clamp(0.92rem, 2.5vw, 1rem);
-    font-weight: 700;
+    padding: clamp(9px, 1.5vh, 11px) clamp(16px, 3vw, 20px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text-primary);
+    font-size: clamp(0.9rem, 2.5vw, 0.98rem);
+    font-weight: 600;
     font-family: inherit;
     cursor: pointer;
     margin-bottom: clamp(16px, 3vh, 24px);
 }
 
+.tether-selected-pill:not(:disabled):hover {
+    background: var(--surface-raised);
+    border-color: var(--border-strong);
+}
+
+.tether-selected-pill:not(:disabled)::after {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid var(--text-tertiary);
+    border-top: 2px solid var(--text-tertiary);
+    transform: rotate(45deg);
+    margin-left: 2px;
+    flex-shrink: 0;
+}
+
 .tether-selected-pill:disabled {
-    opacity: 0.7;
+    opacity: 0.6;
     cursor: default;
 }
 
@@ -110,61 +142,72 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #0a84ff;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(10, 132, 255, 0.8);
     flex-shrink: 0;
 }
+
+/* --- Primary CTA --- */
 
 .tether-lockin {
     width: 100%;
     min-height: var(--control-height);
     margin-top: auto;
     flex-shrink: 0;
-    background: #1f1f22;
+    background: var(--accent-gradient);
     border: none;
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     color: #ffffff;
-    font-size: clamp(1rem, 2.5vw, 1.15rem);
+    font-size: clamp(1rem, 2.5vw, 1.12rem);
     font-weight: 700;
+    letter-spacing: -0.01em;
     font-family: inherit;
     cursor: pointer;
-    transition: color 0.15s ease;
+    box-shadow: var(--shadow-cta);
 }
 
 .tether-lockin:disabled {
-    color: #6d6d73;
+    background: var(--surface-btn);
+    color: var(--text-tertiary);
+    box-shadow: none;
     cursor: default;
 }
 
 .tether-lockin:not(:disabled):hover {
-    filter: brightness(1.08);
+    filter: brightness(1.1);
+    box-shadow: 0 10px 28px rgba(10, 132, 255, 0.45);
 }
 
 .tether-end-early {
     align-self: center;
     margin-bottom: clamp(12px, 2vh, 16px);
-    padding: clamp(10px, 2vh, 12px) clamp(18px, 4vw, 24px);
+    padding: clamp(9px, 1.8vh, 11px) clamp(18px, 4vw, 24px);
     background: transparent;
-    border: 1px solid #3a3d45;
-    border-radius: 12px;
-    color: #8f8f95;
-    font-size: clamp(0.88rem, 2.5vw, 0.95rem);
+    border: 1px solid var(--border-strong);
+    border-radius: 99px;
+    color: var(--text-secondary);
+    font-size: clamp(0.86rem, 2.5vw, 0.92rem);
+    font-weight: 500;
     font-family: inherit;
     cursor: pointer;
 }
 
 .tether-end-early:hover {
-    color: #ffffff;
-    border-color: #5a5d65;
+    color: var(--danger);
+    border-color: rgba(255, 69, 58, 0.5);
+    background: rgba(255, 69, 58, 0.08);
 }
 
 .tether-session-hint {
     text-align: center;
-    color: #92929a;
+    color: var(--text-secondary);
     font-size: clamp(0.85rem, 2.5vw, 0.9rem);
     margin-bottom: clamp(12px, 2vh, 16px);
     max-width: 320px;
     align-self: center;
 }
+
+/* --- Top bar (sub-screens) --- */
 
 .tether-topbar {
     display: grid;
@@ -177,21 +220,27 @@
 .tether-back {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     justify-self: start;
     background: none;
     border: none;
-    color: #0a84ff;
-    font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+    color: var(--accent);
+    font-size: clamp(0.95rem, 2.5vw, 1.02rem);
+    font-weight: 500;
     font-family: inherit;
     cursor: pointer;
-    padding: 0;
+    padding: 6px 8px 6px 0;
+    border-radius: 10px;
+}
+
+.tether-back:hover {
+    opacity: 0.75;
 }
 
 .tether-back-chevron {
     display: inline-block;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     position: relative;
 }
 
@@ -199,29 +248,32 @@
 .tether-back-chevron::after {
     content: "";
     position: absolute;
-    left: 55%;
-    width: 55%;
-    height: 2px;
-    background: #0a84ff;
+    left: 50%;
+    width: 58%;
+    height: 2.4px;
+    background: currentColor;
     border-radius: 2px;
     transform-origin: left center;
 }
 
 .tether-back-chevron::before {
-    top: 28%;
+    top: 27%;
     transform: rotate(-45deg);
 }
 
 .tether-back-chevron::after {
-    bottom: 28%;
+    bottom: 27%;
     transform: rotate(45deg);
 }
 
 .tether-topbar-duration {
     justify-self: center;
-    color: #8e8e96;
-    font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+    color: var(--text-secondary);
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
     font-weight: 600;
+    background: var(--surface);
+    border-radius: 99px;
+    padding: 6px 14px;
 }
 
 .tether-topbar-spacer {
@@ -231,7 +283,10 @@
 .tether-title {
     font-size: var(--title-size);
     font-weight: 700;
+    letter-spacing: -0.025em;
 }
+
+/* --- Website picker --- */
 
 .tether-url-row {
     display: flex;
@@ -245,17 +300,25 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: var(--control-height);
+    min-height: var(--control-height-sm);
     padding: 0 clamp(14px, 3vw, 18px);
-    background: #1f1f22;
-    border-radius: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+.tether-search:focus-within {
+    border-color: var(--accent);
+    background: var(--surface-raised);
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.22);
 }
 
 .tether-search-icon {
-    width: 26px;
-    height: 26px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
-    border: 2px solid #9b9ba3;
+    border: 2px solid var(--text-tertiary);
     border-radius: 50%;
     position: relative;
 }
@@ -263,11 +326,11 @@
 .tether-search-icon::after {
     content: "";
     position: absolute;
-    width: 10px;
+    width: 8px;
     height: 2px;
-    background: #9b9ba3;
-    right: -4px;
-    bottom: 2px;
+    background: var(--text-tertiary);
+    right: -5px;
+    bottom: -1px;
     transform: rotate(45deg);
     border-radius: 2px;
 }
@@ -278,43 +341,54 @@
     background: transparent;
     border: none;
     outline: none;
-    color: #ffffff;
-    font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+    color: var(--text-primary);
+    font-size: clamp(0.95rem, 2.5vw, 1.05rem);
     font-family: inherit;
 }
 
 .tether-search input::placeholder {
-    color: #9b9ba3;
+    color: var(--text-tertiary);
 }
 
 .tether-search input:disabled {
     opacity: 0.6;
 }
 
+.tether-search input:focus-visible {
+    box-shadow: none;
+}
+
 .tether-url-add {
-    min-height: var(--control-height);
+    min-height: var(--control-height-sm);
     padding: 0 clamp(16px, 3vw, 22px);
-    background: #0a84ff;
+    background: var(--accent-gradient);
     border: none;
-    border-radius: 18px;
+    border-radius: var(--radius);
     color: #ffffff;
-    font-size: clamp(0.92rem, 2.5vw, 1rem);
-    font-weight: 700;
+    font-size: clamp(0.92rem, 2.5vw, 0.98rem);
+    font-weight: 600;
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
+    box-shadow: 0 4px 14px rgba(10, 132, 255, 0.3);
+}
+
+.tether-url-add:not(:disabled):hover {
+    filter: brightness(1.1);
 }
 
 .tether-url-add:disabled {
     opacity: 0.5;
     cursor: default;
+    box-shadow: none;
 }
 
 .tether-error {
-    color: #ff453a;
+    color: var(--danger);
     font-size: 0.9rem;
     margin-bottom: clamp(10px, 2vh, 12px);
+    animation: fadeIn 0.25s var(--ease-out) both;
 }
 
 .tether-session-error {
@@ -340,46 +414,69 @@
     justify-content: space-between;
     gap: 12px;
     padding: clamp(12px, 2vh, 14px) clamp(14px, 3vw, 18px);
-    background: #1f1f22;
-    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     font-size: clamp(0.92rem, 2.5vw, 1rem);
-    font-weight: 600;
+    font-weight: 500;
+    animation: screenIn 0.3s var(--ease-out) both;
+    transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+
+.tether-url-item:hover {
+    background: var(--surface-raised);
 }
 
 .tether-url-empty {
-    color: #92929a;
+    color: var(--text-tertiary);
     padding: 14px 0;
     font-size: clamp(0.92rem, 2.5vw, 1rem);
+    text-align: center;
 }
 
 .tether-url-remove {
-    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: var(--surface-raised);
     border: none;
-    color: #0a84ff;
-    font-size: 1.5rem;
+    border-radius: 50%;
+    color: var(--text-secondary);
+    font-size: 1.05rem;
     line-height: 1;
     cursor: pointer;
-    padding: 0 4px;
+    padding: 0;
     flex-shrink: 0;
+}
+
+.tether-url-remove:hover {
+    background: rgba(255, 69, 58, 0.18);
+    color: var(--danger);
 }
 
 .tether-done {
     width: 100%;
     min-height: var(--control-height);
     flex-shrink: 0;
-    background: #0a84ff;
+    background: var(--accent-gradient);
     border: none;
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     color: #ffffff;
-    font-size: clamp(1rem, 2.5vw, 1.15rem);
+    font-size: clamp(1rem, 2.5vw, 1.12rem);
     font-weight: 700;
+    letter-spacing: -0.01em;
     font-family: inherit;
     cursor: pointer;
+    box-shadow: var(--shadow-cta);
 }
 
 .tether-done:hover {
-    filter: brightness(1.08);
+    filter: brightness(1.1);
 }
+
+/* --- Preset chips --- */
 
 .tether-presets {
     display: flex;
@@ -389,27 +486,29 @@
 }
 
 .tether-preset-btn {
-    padding: clamp(6px, 1.5vh, 8px) clamp(10px, 2.5vw, 14px);
-    background: #1c1c1e;
-    border: 1px solid #3a3d45;
-    border-radius: 10px;
-    color: #ffffff;
-    font-size: clamp(0.82rem, 2.5vw, 0.9rem);
+    padding: clamp(7px, 1.5vh, 9px) clamp(12px, 2.5vw, 16px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text-secondary);
+    font-size: clamp(0.82rem, 2.5vw, 0.88rem);
     font-weight: 500;
     font-family: inherit;
     cursor: pointer;
-    transition: all 0.15s ease;
 }
 
 .tether-preset-btn:hover:not(:disabled) {
-    background: #2c2c2e;
-    border-color: #0a84ff;
+    background: var(--accent-soft);
+    border-color: rgba(10, 132, 255, 0.45);
+    color: var(--text-primary);
 }
 
 .tether-preset-btn:disabled {
     opacity: 0.5;
     cursor: default;
 }
+
+/* --- Session complete --- */
 
 .tether-complete {
     text-align: center;
@@ -420,52 +519,97 @@
 .tether-complete-icon {
     font-size: clamp(3.5rem, 12vw, 5rem);
     margin-bottom: clamp(14px, 2.5vh, 20px);
+    animation: popIn 0.6s var(--ease-spring) both;
+}
+
+.tether-complete-check {
+    width: clamp(72px, 16vw, 96px);
+    height: clamp(72px, 16vw, 96px);
+    margin-bottom: clamp(14px, 2.5vh, 20px);
+    color: var(--success);
+    filter: drop-shadow(0 0 18px rgba(48, 209, 88, 0.45));
+    animation: popIn 0.6s var(--ease-spring) both;
+}
+
+.tether-complete-check .check-ring {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 5;
+    opacity: 0.35;
+}
+
+.tether-complete-check .check-mark {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 60;
+    stroke-dashoffset: 60;
+    animation: checkDraw 0.5s var(--ease-out) 0.35s forwards;
+}
+
+@keyframes checkDraw {
+    to { stroke-dashoffset: 0; }
 }
 
 .tether-points-large {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: clamp(24px, 5vh, 40px) 0;
+    margin: clamp(20px, 4vh, 36px) 0;
+    animation: screenIn 0.5s var(--ease-out) 0.15s both;
 }
 
 .tether-points-value {
     font-size: clamp(3rem, 10vw, 4.5rem);
     font-weight: 800;
-    color: #0a84ff;
-    line-height: 1;
+    letter-spacing: -0.04em;
+    background: linear-gradient(180deg, #4da3ff 0%, #0a84ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
 }
 
 .tether-points-label {
-    font-size: clamp(1rem, 2.5vw, 1.2rem);
-    color: #8e8e96;
+    font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+    color: var(--text-secondary);
     font-weight: 600;
-    margin-top: 8px;
+    margin-top: 6px;
 }
 
 .tether-breakdown {
     width: 100%;
-    background: #1c1c1e;
-    border-radius: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: clamp(18px, 3vh, 24px);
     margin-bottom: clamp(24px, 4vh, 40px);
-    box-sizing: border-box;
+    animation: screenIn 0.5s var(--ease-out) 0.28s both;
 }
 
 .tether-breakdown-title {
-    font-size: clamp(1rem, 2.5vw, 1.1rem);
-    font-weight: 700;
-    color: #ffffff;
+    font-size: clamp(0.78rem, 2vw, 0.82rem);
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
     margin-bottom: clamp(14px, 2.5vh, 20px);
     text-align: left;
 }
 
 .tether-breakdown-item {
     margin-bottom: clamp(12px, 2vh, 16px);
+    padding-bottom: clamp(12px, 2vh, 16px);
+    border-bottom: 1px solid var(--border);
 }
 
 .tether-breakdown-item:last-child {
     margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
 }
 
 .tether-breakdown-info {
@@ -476,14 +620,16 @@
 }
 
 .tether-breakdown-label {
-    color: #8e8e96;
-    font-size: clamp(0.92rem, 2.5vw, 1rem);
+    color: var(--text-secondary);
+    font-size: clamp(0.9rem, 2.5vw, 0.96rem);
+    white-space: nowrap;
 }
 
 .tether-breakdown-value {
-    color: #ffffff;
+    color: var(--text-primary);
     font-weight: 600;
-    font-size: clamp(0.92rem, 2.5vw, 1rem);
+    font-size: clamp(0.9rem, 2.5vw, 0.96rem);
+    text-align: right;
 }
 
 .tether-complete-btn {
@@ -499,6 +645,8 @@
 
     .tether-url-add {
         width: 100%;
+        min-height: var(--control-height-sm);
+        padding: 12px 0;
     }
 }
 

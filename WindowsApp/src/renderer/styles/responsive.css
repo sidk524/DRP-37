@@ -1,15 +1,62 @@
+/* ---------------------------------------------------------------------------
+   Tether design system — Apple-style dark theme.
+   Tokens, reset, and shared motion live here; every screen builds on these.
+--------------------------------------------------------------------------- */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 :root {
+    /* Layout */
     --frame-max-width: min(620px, 92vw);
     --frame-padding-x: clamp(12px, 4vw, 24px);
     --frame-padding-y: clamp(16px, 3vh, 32px);
-    --control-height: clamp(48px, 8vh, 64px);
-    --control-height-sm: clamp(44px, 7vh, 56px);
+    --control-height: clamp(48px, 8vh, 60px);
+    --control-height-sm: clamp(44px, 7vh, 54px);
     --duration-row-height: clamp(44px, 7vh, 56px);
     --lock-size: clamp(96px, min(28vw, 22vh), 172px);
-    --title-size: clamp(1.75rem, 4.5vw, 2.5rem);
-    --title-size-lg: clamp(2rem, 5vw, 2.9rem);
+    --title-size: clamp(1.6rem, 4.5vw, 2.2rem);
+    --title-size-lg: clamp(1.9rem, 5vw, 2.6rem);
     --screen-gap: clamp(12px, 2.5vh, 24px);
     --section-gap: clamp(16px, 3vh, 28px);
+
+    /* Color — iOS dark palette */
+    --bg:             #000000;
+    --surface:        rgba(255, 255, 255, 0.07);
+    --surface-raised: rgba(255, 255, 255, 0.10);
+    --surface-btn:    rgba(255, 255, 255, 0.10);
+    --border:         rgba(255, 255, 255, 0.08);
+    --border-strong:  rgba(255, 255, 255, 0.14);
+    --text-primary:   #ffffff;
+    --text-secondary: rgba(235, 235, 245, 0.62);
+    --text-subtle:    rgba(235, 235, 245, 0.62);
+    --text-tertiary:  rgba(235, 235, 245, 0.32);
+    --accent:         #0a84ff;
+    --accent-soft:    rgba(10, 132, 255, 0.14);
+    --accent-gradient: linear-gradient(180deg, #2f96ff 0%, #0a84ff 100%);
+    --success:        #30d158;
+    --danger:         #ff453a;
+
+    /* Shape */
+    --radius-sm: 12px;
+    --radius:    16px;
+    --radius-lg: 22px;
+    --radius-xl: 28px;
+
+    /* Depth */
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
+    --shadow-cta:  0 8px 22px rgba(10, 132, 255, 0.35);
+    --focus-ring:  0 0 0 4px rgba(10, 132, 255, 0.32);
+
+    /* Motion — Apple-style easing */
+    --ease-out:    cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1);
+
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+            "Segoe UI", "Inter", system-ui, sans-serif;
 }
 
 html,
@@ -22,6 +69,11 @@ body,
 
 body {
     margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -33,4 +85,87 @@ body {
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
+}
+
+/* Quiet, Apple-like scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
+    background-clip: content-box;
+}
+
+/* Text selection */
+::selection {
+    background: rgba(10, 132, 255, 0.4);
+}
+
+/* Every control responds to touch — the springy press is what makes it feel alive */
+button {
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        transform 0.18s var(--ease-spring),
+        background 0.2s var(--ease-out),
+        color 0.2s var(--ease-out),
+        border-color 0.2s var(--ease-out),
+        box-shadow 0.25s var(--ease-out),
+        opacity 0.2s var(--ease-out);
+}
+
+button:not(:disabled):active {
+    transform: scale(0.96);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* Shared screen-entrance — replays whenever a view mounts */
+@keyframes screenIn {
+    from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes popIn {
+    0%   { opacity: 0; transform: scale(0.6); }
+    70%  { transform: scale(1.06); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

@@ -1,20 +1,4 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-:root {
-    --bg:           #000000;
-    --surface:      #1f1f22;
-    --surface-btn:  #2b2b30;
-    --border:       #1d1d20;
-    --text-primary: #ffffff;
-    --text-subtle:  #8f8f95;
-    --accent:       #0a84ff;
-    --radius:       18px;
-    --font:         'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-}
+/* Auth screen + shared form controls. Tokens live in responsive.css. */
 
 .app {
     display: flex;
@@ -25,8 +9,10 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    background-color: var(--bg);
-    font-family: var(--font), serif;
+    background:
+        radial-gradient(ellipse 90% 55% at 50% -15%, rgba(10, 132, 255, 0.13), transparent 70%),
+        var(--bg);
+    font-family: var(--font);
     -webkit-font-smoothing: antialiased;
     padding: var(--frame-padding-y) var(--frame-padding-x);
 }
@@ -36,10 +22,11 @@
     flex-direction: column;
     align-items: center;
     width: 100%;
-    max-width: var(--frame-max-width);
+    max-width: min(420px, var(--frame-max-width));
     padding: clamp(16px, 4vh, 40px) 0 clamp(12px, 3vh, 32px);
     gap: var(--screen-gap);
     margin: auto;
+    animation: screenIn 0.5s var(--ease-out) both;
 }
 
 .logo {
@@ -47,17 +34,17 @@
 }
 
 .logo-text {
-    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-size: clamp(1.6rem, 4vw, 2.1rem);
     font-weight: 300;
     color: var(--text-primary);
-    letter-spacing: 0.05em;
-    font-family: var(--font), serif;
+    letter-spacing: 0.06em;
 }
 
 .logo-accent {
     font-weight: 700;
     position: relative;
     display: inline-block;
+    color: var(--accent);
 }
 
 .logo-accent::before {
@@ -66,10 +53,11 @@
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 110%;
+    width: 115%;
     height: 2px;
-    background: var(--text-primary);
-    opacity: 0.5;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.55;
 }
 
 .heading-group {
@@ -83,12 +71,12 @@
     font-size: var(--title-size);
     font-weight: 700;
     color: var(--text-primary);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.022em;
 }
 
 .subtitle {
     font-size: clamp(0.88rem, 2.5vw, 0.95rem);
-    color: var(--text-subtle);
+    color: var(--text-secondary);
     font-weight: 400;
 }
 
@@ -104,22 +92,27 @@
     min-height: var(--control-height-sm);
     padding: 0 clamp(14px, 4vw, 20px);
     background: var(--surface);
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text-primary);
     font-size: clamp(0.95rem, 2.5vw, 1rem);
-    font-family: var(--font), serif;
+    font-family: var(--font);
     outline: none;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
 }
 
 .input-field::placeholder {
-    color: var(--text-subtle);
+    color: var(--text-tertiary);
+}
+
+.input-field:hover {
+    background: var(--surface-raised);
 }
 
 .input-field:focus {
     border-color: var(--accent);
-    background: #252528;
+    background: var(--surface-raised);
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.22);
 }
 
 .btn-continue {
@@ -129,23 +122,23 @@
     background: var(--surface-btn);
     border: none;
     border-radius: var(--radius);
-    color: var(--text-subtle);
+    color: var(--text-tertiary);
     font-size: clamp(0.95rem, 2.5vw, 1rem);
-    font-family: var(--font), serif;
-    font-weight: 500;
+    font-family: var(--font);
+    font-weight: 600;
+    letter-spacing: -0.01em;
     cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
     margin-top: 4px;
 }
 
-.btn-continue:not(:disabled):hover {
-    background: #35353a;
-    color: var(--text-primary);
+.btn-continue:not(:disabled) {
+    background: var(--accent-gradient);
+    color: #ffffff;
+    box-shadow: var(--shadow-cta);
 }
 
-.btn-continue:not(:disabled) {
-    background: var(--surface-btn);
-    color: var(--text-primary);
+.btn-continue:not(:disabled):hover {
+    filter: brightness(1.1);
 }
 
 .divider {
@@ -162,8 +155,8 @@
 }
 
 .divider-text {
-    color: var(--text-subtle);
-    font-size: 0.875rem;
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
 }
 
 .btn-google {
@@ -179,25 +172,25 @@
     border-radius: var(--radius);
     color: var(--text-primary);
     font-size: clamp(0.95rem, 2.5vw, 1rem);
-    font-family: var(--font), serif;
+    font-family: var(--font);
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s ease;
 }
 
-.btn-google:hover {
-    background: #2f2f2f;
+.btn-google:not(:disabled):hover {
+    background: var(--surface-raised);
+    border-color: var(--border-strong);
 }
 
 .google-icon {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
 }
 
 .login-text {
     font-size: clamp(0.88rem, 2.5vw, 0.95rem);
-    color: var(--text-subtle);
+    color: var(--text-secondary);
 }
 
 .login-link {
@@ -213,31 +206,34 @@
 .login-link-btn {
     background: none;
     border: none;
-    font-family: var(--font), serif;
+    font-family: var(--font);
     font-size: clamp(0.88rem, 2.5vw, 0.95rem);
     cursor: pointer;
     padding: 0;
 }
 
 .auth-error {
-    color: #ff6b6b;
+    color: var(--danger);
     font-size: 0.875rem;
     text-align: center;
     line-height: 1.4;
     margin: 2px 0;
+    animation: fadeIn 0.25s var(--ease-out) both;
 }
 
 .auth-info {
-    color: #6bd49b;
+    color: var(--success);
     font-size: 0.875rem;
     text-align: center;
     line-height: 1.4;
     margin: 2px 0;
+    animation: fadeIn 0.25s var(--ease-out) both;
 }
 
 .auth-loading {
-    color: var(--text-subtle);
+    color: var(--text-secondary);
     font-size: 0.95rem;
+    animation: fadeIn 0.4s var(--ease-out) both;
 }
 
 .btn-continue:disabled,
@@ -248,7 +244,7 @@
 
 .footer-text {
     font-size: 0.78rem;
-    color: var(--text-subtle);
+    color: var(--text-tertiary);
     text-align: center;
     line-height: 1.6;
     margin-top: auto;
@@ -256,9 +252,10 @@
 }
 
 .footer-link {
-    color: var(--text-subtle);
+    color: var(--text-secondary);
     text-decoration: underline;
     text-underline-offset: 2px;
+    transition: color 0.2s var(--ease-out);
 }
 
 .footer-link:hover {
