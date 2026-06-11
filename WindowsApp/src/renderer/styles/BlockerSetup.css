@@ -38,6 +38,10 @@
     min-height: min-content;
 }
 
+.tether-frame-subscreen {
+    min-height: min(100%, calc(100dvh - 2 * var(--frame-padding-y)));
+}
+
 /* --- Header --- */
 
 .tether-header-actions {
@@ -284,6 +288,7 @@
     font-size: var(--title-size);
     font-weight: 700;
     letter-spacing: -0.025em;
+    margin-bottom: var(--section-gap);
 }
 
 /* --- Website picker --- */
@@ -537,55 +542,160 @@
 }
 
 .tether-groups {
+    flex: 1 1 auto;
     margin-bottom: clamp(14px, 2.5vh, 20px);
+    min-height: 0;
 }
 
-.tether-groups-title {
-    margin: 0 0 clamp(8px, 1.8vh, 10px);
-    color: var(--text-secondary);
-    font-size: clamp(0.82rem, 2.4vw, 0.9rem);
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
+.tether-groups-card {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(8px, 1.5vh, 10px);
+    width: 100%;
+    padding: clamp(16px, 3vh, 20px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
 }
 
 .tether-group-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: clamp(8px, 2vw, 10px);
-}
-
-.tether-group-btn {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    padding: clamp(10px, 2vh, 12px) clamp(12px, 2.8vw, 14px);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: rgba(10, 132, 255, 0.08);
-    color: var(--text-primary);
-    cursor: pointer;
-    font-family: inherit;
-    font-size: clamp(0.86rem, 2.4vw, 0.94rem);
-    font-weight: 600;
-    text-align: left;
+    gap: clamp(8px, 1.5vh, 10px);
 }
 
-.tether-group-btn small {
+.tether-group-item {
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 2vw, 12px);
+    width: 100%;
+    min-height: var(--control-height-sm);
+    padding: clamp(12px, 2vh, 14px) clamp(14px, 3vw, 16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+
+.tether-group-item:hover:not(:disabled) {
+    background: var(--surface-raised);
+    border-color: var(--border-strong);
+}
+
+.tether-group-item.selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.3);
+}
+
+.tether-group-item:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.tether-group-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.22);
+    flex-shrink: 0;
+}
+
+.tether-group-dot.selected {
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(10, 132, 255, 0.8);
+}
+
+.tether-group-item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.tether-group-item-name {
+    font-weight: 600;
+    font-size: clamp(0.92rem, 2.5vw, 1rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tether-group-item-meta {
     color: var(--text-secondary);
-    font-size: clamp(0.76rem, 2.1vw, 0.82rem);
+    font-size: clamp(0.78rem, 2.1vw, 0.84rem);
     font-weight: 500;
 }
 
-.tether-group-btn:hover:not(:disabled) {
-    border-color: rgba(10, 132, 255, 0.45);
-    background: rgba(10, 132, 255, 0.16);
+.tether-group-manage-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(10px, 2vw, 16px);
+    width: 100%;
+    min-height: var(--control-height-sm);
+    padding: clamp(10px, 2vh, 12px) clamp(14px, 3vw, 16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.04);
 }
 
-.tether-group-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
+.tether-group-actions {
+    display: flex;
+    align-items: center;
+    gap: clamp(4px, 1vw, 8px);
+    flex-shrink: 0;
+}
+
+.tether-group-action {
+    background: none;
+    border: none;
+    padding: clamp(6px, 1.2vh, 8px) clamp(8px, 2vw, 10px);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: clamp(0.88rem, 2.4vw, 0.94rem);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tether-group-action:hover {
+    filter: brightness(1.15);
+}
+
+.tether-group-action.danger {
+    color: var(--danger);
+}
+
+.tether-group-secondary {
+    width: 100%;
+    min-height: var(--control-height);
+    margin-top: auto;
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    color: var(--text-primary);
+    font-size: clamp(1rem, 2.5vw, 1.08rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.tether-group-secondary:hover {
+    background: var(--surface-raised);
+    border-color: var(--border-strong);
+}
+
+.tether-groups .tether-done {
+    margin-top: auto;
 }
 
 /* --- Session complete --- */
