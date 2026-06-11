@@ -260,9 +260,23 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         setUrlError("");
     }
 
+    function addPresetWebsites(domains = []) {
+        if (sessionRunning) return;
+        const normalizedDomains = displayDomains(domains);
+        if (normalizedDomains.length === 0) return;
+        setWebsites((prev) => Array.from(new Set([...prev, ...normalizedDomains])).sort());
+        setUrlError("");
+    }
+
     function removeWebsite(domain) {
         if (sessionRunning) return;
         setWebsites((prev) => prev.filter((item) => item !== domain));
+    }
+
+    function clearWebsites() {
+        if (sessionRunning) return;
+        setWebsites([]);
+        setUrlError("");
     }
 
     async function handleLockIn() {
@@ -338,7 +352,9 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         setSeconds,
         addWebsite,
         addPresetWebsite,
+        addPresetWebsites,
         removeWebsite,
+        clearWebsites,
         handleLockIn,
         handleStopSession,
         handleSignOut,

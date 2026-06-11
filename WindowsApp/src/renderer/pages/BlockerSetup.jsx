@@ -7,6 +7,21 @@ import Settings from "./Settings";
 import SessionComplete from "./SessionComplete";
 import { useBlockerSessionController } from "../hooks/useBlockerSessionController";
 
+const WEBSITE_GROUPS = [
+    {
+        name: "Social media",
+        domains: ["instagram.com", "tiktok.com", "youtube.com", "facebook.com", "x.com", "reddit.com"],
+    },
+    {
+        name: "Messaging",
+        domains: ["web.whatsapp.com", "discord.com", "messenger.com", "telegram.org"],
+    },
+    {
+        name: "Streaming",
+        domains: ["youtube.com", "netflix.com", "twitch.tv", "primevideo.com"],
+    },
+];
+
 export function strictnessToMode(strictness) {
     if (strictness === "gentle") return "breathing";
     if (strictness === "moderate") return "reflect";
@@ -41,7 +56,9 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         setSeconds,
         addWebsite,
         addPresetWebsite,
+        addPresetWebsites,
         removeWebsite,
+        clearWebsites,
         handleLockIn,
         handleStopSession,
         handleSignOut,
@@ -103,6 +120,16 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                     <p className="tether-subtitle-count">
                         {selectedCount} website{selectedCount === 1 ? "" : "s"} selected
                     </p>
+                    <div className="tether-selection-actions">
+                        <button
+                            type="button"
+                            className="tether-clear-all"
+                            onClick={clearWebsites}
+                            disabled={sessionRunning || selectedCount === 0}
+                        >
+                            Clear all
+                        </button>
+                    </div>
 
                     <div className="tether-url-row">
                         <label className="tether-search">
@@ -170,6 +197,27 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                         >
                             YouTube
                         </button>
+                    </div>
+
+                    <div className="tether-groups">
+                        <h2 className="tether-groups-title">Quick groups</h2>
+                        <div className="tether-group-list">
+                            {WEBSITE_GROUPS.map((group) => (
+                                <button
+                                    key={group.name}
+                                    type="button"
+                                    className="tether-group-btn"
+                                    onClick={() => addPresetWebsites(group.domains)}
+                                    disabled={sessionRunning}
+                                >
+                                    <span>{group.name}</span>
+                                    <small>
+                                        Add {group.domains.length} website
+                                        {group.domains.length === 1 ? "" : "s"}
+                                    </small>
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     <ul className="tether-url-list">

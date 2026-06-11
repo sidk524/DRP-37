@@ -456,6 +456,34 @@
     color: var(--danger);
 }
 
+.tether-selection-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: clamp(10px, 2vh, 12px);
+}
+
+.tether-clear-all {
+    padding: clamp(6px, 1.4vh, 8px) clamp(10px, 2.5vw, 14px);
+    border: 1px solid rgba(255, 69, 58, 0.35);
+    border-radius: 99px;
+    background: rgba(255, 69, 58, 0.1);
+    color: var(--danger);
+    font-family: inherit;
+    font-size: clamp(0.8rem, 2.2vw, 0.86rem);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tether-clear-all:hover:not(:disabled) {
+    background: rgba(255, 69, 58, 0.18);
+    border-color: rgba(255, 69, 58, 0.55);
+}
+
+.tether-clear-all:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
 .tether-done {
     width: 100%;
     min-height: var(--control-height);
@@ -504,6 +532,58 @@
 }
 
 .tether-preset-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.tether-groups {
+    margin-bottom: clamp(14px, 2.5vh, 20px);
+}
+
+.tether-groups-title {
+    margin: 0 0 clamp(8px, 1.8vh, 10px);
+    color: var(--text-secondary);
+    font-size: clamp(0.82rem, 2.4vw, 0.9rem);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+}
+
+.tether-group-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: clamp(8px, 2vw, 10px);
+}
+
+.tether-group-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: clamp(10px, 2vh, 12px) clamp(12px, 2.8vw, 14px);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: rgba(10, 132, 255, 0.08);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: clamp(0.86rem, 2.4vw, 0.94rem);
+    font-weight: 600;
+    text-align: left;
+}
+
+.tether-group-btn small {
+    color: var(--text-secondary);
+    font-size: clamp(0.76rem, 2.1vw, 0.82rem);
+    font-weight: 500;
+}
+
+.tether-group-btn:hover:not(:disabled) {
+    border-color: rgba(10, 132, 255, 0.45);
+    background: rgba(10, 132, 255, 0.16);
+}
+
+.tether-group-btn:disabled {
     opacity: 0.5;
     cursor: default;
 }
