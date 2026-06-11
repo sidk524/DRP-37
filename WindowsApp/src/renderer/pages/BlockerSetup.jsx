@@ -1,5 +1,5 @@
 import "../styles/BlockerSetup.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DurationScrollPicker from "../components/DurationScrollPicker";
 import LockGraphic from "../components/LockGraphic";
 import Groups from "./Groups";
@@ -47,6 +47,7 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
     const [urlInput, setUrlInput] = useState("");
     const [managerError, setManagerError] = useState("");
     const [editorReturnView, setEditorReturnView] = useState("groupManager");
+    const [pickerDraftGroupId, setPickerDraftGroupId] = useState(null);
 
     const {
         blockGroups,
@@ -76,6 +77,19 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         defaultMode,
         onStrictnessChange,
     });
+
+    useEffect(() => {
+        if (view === "groupPicker") {
+            setPickerDraftGroupId(selectedBlockGroupId);
+        }
+    }, [view, selectedBlockGroupId]);
+
+    function commitPickerSelection() {
+        if (pickerDraftGroupId) {
+            selectBlockGroup(pickerDraftGroupId);
+        }
+        setView("duration");
+    }
 
     function openEditor(group, returnView = "groupManager") {
         setEditingGroup(group);
@@ -374,7 +388,7 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                         <button
                             type="button"
                             className="tether-back"
-                            onClick={() => setView("duration")}
+                            onClick={commitPickerSelection}
                         >
                             <span className="tether-back-chevron" aria-hidden />
                             Back
@@ -398,17 +412,14 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                                     <p className="tether-url-empty">No block groups yet</p>
                                 ) : (
                                     blockGroups.map((group) => {
-                                        const selected = group.id === selectedBlockGroupId;
+                                        const selected = group.id === pickerDraftGroupId;
                                         const websiteCount = groupWebsiteCount(group);
                                         return (
                                             <button
                                                 key={group.id}
                                                 type="button"
                                                 className={`tether-group-item${selected ? " selected" : ""}`}
-                                                onClick={() => {
-                                                    selectBlockGroup(group.id);
-                                                    setView("duration");
-                                                }}
+                                                onClick={() => setPickerDraftGroupId(group.id)}
                                                 disabled={sessionRunning}
                                             >
                                                 <span
