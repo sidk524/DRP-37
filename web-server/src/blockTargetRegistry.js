@@ -98,6 +98,32 @@ function registerTarget(entry) {
         processTokens: ["twitch"]
     },
     {
+        id: "whatsapp",
+        packages: ["com.whatsapp"],
+        domains: ["web.whatsapp.com", "whatsapp.com", "www.whatsapp.com"],
+        processTokens: ["whatsapp"]
+    },
+    {
+        id: "messenger",
+        packages: ["com.facebook.orca"],
+        domains: ["messenger.com", "www.messenger.com"],
+        processTokens: ["messenger"],
+        aliases: ["facebook messenger"]
+    },
+    {
+        id: "telegram",
+        packages: ["org.telegram.messenger"],
+        domains: ["telegram.org", "www.telegram.org", "web.telegram.org"],
+        processTokens: ["telegram"]
+    },
+    {
+        id: "primevideo",
+        packages: ["com.amazon.avod.thirdpartyclient"],
+        domains: ["primevideo.com", "www.primevideo.com"],
+        processTokens: ["primevideo"],
+        aliases: ["prime video", "amazon prime video"]
+    },
+    {
         id: "notepad",
         packages: [],
         domains: [],

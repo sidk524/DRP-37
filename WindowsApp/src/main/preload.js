@@ -41,6 +41,10 @@ contextBridge.exposeInMainWorld("tether", {
         invoke(CHANNELS.WEBSERVER_GET_GROUP_LEADERBOARD, groupId),
     syncDefaultGroups: (payload) =>
         invoke(CHANNELS.WEBSERVER_SYNC_DEFAULT_GROUPS, payload),
+    listBlockGroups: () => invoke(CHANNELS.WEBSERVER_LIST_BLOCK_GROUPS),
+    createBlockGroup: (payload) => invoke(CHANNELS.WEBSERVER_CREATE_BLOCK_GROUP, payload),
+    updateBlockGroup: (payload) => invoke(CHANNELS.WEBSERVER_UPDATE_BLOCK_GROUP, payload),
+    deleteBlockGroup: (groupId) => invoke(CHANNELS.WEBSERVER_DELETE_BLOCK_GROUP, groupId),
 
     startSession: (config) => invoke(CHANNELS.SESSION_START, config),
     updateSession: (config) => invoke(CHANNELS.SESSION_UPDATE, config),

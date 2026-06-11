@@ -19,6 +19,10 @@ module.exports = {
     WEBSERVER_JOIN_GROUP: "webserver:joinGroup",
     WEBSERVER_GET_GROUP_LEADERBOARD: "webserver:getGroupLeaderboard",
     WEBSERVER_SYNC_DEFAULT_GROUPS: "webserver:syncDefaultGroups",
+    WEBSERVER_LIST_BLOCK_GROUPS: "webserver:listBlockGroups",
+    WEBSERVER_CREATE_BLOCK_GROUP: "webserver:createBlockGroup",
+    WEBSERVER_UPDATE_BLOCK_GROUP: "webserver:updateBlockGroup",
+    WEBSERVER_DELETE_BLOCK_GROUP: "webserver:deleteBlockGroup",
 
     SESSION_START: "session:start",
     SESSION_UPDATE: "session:update",

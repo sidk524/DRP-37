@@ -3,9 +3,12 @@ import {
     createSession,
     endSession,
     loadActiveSession,
-    loadSavedBlockSelections,
-    saveBlockSelections,
 } from "../services/BlockSessionRepository";
+import {
+    listBlockGroups,
+    loadLastBlockGroupId,
+    saveLastBlockGroupId,
+} from "../services/BlockGroupRepository";
 import { getUserTotalPoints, loadOnboarding, saveSessionPoints, signOut } from "../services/SupabaseClient";
 import {
     getTetherSession,
@@ -49,9 +52,10 @@ function sessionEndsAt(serverSession) {
 }
 
 export function useBlockerSessionController({ userId, defaultMode, onStrictnessChange }) {
-    const [websites, setWebsites] = useState([]);
-    const [urlInput, setUrlInput] = useState("");
-    const [urlError, setUrlError] = useState("");
+    const [blockGroups, setBlockGroups] = useState([]);
+    const [blockGroupsLoading, setBlockGroupsLoading] = useState(true);
+    const [blockGroupsError, setBlockGroupsError] = useState("");
+    const [selectedBlockGroupId, setSelectedBlockGroupId] = useState(null);
     const [hours, setHours] = useState(0);
     const [minutes, setMinutes] = useState(30);
     const [seconds, setSeconds] = useState(0);
@@ -73,24 +77,43 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
     }
 
     const sessionRunning = !!active;
-    const selectedCount = websites.length;
+    const selectedBlockGroup = blockGroups.find((group) => group.id === selectedBlockGroupId) || null;
     const totalSeconds = Math.max(5, hours * 3600 + minutes * 60 + seconds);
 
     useEffect(() => {
         setMode(defaultMode);
     }, [defaultMode]);
 
-    useEffect(() => {
-        if (sessionRunning) return;
-        const restoredSelections = displayDomains(loadSavedBlockSelections());
-        if (restoredSelections.length > 0) {
-            setWebsites(restoredSelections);
+    async function refreshBlockGroups() {
+        setBlockGroupsError("");
+        try {
+            const groups = await listBlockGroups();
+            setBlockGroups(groups);
+            setSelectedBlockGroupId((current) => {
+                if (current && groups.some((group) => group.id === current)) return current;
+                const lastId = loadLastBlockGroupId();
+                if (lastId && groups.some((group) => group.id === lastId)) return lastId;
+                return groups[0]?.id || null;
+            });
+            return groups;
+        } catch (error) {
+            console.error("Failed to load block groups:", error);
+            setBlockGroupsError(error.message || "Could not load block groups.");
+            return [];
+        } finally {
+            setBlockGroupsLoading(false);
         }
-    }, [sessionRunning]);
+    }
 
     useEffect(() => {
-        saveBlockSelections(displayDomains(websites));
-    }, [websites]);
+        refreshBlockGroups();
+    }, [userId]);
+
+    function selectBlockGroup(groupId) {
+        if (sessionRunning) return;
+        setSelectedBlockGroupId(groupId);
+        saveLastBlockGroupId(groupId);
+    }
 
     async function refreshPoints() {
         try {
@@ -114,8 +137,9 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         const endsAt = sessionEndsAt(serverSession);
         if (endsAt <= Date.now()) return null;
 
-        const selectedDomains = displayDomains(serverSession.domains_blocked);
-        setWebsites(selectedDomains);
+        if (serverSession.block_group_id) {
+            setSelectedBlockGroupId(serverSession.block_group_id);
+        }
         setRemoteSessionId(serverSession.id);
         const friction = await loadFrictionContext();
 
@@ -238,52 +262,15 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         setSeconds(remainingSeconds % 60);
     }, [active, now]);
 
-    function addWebsite() {
-        const normalized = normalizeWebsite(urlInput);
-        if (!normalized) {
-            setUrlError("Enter a valid website (e.g. instagram.com)");
-            return;
-        }
-        if (websites.includes(normalized)) {
-            setUrlError("That website is already in your list");
-            return;
-        }
-        setWebsites((prev) => [...prev, normalized].sort());
-        setUrlInput("");
-        setUrlError("");
-    }
-
-    function addPresetWebsite(domain) {
-        if (sessionRunning) return;
-        if (websites.includes(domain)) return;
-        setWebsites((prev) => [...prev, domain].sort());
-        setUrlError("");
-    }
-
-    function addPresetWebsites(domains = []) {
-        if (sessionRunning) return;
-        const normalizedDomains = displayDomains(domains);
-        if (normalizedDomains.length === 0) return;
-        setWebsites((prev) => Array.from(new Set([...prev, ...normalizedDomains])).sort());
-        setUrlError("");
-    }
-
-    function removeWebsite(domain) {
-        if (sessionRunning) return;
-        setWebsites((prev) => prev.filter((item) => item !== domain));
-    }
-
-    function clearWebsites() {
-        if (sessionRunning) return;
-        setWebsites([]);
-        setUrlError("");
-    }
-
     async function handleLockIn() {
-        if (selectedCount === 0) return;
+        if (!selectedBlockGroupId) return;
         setSessionError("");
         try {
-            const serverSession = await createSession({ domainsBlocked: websites, totalDurationSeconds: totalSeconds });
+            const serverSession = await createSession({
+                blockGroupId: selectedBlockGroupId,
+                totalDurationSeconds: totalSeconds,
+            });
+            saveLastBlockGroupId(selectedBlockGroupId);
             const localSession = await startLocalSession(serverSession);
             if (localSession) {
                 setCurrentActiveSession(localSession);
@@ -333,9 +320,11 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
     }
 
     return {
-        websites,
-        urlInput,
-        urlError,
+        blockGroups,
+        blockGroupsLoading,
+        blockGroupsError,
+        selectedBlockGroupId,
+        selectedBlockGroup,
         hours,
         minutes,
         seconds,
@@ -343,18 +332,12 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         points,
         sessionError,
         sessionRunning,
-        selectedCount,
         lastCompletedSession,
-        setUrlInput,
-        setUrlError,
         setHours,
         setMinutes,
         setSeconds,
-        addWebsite,
-        addPresetWebsite,
-        addPresetWebsites,
-        removeWebsite,
-        clearWebsites,
+        selectBlockGroup,
+        refreshBlockGroups,
         handleLockIn,
         handleStopSession,
         handleSignOut,
@@ -362,3 +345,5 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         setLastCompletedSession,
     };
 }
+
+export { normalizeWebsite, displayDomains };

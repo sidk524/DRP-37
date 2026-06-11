@@ -86,13 +86,6 @@ import kotlin.math.max
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val appPresets = listOf(
-    AppPreset("Instagram", "com.instagram.android"),
-    AppPreset("TikTok", "com.zhiliaoapp.musically"),
-    AppPreset("Facebook", "com.facebook.katana"),
-    AppPreset("YouTube", "com.google.android.youtube")
-)
-
 @Composable
 fun BlockerSetupScreen(
     onboardingSettings: OnboardingSettings? = null,
@@ -101,11 +94,29 @@ fun BlockerSetupScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val installedApps = remember { loadLaunchableApps(context) }
+    val installedPackages = remember(installedApps) { installedApps.map { it.packageName }.toSet() }
     val sessionViewModel: BlockerSessionViewModel = viewModel()
     val sessionState by sessionViewModel.state.collectAsState()
     var showAccessibilityDialog by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf(BlockerFlowScreen.Duration) }
+    var editingGroupId by remember { mutableStateOf<String?>(null) }
+    var editorName by remember { mutableStateOf("") }
+    var editorPackages by remember { mutableStateOf(setOf<String>()) }
+    var editorEntries by remember { mutableStateOf(listOf<String>()) }
     val defaultMode = strictnessToMode(onboardingSettings?.strictness ?: "moderate")
+
+    LaunchedEffect(installedPackages) {
+        sessionViewModel.setInstalledPackages(installedPackages)
+    }
+
+    fun openGroupEditor(group: com.drp37.blocker.remote.webserver.BlockGroup?) {
+        editingGroupId = group?.id
+        editorName = group?.name.orEmpty()
+        editorPackages = group?.expandedAppsBlocked?.toSet().orEmpty()
+        editorEntries = group?.let { (it.targets + it.domainsBlocked).distinct() }.orEmpty()
+        sessionViewModel.clearError()
+        screen = BlockerFlowScreen.GroupEditor
+    }
 
     fun showAccessibilityPromptIfNeeded() {
         if (isAppBlockingServiceEnabled(context)) {
@@ -154,11 +165,73 @@ fun BlockerSetupScreen(
         BlockerFlowScreen.AppSelection -> {
             AppSelectionScreen(
                 installedApps = installedApps,
-                selectedPackages = sessionState.selectedPackages,
-                locked = sessionState.sessionRunning,
-                onTogglePackage = sessionViewModel::togglePackage,
-                onSelectPackage = sessionViewModel::selectPackage,
-                onDone = { screen = BlockerFlowScreen.Duration }
+                selectedPackages = editorPackages,
+                locked = false,
+                onTogglePackage = { packageName ->
+                    editorPackages = if (packageName in editorPackages) {
+                        editorPackages - packageName
+                    } else {
+                        editorPackages + packageName
+                    }
+                },
+                onDone = { screen = BlockerFlowScreen.GroupEditor }
+            )
+        }
+        BlockerFlowScreen.GroupPicker -> {
+            BlockGroupPickerScreen(
+                groups = sessionState.blockGroups,
+                loading = sessionState.blockGroupsLoading,
+                selectedGroupId = sessionState.selectedBlockGroupId,
+                deviceAppCount = { group -> sessionViewModel.deviceAppsForGroup(group).size },
+                errorMessage = sessionState.errorMessage,
+                onSelect = { group ->
+                    sessionViewModel.selectBlockGroup(group.id)
+                    screen = BlockerFlowScreen.Duration
+                },
+                onManageGroups = { screen = BlockerFlowScreen.GroupManager },
+                onBack = { screen = BlockerFlowScreen.Duration }
+            )
+        }
+        BlockerFlowScreen.GroupManager -> {
+            BlockGroupManagerScreen(
+                groups = sessionState.blockGroups,
+                errorMessage = sessionState.errorMessage,
+                onEdit = { group -> openGroupEditor(group) },
+                onDelete = { group -> sessionViewModel.deleteBlockGroup(group.id) },
+                onCreate = { openGroupEditor(null) },
+                onBack = { screen = BlockerFlowScreen.GroupPicker }
+            )
+        }
+        BlockerFlowScreen.GroupEditor -> {
+            BlockGroupEditorScreen(
+                isNewGroup = editingGroupId == null,
+                name = editorName,
+                entries = editorEntries,
+                deviceAppCount = editorPackages.count { it in installedPackages },
+                saving = sessionState.savingGroup,
+                errorMessage = sessionState.errorMessage,
+                onNameChange = {
+                    editorName = it
+                    sessionViewModel.clearError()
+                },
+                onAddEntry = { entry ->
+                    if (entry.isNotBlank() && entry !in editorEntries) {
+                        editorEntries = (editorEntries + entry).sorted()
+                    }
+                },
+                onRemoveEntry = { entry -> editorEntries = editorEntries - entry },
+                onChooseApps = { screen = BlockerFlowScreen.AppSelection },
+                onSave = {
+                    sessionViewModel.saveBlockGroup(
+                        groupId = editingGroupId,
+                        name = editorName,
+                        packages = editorPackages.toList(),
+                        domains = emptyList(),
+                        targets = editorEntries,
+                        onSaved = { screen = BlockerFlowScreen.GroupPicker }
+                    )
+                },
+                onBack = { screen = BlockerFlowScreen.GroupManager }
             )
         }
         BlockerFlowScreen.Groups -> {
@@ -173,7 +246,7 @@ fun BlockerSetupScreen(
                 )
             } else {
                 DurationLockScreen(
-                    selectedAppCount = sessionState.selectedPackages.size,
+                    blockGroupLabel = sessionState.selectedBlockGroup?.name,
                     hours = sessionState.hours,
                     minutes = sessionState.minutes,
                     seconds = sessionState.seconds,
@@ -192,7 +265,7 @@ fun BlockerSetupScreen(
                             sessionViewModel.startSession()
                         }
                     },
-                    onSelectApps = { screen = BlockerFlowScreen.AppSelection },
+                    onSelectApps = { screen = BlockerFlowScreen.GroupPicker },
                     onGroups = { screen = BlockerFlowScreen.Groups },
                     onSettings = { screen = BlockerFlowScreen.Settings },
                     onStopSession = { sessionViewModel.stopSessionManually() },
@@ -240,15 +313,15 @@ private fun AppSelectionScreen(
     selectedPackages: Set<String>,
     locked: Boolean,
     onTogglePackage: (String) -> Unit,
-    onSelectPackage: (String) -> Unit,
     onDone: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var showLockedWarning by remember { mutableStateOf(false) }
     var lockedWarningNonce by remember { mutableStateOf(0) }
-    val installedByPackage = remember(installedApps) { installedApps.associateBy { it.packageName } }
 
-    val selectedCount = selectedPackages.size
+    val selectedCount = selectedPackages.count { packageName ->
+        installedApps.any { it.packageName == packageName }
+    }
     val visibleApps = sortAppsForSelection(
         apps = filterApps(installedApps, query),
         selectedPackages = selectedPackages
@@ -330,30 +403,6 @@ private fun AppSelectionScreen(
 
                 Spacer(modifier = Modifier.height(layout.countToSearchGap))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    appPresets.forEach { preset ->
-                        if (installedByPackage[preset.packageName] != null) {
-                            val selected = preset.packageName in selectedPackages
-                            PresetChip(
-                                label = preset.label,
-                                selected = selected,
-                                onClick = {
-                                    if (locked) {
-                                        lockedWarningNonce += 1
-                                    } else {
-                                        onSelectPackage(preset.packageName)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(layout.countToSearchGap))
-
                 SearchField(
                     value = query,
                     layout = layout,
@@ -413,39 +462,9 @@ private fun AppSelectionScreen(
     }
 }
 
-private data class AppPreset(
-    val label: String,
-    val packageName: String
-)
-
-@Composable
-private fun PresetChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(
-                if (selected) Color(0xFF0A84FF) else Color(0xFF1F1F22)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp)
-    ) {
-        Text(
-            text = label,
-            color = Color.White,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1
-        )
-    }
-}
-
 @Composable
 private fun DurationLockScreen(
-    selectedAppCount: Int,
+    blockGroupLabel: String?,
     hours: Int,
     minutes: Int,
     seconds: Int,
@@ -579,8 +598,8 @@ private fun DurationLockScreen(
 
                 Spacer(modifier = Modifier.height(layout.lockToReadyGap))
 
-                SelectedAppsButton(
-                    selectedAppCount = selectedAppCount,
+                SelectedBlockGroupButton(
+                    blockGroupLabel = blockGroupLabel,
                     layout = layout,
                     onClick = onSelectApps
                 )
@@ -994,8 +1013,8 @@ private fun AnimatedLockGraphic(
 }
 
 @Composable
-private fun SelectedAppsButton(
-    selectedAppCount: Int,
+private fun SelectedBlockGroupButton(
+    blockGroupLabel: String?,
     layout: DurationLockLayoutMetrics,
     onClick: () -> Unit
 ) {
@@ -1015,10 +1034,12 @@ private fun SelectedAppsButton(
         )
         Spacer(modifier = Modifier.width(layout.readyDotGap))
         Text(
-            text = "Selected Apps · $selectedAppCount",
+            text = blockGroupLabel?.let { "Block group · $it" } ?: "Choose a block group",
             color = Color.White,
             fontSize = layout.readyTextSize.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -1354,6 +1375,9 @@ private data class DurationLockLayoutMetrics(
 
 private enum class BlockerFlowScreen {
     AppSelection,
+    GroupPicker,
+    GroupManager,
+    GroupEditor,
     Groups,
     Settings,
     Duration

@@ -5,22 +5,8 @@ import LockGraphic from "../components/LockGraphic";
 import Groups from "./Groups";
 import Settings from "./Settings";
 import SessionComplete from "./SessionComplete";
-import { useBlockerSessionController } from "../hooks/useBlockerSessionController";
-
-const WEBSITE_GROUPS = [
-    {
-        name: "Social media",
-        domains: ["instagram.com", "tiktok.com", "youtube.com", "facebook.com", "x.com", "reddit.com"],
-    },
-    {
-        name: "Messaging",
-        domains: ["web.whatsapp.com", "discord.com", "messenger.com", "telegram.org"],
-    },
-    {
-        name: "Streaming",
-        domains: ["youtube.com", "netflix.com", "twitch.tv", "primevideo.com"],
-    },
-];
+import { useBlockerSessionController, normalizeWebsite } from "../hooks/useBlockerSessionController";
+import { createBlockGroup, deleteBlockGroup, updateBlockGroup } from "../services/BlockGroupRepository";
 
 const PRESET_WEBSITES = [
     { label: "Instagram", domain: "instagram.com" },
@@ -43,32 +29,41 @@ function formatDurationPill(hours, minutes) {
     return "5m";
 }
 
+function groupEntries(group) {
+    return Array.from(new Set([...(group.targets || []), ...(group.domainsBlocked || [])]));
+}
+
+function groupWebsiteCount(group) {
+    return (group.expandedDomainsBlocked || []).length;
+}
+
 function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }) {
     const [view, setView] = useState("duration");
-    const availablePresetDomains = new Set(WEBSITE_GROUPS.flatMap((group) => group.domains));
-    const visiblePresetWebsites = PRESET_WEBSITES.filter((preset) => availablePresetDomains.has(preset.domain));
+    const [editingGroup, setEditingGroup] = useState(null);
+    const [editorName, setEditorName] = useState("");
+    const [editorEntries, setEditorEntries] = useState([]);
+    const [editorError, setEditorError] = useState("");
+    const [editorSaving, setEditorSaving] = useState(false);
+    const [urlInput, setUrlInput] = useState("");
+    const [managerError, setManagerError] = useState("");
 
     const {
-        websites,
-        urlInput,
-        urlError,
+        blockGroups,
+        blockGroupsLoading,
+        blockGroupsError,
+        selectedBlockGroupId,
+        selectedBlockGroup,
         hours,
         minutes,
         seconds,
         active,
         sessionError,
         sessionRunning,
-        selectedCount,
-        setUrlInput,
-        setUrlError,
         setHours,
         setMinutes,
         setSeconds,
-        addWebsite,
-        addPresetWebsite,
-        addPresetWebsites,
-        removeWebsite,
-        clearWebsites,
+        selectBlockGroup,
+        refreshBlockGroups,
         handleLockIn,
         handleStopSession,
         handleSignOut,
@@ -80,6 +75,84 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         defaultMode,
         onStrictnessChange,
     });
+
+    function openEditor(group) {
+        setEditingGroup(group);
+        setEditorName(group?.name || "");
+        setEditorEntries(group ? groupEntries(group) : []);
+        setEditorError("");
+        setUrlInput("");
+        setView("editor");
+    }
+
+    function addEditorEntry() {
+        const normalized = normalizeWebsite(urlInput);
+        if (!normalized) {
+            setEditorError("Enter a valid website (e.g. instagram.com)");
+            return;
+        }
+        if (editorEntries.includes(normalized)) {
+            setEditorError("That website is already in this group");
+            return;
+        }
+        setEditorEntries((prev) => [...prev, normalized].sort());
+        setUrlInput("");
+        setEditorError("");
+    }
+
+    function addPresetEntry(domain) {
+        if (editorEntries.includes(domain)) return;
+        setEditorEntries((prev) => [...prev, domain].sort());
+        setEditorError("");
+    }
+
+    function removeEditorEntry(entry) {
+        setEditorEntries((prev) => prev.filter((item) => item !== entry));
+    }
+
+    async function saveEditor() {
+        const name = editorName.trim();
+        if (!name) {
+            setEditorError("Give this group a name");
+            return;
+        }
+        if (editorEntries.length === 0) {
+            setEditorError("Add at least one website");
+            return;
+        }
+
+        setEditorSaving(true);
+        setEditorError("");
+        try {
+            if (editingGroup?.id) {
+                await updateBlockGroup({
+                    id: editingGroup.id,
+                    name,
+                    targets: editorEntries,
+                    appsBlocked: editingGroup.appsBlocked || [],
+                    domainsBlocked: [],
+                });
+            } else {
+                await createBlockGroup({ name, targets: editorEntries });
+            }
+            await refreshBlockGroups();
+            setView("groupPicker");
+        } catch (error) {
+            setEditorError(error.message || "Could not save block group.");
+        } finally {
+            setEditorSaving(false);
+        }
+    }
+
+    async function handleDeleteGroup(group) {
+        setManagerError("");
+        try {
+            await deleteBlockGroup(group.id);
+            await refreshBlockGroups();
+        } catch (error) {
+            setManagerError(error.message || "Could not delete block group.");
+        }
+    }
 
     if (view === "settings") {
         return (
@@ -107,7 +180,176 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         );
     }
 
-    if (view === "websites") {
+    if (view === "editor") {
+        return (
+            <div className="tether-screen">
+                <div className="tether-frame">
+                    <div className="tether-topbar">
+                        <button
+                            type="button"
+                            className="tether-back"
+                            onClick={() => setView("groupManager")}
+                        >
+                            <span className="tether-back-chevron" aria-hidden />
+                            Back
+                        </button>
+                        <span className="tether-topbar-spacer" aria-hidden />
+                    </div>
+
+                    <h1 className="tether-title">
+                        {editingGroup?.id ? "Edit block group" : "New block group"}
+                    </h1>
+
+                    <div className="tether-url-row">
+                        <label className="tether-search">
+                            <input
+                                type="text"
+                                value={editorName}
+                                onChange={(e) => {
+                                    setEditorName(e.target.value);
+                                    setEditorError("");
+                                }}
+                                placeholder="Group name"
+                                spellCheck={false}
+                                maxLength={80}
+                            />
+                        </label>
+                    </div>
+
+                    <div className="tether-url-row">
+                        <label className="tether-search">
+                            <span className="tether-search-icon" aria-hidden />
+                            <input
+                                type="text"
+                                value={urlInput}
+                                onChange={(e) => {
+                                    setUrlInput(e.target.value);
+                                    setEditorError("");
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        addEditorEntry();
+                                    }
+                                }}
+                                placeholder="e.g. instagram.com"
+                                spellCheck={false}
+                            />
+                        </label>
+                        <button type="button" className="tether-url-add" onClick={addEditorEntry}>
+                            Add
+                        </button>
+                    </div>
+
+                    {editorError && <p className="tether-error">{editorError}</p>}
+
+                    <div className="tether-presets">
+                        {PRESET_WEBSITES.map((preset) => (
+                            <button
+                                key={preset.domain}
+                                type="button"
+                                className="tether-preset-btn"
+                                onClick={() => addPresetEntry(preset.domain)}
+                            >
+                                {preset.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <ul className="tether-url-list">
+                        {editorEntries.length === 0 ? (
+                            <li className="tether-url-empty">No websites added yet</li>
+                        ) : (
+                            editorEntries.map((entry) => (
+                                <li key={entry} className="tether-url-item">
+                                    <span>{entry}</span>
+                                    <button
+                                        type="button"
+                                        className="tether-url-remove"
+                                        onClick={() => removeEditorEntry(entry)}
+                                        aria-label={`Remove ${entry}`}
+                                    >
+                                        ×
+                                    </button>
+                                </li>
+                            ))
+                        )}
+                    </ul>
+
+                    <button
+                        type="button"
+                        className="tether-done"
+                        onClick={saveEditor}
+                        disabled={editorSaving}
+                    >
+                        {editorSaving ? "Saving…" : "Save group"}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (view === "groupManager") {
+        return (
+            <div className="tether-screen">
+                <div className="tether-frame">
+                    <div className="tether-topbar">
+                        <button
+                            type="button"
+                            className="tether-back"
+                            onClick={() => setView("groupPicker")}
+                        >
+                            <span className="tether-back-chevron" aria-hidden />
+                            Back
+                        </button>
+                        <span className="tether-topbar-spacer" aria-hidden />
+                    </div>
+
+                    <h1 className="tether-title">Manage block groups</h1>
+
+                    {managerError && <p className="tether-error">{managerError}</p>}
+
+                    <div className="tether-groups">
+                        <div className="tether-group-list">
+                            {blockGroups.map((group) => (
+                                <div key={group.id} className="tether-url-item">
+                                    <span>
+                                        {group.name}
+                                        {group.systemKey ? " · default" : ""}
+                                    </span>
+                                    <span>
+                                        <button
+                                            type="button"
+                                            className="tether-header-action"
+                                            onClick={() => openEditor(group)}
+                                        >
+                                            Edit
+                                        </button>
+                                        {!group.systemKey && (
+                                            <button
+                                                type="button"
+                                                className="tether-url-remove"
+                                                onClick={() => handleDeleteGroup(group)}
+                                                aria-label={`Delete ${group.name}`}
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <button type="button" className="tether-done" onClick={() => openEditor(null)}>
+                        New block group
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (view === "groupPicker") {
         return (
             <div className="tether-screen">
                 <div className="tether-frame">
@@ -126,117 +368,46 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                         <span className="tether-topbar-spacer" aria-hidden />
                     </div>
 
-                    <h1 className="tether-title">Choose websites</h1>
-                    <p className="tether-subtitle-count">
-                        {selectedCount} website{selectedCount === 1 ? "" : "s"} selected
-                    </p>
-                    <div className="tether-selection-actions">
-                        <button
-                            type="button"
-                            className="tether-clear-all"
-                            onClick={clearWebsites}
-                            disabled={sessionRunning || selectedCount === 0}
-                        >
-                            Clear all
-                        </button>
-                    </div>
+                    <h1 className="tether-title">Choose a block group</h1>
 
-                    <div className="tether-url-row">
-                        <label className="tether-search">
-                            <span className="tether-search-icon" aria-hidden />
-                            <input
-                                type="text"
-                                value={urlInput}
-                                onChange={(e) => {
-                                    setUrlInput(e.target.value);
-                                    setUrlError("");
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        addWebsite();
-                                    }
-                                }}
-                                placeholder="e.g. instagram.com"
-                                spellCheck={false}
-                                disabled={sessionRunning}
-                            />
-                        </label>
-                        <button
-                            type="button"
-                            className="tether-url-add"
-                            onClick={addWebsite}
-                            disabled={sessionRunning}
-                        >
-                            Add
-                        </button>
-                    </div>
-
-                    {urlError && <p className="tether-error">{urlError}</p>}
-
-                    <div className="tether-presets">
-                        {visiblePresetWebsites.map((preset) => (
-                            <button
-                                key={preset.domain}
-                                type="button"
-                                className="tether-preset-btn"
-                                onClick={() => addPresetWebsite(preset.domain)}
-                                disabled={sessionRunning}
-                            >
-                                {preset.label}
-                            </button>
-                        ))}
-                    </div>
+                    {blockGroupsError && <p className="tether-error">{blockGroupsError}</p>}
 
                     <div className="tether-groups">
-                        <h2 className="tether-groups-title">Quick groups</h2>
                         <div className="tether-group-list">
-                            {WEBSITE_GROUPS.map((group) => (
-                                <button
-                                    key={group.name}
-                                    type="button"
-                                    className="tether-group-btn"
-                                    onClick={() => addPresetWebsites(group.domains)}
-                                    disabled={sessionRunning}
-                                >
-                                    <span>{group.name}</span>
-                                    <small>
-                                        Add {group.domains.length} website
-                                        {group.domains.length === 1 ? "" : "s"}
-                                    </small>
-                                </button>
-                            ))}
+                            {blockGroupsLoading ? (
+                                <p className="tether-url-empty">Loading block groups…</p>
+                            ) : (
+                                blockGroups.map((group) => (
+                                    <button
+                                        key={group.id}
+                                        type="button"
+                                        className="tether-group-btn"
+                                        onClick={() => {
+                                            selectBlockGroup(group.id);
+                                            setView("duration");
+                                        }}
+                                        disabled={sessionRunning}
+                                    >
+                                        <span>
+                                            {group.id === selectedBlockGroupId ? "✓ " : ""}
+                                            {group.name}
+                                        </span>
+                                        <small>
+                                            {groupWebsiteCount(group)} website
+                                            {groupWebsiteCount(group) === 1 ? "" : "s"}
+                                        </small>
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
-
-                    <ul className="tether-url-list">
-                        {websites.length === 0 ? (
-                            <li className="tether-url-empty">No websites added yet</li>
-                        ) : (
-                            websites.map((domain) => (
-                                <li key={domain} className="tether-url-item">
-                                    <span>{domain}</span>
-                                    {!sessionRunning && (
-                                        <button
-                                            type="button"
-                                            className="tether-url-remove"
-                                            onClick={() => removeWebsite(domain)}
-                                            aria-label={`Remove ${domain}`}
-                                        >
-                                            ×
-                                        </button>
-                                    )}
-                                </li>
-                            ))
-                        )}
-                    </ul>
 
                     <button
                         type="button"
                         className="tether-done"
-                        onClick={() => setView("duration")}
+                        onClick={() => setView("groupManager")}
                     >
-                        Done · {selectedCount} website{selectedCount === 1 ? "" : "s"}
+                        Manage groups
                     </button>
                 </div>
             </div>
@@ -290,12 +461,14 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                 <button
                     type="button"
                     className="tether-selected-pill"
-                    onClick={() => !sessionRunning && setView("websites")}
+                    onClick={() => !sessionRunning && setView("groupPicker")}
                     disabled={sessionRunning}
                 >
                     <span className="tether-selected-dot" aria-hidden />
                     <span>
-                        Selected Websites · {selectedCount}
+                        {selectedBlockGroup
+                            ? `Block group · ${selectedBlockGroup.name}`
+                            : "Choose a block group"}
                     </span>
                 </button>
 
@@ -316,7 +489,7 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                 <button
                     type="button"
                     className="tether-lockin"
-                    disabled={sessionRunning || selectedCount === 0}
+                    disabled={sessionRunning || !selectedBlockGroupId}
                     onClick={handleLockIn}
                 >
                     {sessionRunning ? "Session Running" : "Lock-In!"}

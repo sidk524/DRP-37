@@ -92,6 +92,18 @@ function registerAllIpcHandlers() {
     ipcMain.handle(CHANNELS.WEBSERVER_SYNC_DEFAULT_GROUPS, (_e, payload) =>
         webServerService.syncDefaultGroups(payload)
     );
+    ipcMain.handle(CHANNELS.WEBSERVER_LIST_BLOCK_GROUPS, () =>
+        webServerService.listBlockGroups()
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_CREATE_BLOCK_GROUP, (_e, payload) =>
+        webServerService.createBlockGroup(payload)
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_UPDATE_BLOCK_GROUP, (_e, payload) =>
+        webServerService.updateBlockGroup(payload)
+    );
+    ipcMain.handle(CHANNELS.WEBSERVER_DELETE_BLOCK_GROUP, (_e, groupId) =>
+        webServerService.deleteBlockGroup(groupId)
+    );
 
     ipcMain.handle(CHANNELS.SESSION_START, (_e, cfg) => blockerService.startSession(cfg));
     ipcMain.handle(CHANNELS.SESSION_UPDATE, (_e, cfg) => blockerService.updateSession(cfg));

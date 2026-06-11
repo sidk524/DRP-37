@@ -3,8 +3,11 @@ package com.drp37.blocker.ui.session
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drp37.blocker.local.TetherLocalStore
+import com.drp37.blocker.remote.webserver.BlockGroup
+import com.drp37.blocker.remote.webserver.BlockSessionRecord
 import com.drp37.blocker.remote.webserver.FocusPointsRecord
 import com.drp37.blocker.remote.webserver.WebServerService
+import com.drp37.blocker.util.filterAppsForDevice
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +19,10 @@ import java.time.Instant
 import kotlin.math.max
 
 data class BlockerSessionUiState(
-    val selectedPackages: Set<String> = emptySet(),
+    val blockGroups: List<BlockGroup> = emptyList(),
+    val blockGroupsLoading: Boolean = false,
+    val selectedBlockGroupId: String? = null,
+    val savingGroup: Boolean = false,
     val hours: Int = 0,
     val minutes: Int = 0,
     val seconds: Int = 0,
@@ -26,22 +32,36 @@ data class BlockerSessionUiState(
     val activeSessionId: String? = null,
     val activeStartedAtEpochMillis: Long = 0L,
     val activeDurationSeconds: Int = 0,
+    val activeBlockedAppsCount: Int = 0,
     val mode: String = "reflect",
     val totalPoints: Int = 0,
     val lastCompletedSession: FocusPointsRecord? = null,
     val errorMessage: String? = null
-)
+) {
+    val selectedBlockGroup: BlockGroup?
+        get() = blockGroups.find { it.id == selectedBlockGroupId }
+}
 
 class BlockerSessionViewModel : ViewModel() {
     private val _state = MutableStateFlow(BlockerSessionUiState())
     val state: StateFlow<BlockerSessionUiState> = _state
     private var timerJob: Job? = null
     private var restored = false
+    private var installedPackages: Set<String> = emptySet()
+
+    fun setInstalledPackages(packages: Set<String>) {
+        installedPackages = packages
+    }
+
+    fun deviceAppsForGroup(group: BlockGroup): List<String> {
+        return filterAppsForDevice(group.expandedAppsBlocked, installedPackages)
+    }
 
     fun restore(defaultMode: String) {
         if (restored) return
         restored = true
         _state.update { it.copy(mode = normalizeMode(defaultMode)) }
+        refreshBlockGroups()
         viewModelScope.launch {
             refreshTotalPoints()
             runCatching {
@@ -57,14 +77,16 @@ class BlockerSessionViewModel : ViewModel() {
                     return@onSuccess
                 }
                 val mode = TetherLocalStore.getActiveSession()?.mode ?: normalizeMode(defaultMode)
-                TetherLocalStore.setActiveSession(activeSession, mode)
+                val localApps = deviceAppsForSession(activeSession)
+                TetherLocalStore.setActiveSession(activeSession.copy(appsBlocked = localApps), mode)
                 _state.update {
                     it.copy(
-                        selectedPackages = activeSession.appsBlocked.toSet(),
+                        selectedBlockGroupId = activeSession.blockGroupId ?: it.selectedBlockGroupId,
                         sessionRunning = true,
                         activeSessionId = activeSession.id,
                         activeStartedAtEpochMillis = startedAt.toEpochMilli(),
                         activeDurationSeconds = activeSession.totalDurationSeconds,
+                        activeBlockedAppsCount = localApps.size,
                         remainingSeconds = max(1, restoredRemainingSeconds),
                         mode = mode,
                         errorMessage = null
@@ -73,6 +95,121 @@ class BlockerSessionViewModel : ViewModel() {
                 startTimer()
             }.onFailure { error ->
                 _state.update { it.copy(errorMessage = error.message ?: "Could not restore block session.") }
+            }
+        }
+    }
+
+    fun refreshBlockGroups() {
+        _state.update { it.copy(blockGroupsLoading = true) }
+        viewModelScope.launch {
+            runCatching {
+                WebServerService.listBlockGroups()
+            }.onSuccess { groups ->
+                _state.update { current ->
+                    val selectedId = current.selectedBlockGroupId
+                        ?.takeIf { id -> groups.any { it.id == id } }
+                        ?: groups.firstOrNull()?.id
+                    current.copy(
+                        blockGroups = groups,
+                        blockGroupsLoading = false,
+                        selectedBlockGroupId = selectedId
+                    )
+                }
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(
+                        blockGroupsLoading = false,
+                        errorMessage = error.message ?: "Could not load block groups."
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectBlockGroup(groupId: String) {
+        if (_state.value.sessionRunning) {
+            _state.update { it.copy(errorMessage = "The block group can't be changed when a session is active.") }
+            return
+        }
+        _state.update { it.copy(selectedBlockGroupId = groupId, errorMessage = null) }
+    }
+
+    fun saveBlockGroup(
+        groupId: String?,
+        name: String,
+        packages: List<String>,
+        domains: List<String>,
+        targets: List<String> = emptyList(),
+        onSaved: (() -> Unit)? = null
+    ) {
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) {
+            _state.update { it.copy(errorMessage = "Give this group a name.") }
+            return
+        }
+        if (packages.isEmpty() && domains.isEmpty() && targets.isEmpty()) {
+            _state.update { it.copy(errorMessage = "Choose at least one app or website.") }
+            return
+        }
+        _state.update { it.copy(savingGroup = true, errorMessage = null) }
+        viewModelScope.launch {
+            runCatching {
+                if (groupId == null) {
+                    WebServerService.createBlockGroup(
+                        name = trimmedName,
+                        targets = targets,
+                        appsBlocked = packages,
+                        domainsBlocked = domains
+                    )
+                } else {
+                    WebServerService.updateBlockGroup(
+                        groupId = groupId,
+                        name = trimmedName,
+                        targets = targets,
+                        appsBlocked = packages,
+                        domainsBlocked = domains
+                    )
+                }
+            }.onSuccess { group ->
+                _state.update { current ->
+                    val groups = current.blockGroups.filter { it.id != group.id } + group
+                    current.copy(
+                        savingGroup = false,
+                        blockGroups = groups.sortedWith(
+                            compareBy({ it.systemKey == null }, { it.name.lowercase() })
+                        ),
+                        selectedBlockGroupId = current.selectedBlockGroupId ?: group.id
+                    )
+                }
+                refreshBlockGroups()
+                onSaved?.invoke()
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(
+                        savingGroup = false,
+                        errorMessage = error.message ?: "Could not save block group."
+                    )
+                }
+            }
+        }
+    }
+
+    fun deleteBlockGroup(groupId: String) {
+        viewModelScope.launch {
+            runCatching {
+                WebServerService.deleteBlockGroup(groupId)
+            }.onSuccess {
+                _state.update { current ->
+                    val groups = current.blockGroups.filter { it.id != groupId }
+                    current.copy(
+                        blockGroups = groups,
+                        selectedBlockGroupId = current.selectedBlockGroupId
+                            ?.takeIf { it != groupId }
+                            ?: groups.firstOrNull()?.id
+                    )
+                }
+            }.onFailure { error ->
+                _state.update { it.copy(errorMessage = error.message ?: "Could not delete block group.") }
             }
         }
     }
@@ -97,52 +234,32 @@ class BlockerSessionViewModel : ViewModel() {
         _state.update { it.copy(seconds = value.coerceIn(0, 59)) }
     }
 
-    fun togglePackage(packageName: String) {
-        val current = _state.value
-        if (current.sessionRunning) {
-            _state.update { it.copy(errorMessage = "Selected apps can't be modified when session is active.") }
-            return
-        }
-        val next = if (packageName in current.selectedPackages) {
-            current.selectedPackages - packageName
-        } else {
-            current.selectedPackages + packageName
-        }
-        _state.update { it.copy(selectedPackages = next, errorMessage = null) }
-    }
-
-    fun selectPackage(packageName: String) {
-        val current = _state.value
-        if (current.sessionRunning) {
-            _state.update { it.copy(errorMessage = "Selected apps can't be modified when session is active.") }
-            return
-        }
-        _state.update { it.copy(selectedPackages = it.selectedPackages + packageName, errorMessage = null) }
-    }
-
     fun startSession() {
         val current = _state.value
         val totalDurationSeconds = (current.hours * 3600 + current.minutes * 60 + current.seconds).takeIf { it > 0 } ?: 5
-        if (current.selectedPackages.isEmpty()) {
-            _state.update { it.copy(errorMessage = "Choose at least one app to block.") }
+        val blockGroupId = current.selectedBlockGroupId
+        if (blockGroupId == null) {
+            _state.update { it.copy(errorMessage = "Choose a block group first.") }
             return
         }
         _state.update { it.copy(isStartingSession = true, errorMessage = null, lastCompletedSession = null) }
         viewModelScope.launch {
             runCatching {
                 WebServerService.createSession(
-                    appsBlocked = current.selectedPackages,
+                    blockGroupId = blockGroupId,
                     totalDurationSeconds = totalDurationSeconds
                 )
             }.onSuccess { session ->
                 val startedAt = Instant.parse(session.startedAt)
                 val elapsedSeconds = Duration.between(startedAt, Instant.now()).seconds.toInt()
-                TetherLocalStore.setActiveSession(session, current.mode)
+                val localApps = deviceAppsForSession(session)
+                TetherLocalStore.setActiveSession(session.copy(appsBlocked = localApps), current.mode)
                 _state.update {
                     it.copy(
                         activeSessionId = session.id,
                         activeStartedAtEpochMillis = startedAt.toEpochMilli(),
                         activeDurationSeconds = session.totalDurationSeconds,
+                        activeBlockedAppsCount = localApps.size,
                         remainingSeconds = max(1, session.totalDurationSeconds - elapsedSeconds),
                         sessionRunning = true,
                         isStartingSession = false,
@@ -185,6 +302,11 @@ class BlockerSessionViewModel : ViewModel() {
         _state.update { it.copy(errorMessage = null) }
     }
 
+    private fun deviceAppsForSession(session: BlockSessionRecord): List<String> {
+        if (installedPackages.isEmpty()) return session.appsBlocked
+        return filterAppsForDevice(session.appsBlocked, installedPackages)
+    }
+
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
@@ -220,7 +342,7 @@ class BlockerSessionViewModel : ViewModel() {
                 mode = current.mode,
                 actualMs = actualMs,
                 plannedMs = plannedMs,
-                blockedAppsCount = current.selectedPackages.size.coerceAtLeast(1),
+                blockedAppsCount = current.activeBlockedAppsCount.coerceAtLeast(1),
                 endedAt = endedAt.toString()
             )
         }
@@ -253,6 +375,7 @@ class BlockerSessionViewModel : ViewModel() {
                 activeSessionId = null,
                 activeStartedAtEpochMillis = 0L,
                 activeDurationSeconds = 0,
+                activeBlockedAppsCount = 0,
                 isStartingSession = false
             )
         }

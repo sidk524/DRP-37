@@ -3,6 +3,7 @@ package com.drp37.blocker.remote.webserver
 data class BlockSessionRecord(
     val id: String,
     val userId: String,
+    val blockGroupId: String? = null,
     val canonicalTargets: List<String>,
     val appsBlocked: List<String>,
     val domainsBlocked: List<String>,
@@ -10,6 +11,19 @@ data class BlockSessionRecord(
     val totalDurationSeconds: Int,
     val startedAt: String,
     val endedAt: String? = null
+)
+
+data class BlockGroup(
+    val id: String,
+    val name: String,
+    val systemKey: String? = null,
+    val targets: List<String> = emptyList(),
+    val appsBlocked: List<String> = emptyList(),
+    val domainsBlocked: List<String> = emptyList(),
+    val canonicalTargets: List<String> = emptyList(),
+    val expandedAppsBlocked: List<String> = emptyList(),
+    val expandedDomainsBlocked: List<String> = emptyList(),
+    val processTokens: List<String> = emptyList()
 )
 
 data class OnboardingSettings(

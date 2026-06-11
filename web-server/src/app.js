@@ -4,6 +4,14 @@ const { randomInt } = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 const ws = require("ws");
 const { expandBlockTargets } = require("./expandBlockTargets");
+const {
+    publicBlockGroup,
+    ensureBlockGroups,
+    getBlockGroup,
+    createBlockGroup,
+    updateBlockGroup,
+    deleteBlockGroup
+} = require("./blockGroups");
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabasePublishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -28,7 +36,7 @@ const supabaseAdmin = supabaseUrl && supabaseSecretKey
     : null;
 
 const app = express();
-const SESSION_FIELDS = "id,user_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
+const SESSION_FIELDS = "id,user_id,block_group_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
 const GROUP_FIELDS = "id,name,invite_code,created_by,created_at";
 const DEFAULT_GROUP_FIELDS = `${GROUP_FIELDS},default_group_key`;
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -48,7 +56,7 @@ app.use((req, res, next) => {
         res.setHeader("Access-Control-Allow-Origin", origin);
         res.setHeader("Vary", "Origin");
     }
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,Accept");
     if (req.method === "OPTIONS") {
         res.sendStatus(204);
@@ -120,11 +128,12 @@ const closeSession = async (userId, sessionId = null) => {
     return query.select(SESSION_FIELDS);
 };
 
-const createSession = async (userId, expandedTargets, totalDurationSeconds) => {
+const createSession = async (userId, expandedTargets, totalDurationSeconds, blockGroupId = null) => {
     return supabaseAdmin
         .from("block_sessions")
         .insert({
             user_id: userId,
+            block_group_id: blockGroupId,
             canonical_targets: expandedTargets.canonicalTargets,
             apps_blocked: expandedTargets.appsBlocked,
             domains_blocked: expandedTargets.domainsBlocked,
@@ -159,6 +168,9 @@ const missingSchemaError = (error) => {
         return makeHttpError(503, "Default groups are not available. Run Supabase migration 005_default_leaderboard_groups.sql.");
     }
     if (!["PGRST205", "42P01"].includes(error?.code)) return null;
+    if (/block_groups/i.test(message)) {
+        return makeHttpError(503, "Block group tables are not available. Run Supabase migration 006_block_groups.sql.");
+    }
     if (!/(leaderboard_groups|group_members)/i.test(message)) return null;
     return makeHttpError(503, "Group tables are not available. Run Supabase migration 003_leaderboard_groups.sql.");
 };
@@ -683,6 +695,87 @@ app.get("/api/groups/:groupId/leaderboard", requireSupabase, requireUser, async 
     }
 });
 
+const parseBlockGroupBody = (body) => {
+    const name = body?.name != null ? String(body.name).trim() : null;
+    if (name != null) {
+        if (!name) return { error: "name is required" };
+        if (name.length > 80) return { error: "name must be 80 characters or fewer" };
+    }
+
+    const targets = body?.targets != null ? validateStringArray(body.targets, "targets") : null;
+    if (targets?.error) return { error: targets.error };
+
+    const appsBlocked = body?.appsBlocked != null ? validateStringArray(body.appsBlocked, "appsBlocked") : null;
+    if (appsBlocked?.error) return { error: appsBlocked.error };
+
+    const domainsBlocked = body?.domainsBlocked != null ? validateStringArray(body.domainsBlocked, "domainsBlocked") : null;
+    if (domainsBlocked?.error) return { error: domainsBlocked.error };
+
+    return { name, targets, appsBlocked, domainsBlocked };
+};
+
+app.get("/api/block-groups", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const groups = await ensureBlockGroups(supabaseAdmin, req.user.id);
+        res.json({ blockGroups: groups.map(publicBlockGroup) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.post("/api/block-groups", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const parsed = parseBlockGroupBody(req.body);
+        if (parsed.error) {
+            res.status(400).json({ error: parsed.error });
+            return;
+        }
+        if (!parsed.name) {
+            res.status(400).json({ error: "name is required" });
+            return;
+        }
+
+        const group = await createBlockGroup(supabaseAdmin, req.user.id, {
+            name: parsed.name,
+            targets: parsed.targets || [],
+            appsBlocked: parsed.appsBlocked || [],
+            domainsBlocked: parsed.domainsBlocked || []
+        });
+        res.status(201).json({ blockGroup: publicBlockGroup(group) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.put("/api/block-groups/:groupId", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const parsed = parseBlockGroupBody(req.body);
+        if (parsed.error) {
+            res.status(400).json({ error: parsed.error });
+            return;
+        }
+
+        const group = await updateBlockGroup(supabaseAdmin, req.user.id, req.params.groupId, {
+            name: parsed.name,
+            targets: parsed.targets,
+            appsBlocked: parsed.appsBlocked,
+            domainsBlocked: parsed.domainsBlocked
+        });
+        res.json({ blockGroup: publicBlockGroup(group) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.delete("/api/block-groups/:groupId", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        await deleteBlockGroup(supabaseAdmin, req.user.id, req.params.groupId);
+        res.status(204).end();
+    } catch (error) {
+        next(error);
+    }
+});
+
 app.get("/api/session/current", requireSupabase, requireUser, async (req, res, next) => {
     try {
         const { data, error } = await supabaseAdmin
@@ -716,11 +809,56 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
             appsBlocked,
             domainsBlocked,
             targets,
+            blockGroupId,
             totalDurationSeconds,
             sessionId
         } = req.body || {};
 
         if (active === true) {
+            if (!Number.isInteger(totalDurationSeconds) || totalDurationSeconds <= 0) {
+                res.status(400).json({ error: "totalDurationSeconds must be a positive integer" });
+                return;
+            }
+
+            if (blockGroupId != null) {
+                const group = await getBlockGroup(supabaseAdmin, req.user.id, String(blockGroupId));
+                if (!group) {
+                    res.status(404).json({ error: "Block group not found" });
+                    return;
+                }
+
+                const groupTargets = {
+                    canonicalTargets: group.canonical_targets || [],
+                    appsBlocked: group.expanded_apps_blocked || [],
+                    domainsBlocked: group.expanded_domains_blocked || [],
+                    processTokens: group.process_tokens || []
+                };
+
+                if (
+                    groupTargets.appsBlocked.length === 0
+                    && groupTargets.domainsBlocked.length === 0
+                    && groupTargets.processTokens.length === 0
+                ) {
+                    res.status(400).json({ error: "Block group has no targets" });
+                    return;
+                }
+
+                const { error: closeExistingError } = await closeSession(req.user.id);
+                if (closeExistingError) throw closeExistingError;
+
+                let { data, error } = await createSession(req.user.id, groupTargets, totalDurationSeconds, group.id);
+                if (error && error.code === "23505") {
+                    const { error: retryCloseError } = await closeSession(req.user.id);
+                    if (retryCloseError) throw retryCloseError;
+                    ({ data, error } = await createSession(req.user.id, groupTargets, totalDurationSeconds, group.id));
+                }
+
+                if (error) throw error;
+
+                res.status(201).json({ session: data });
+                return;
+            }
+
             const safeAppsBlocked = validateStringArray(appsBlocked, "appsBlocked");
             if (safeAppsBlocked.error) {
                 res.status(400).json({ error: safeAppsBlocked.error });
@@ -736,11 +874,6 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
             const safeTargets = validateStringArray(targets, "targets");
             if (safeTargets.error) {
                 res.status(400).json({ error: safeTargets.error });
-                return;
-            }
-
-            if (!Number.isInteger(totalDurationSeconds) || totalDurationSeconds <= 0) {
-                res.status(400).json({ error: "totalDurationSeconds must be a positive integer" });
                 return;
             }
 

@@ -1,6 +1,6 @@
 const request = require("supertest");
 
-const SESSION_FIELDS = "id,user_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
+const SESSION_FIELDS = "id,user_id,block_group_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
 
 const makeQuery = (terminalMethod, terminalResult) => {
     const query = {};
@@ -90,6 +90,7 @@ describe("block session API", () => {
         expect(response.body).toEqual({ session: createdSession });
         expect(insertQuery.insert).toHaveBeenCalledWith({
             user_id: "user-1",
+            block_group_id: null,
             canonical_targets: [],
             apps_blocked: ["com.example.app"],
             domains_blocked: [],
@@ -165,6 +166,7 @@ describe("block session API", () => {
         expect(response.body).toEqual({ session: createdSession });
         expect(insertQuery.insert).toHaveBeenCalledWith({
             user_id: "user-1",
+            block_group_id: null,
             canonical_targets: ["instagram"],
             apps_blocked: ["com.instagram.android"],
             domains_blocked: ["instagram.com", "www.instagram.com"],

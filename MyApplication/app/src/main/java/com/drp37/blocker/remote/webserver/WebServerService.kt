@@ -21,18 +21,66 @@ object WebServerService {
     }
 
     suspend fun createSession(
-        appsBlocked: Set<String>,
+        blockGroupId: String,
         totalDurationSeconds: Int
     ): BlockSessionRecord {
         val body = JSONObject()
             .put("active", true)
-            .put("appsBlocked", JSONArray(appsBlocked.sorted()))
+            .put("blockGroupId", blockGroupId)
             .put("totalDurationSeconds", totalDurationSeconds)
 
         val response = request(method = "PUT", path = "/api/session/current", body = body)
         val session = response.optJSONObject("session")
             ?: throw IOException("Server did not return a block session.")
         return session.toBlockSessionRecord()
+    }
+
+    suspend fun listBlockGroups(): List<BlockGroup> {
+        val response = request(method = "GET", path = "/api/block-groups")
+        return response.optJSONArray("blockGroups")?.toObjectList { toBlockGroup() }.orEmpty()
+    }
+
+    suspend fun createBlockGroup(
+        name: String,
+        targets: List<String> = emptyList(),
+        appsBlocked: List<String> = emptyList(),
+        domainsBlocked: List<String> = emptyList()
+    ): BlockGroup {
+        val body = JSONObject()
+            .put("name", name.trim())
+            .put("targets", JSONArray(targets))
+            .put("appsBlocked", JSONArray(appsBlocked))
+            .put("domainsBlocked", JSONArray(domainsBlocked))
+
+        val response = request(method = "POST", path = "/api/block-groups", body = body)
+        val group = response.optJSONObject("blockGroup")
+            ?: throw IOException("Server did not return a block group.")
+        return group.toBlockGroup()
+    }
+
+    suspend fun updateBlockGroup(
+        groupId: String,
+        name: String,
+        targets: List<String>,
+        appsBlocked: List<String>,
+        domainsBlocked: List<String>
+    ): BlockGroup {
+        val encodedId = URLEncoder.encode(groupId, StandardCharsets.UTF_8.name())
+        val body = JSONObject()
+            .put("name", name.trim())
+            .put("targets", JSONArray(targets))
+            .put("appsBlocked", JSONArray(appsBlocked))
+            .put("domainsBlocked", JSONArray(domainsBlocked))
+
+        val response = request(method = "PUT", path = "/api/block-groups/$encodedId", body = body)
+        val group = response.optJSONObject("blockGroup")
+            ?: throw IOException("Server did not return a block group.")
+        return group.toBlockGroup()
+    }
+
+    suspend fun deleteBlockGroup(groupId: String) {
+        val encodedId = URLEncoder.encode(groupId, StandardCharsets.UTF_8.name())
+        request(method = "DELETE", path = "/api/block-groups/$encodedId")
     }
 
     suspend fun endSession(sessionId: String?) {
@@ -159,9 +207,16 @@ object WebServerService {
                 connection.inputStream
             } else {
                 connection.errorStream
-            } ?: throw IOException("Server returned HTTP $responseCode.")
+            }
+            if (stream == null) {
+                if (responseCode in 200..299) return@withContext JSONObject()
+                throw IOException("Server returned HTTP $responseCode.")
+            }
 
             val responseText = stream.bufferedReader().use { it.readText() }
+            if (responseCode in 200..299 && responseText.isBlank()) {
+                return@withContext JSONObject()
+            }
             if (responseCode !in 200..299) {
                 val errorMessage = runCatching {
                     JSONObject(responseText).optString("error")
@@ -196,6 +251,7 @@ private fun JSONObject.toBlockSessionRecord(): BlockSessionRecord {
     return BlockSessionRecord(
         id = getString("id"),
         userId = getString("user_id"),
+        blockGroupId = optString("block_group_id").takeUnless { it.isBlank() || it == "null" },
         canonicalTargets = optJSONArray("canonical_targets")?.toStringList().orEmpty(),
         appsBlocked = optJSONArray("apps_blocked")?.toStringList().orEmpty(),
         domainsBlocked = optJSONArray("domains_blocked")?.toStringList().orEmpty(),
@@ -226,6 +282,21 @@ private fun JSONObject.toFocusPointsRecord(): FocusPointsRecord {
         points = optInt("points", 0),
         endedAt = optString("ended_at").orEmpty(),
         createdAt = optString("created_at").orEmpty()
+    )
+}
+
+private fun JSONObject.toBlockGroup(): BlockGroup {
+    return BlockGroup(
+        id = getString("id"),
+        name = optString("name").orEmpty(),
+        systemKey = optString("systemKey").takeUnless { it.isBlank() || it == "null" },
+        targets = optJSONArray("targets")?.toStringList().orEmpty(),
+        appsBlocked = optJSONArray("appsBlocked")?.toStringList().orEmpty(),
+        domainsBlocked = optJSONArray("domainsBlocked")?.toStringList().orEmpty(),
+        canonicalTargets = optJSONArray("canonicalTargets")?.toStringList().orEmpty(),
+        expandedAppsBlocked = optJSONArray("expandedAppsBlocked")?.toStringList().orEmpty(),
+        expandedDomainsBlocked = optJSONArray("expandedDomainsBlocked")?.toStringList().orEmpty(),
+        processTokens = optJSONArray("processTokens")?.toStringList().orEmpty()
     )
 }
 

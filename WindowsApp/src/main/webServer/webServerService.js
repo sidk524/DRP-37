@@ -50,12 +50,12 @@ async function getCurrentSession() {
     return data.session || null;
 }
 
-async function createSession({ domainsBlocked, totalDurationSeconds }) {
+async function createSession({ blockGroupId, domainsBlocked, totalDurationSeconds }) {
     const data = await request("/api/session/current", {
         method: "PUT",
         body: {
             active: true,
-            domainsBlocked,
+            ...(blockGroupId ? { blockGroupId } : { domainsBlocked }),
             totalDurationSeconds,
         },
     });
@@ -109,6 +109,34 @@ async function syncDefaultGroups({ scrollingWorst } = {}) {
         body: { scrollingWorst: normalizedScrollingWorst },
     });
     return data.groups || [];
+}
+
+async function listBlockGroups() {
+    const data = await request("/api/block-groups");
+    return data.blockGroups || [];
+}
+
+async function createBlockGroup({ name, targets, appsBlocked, domainsBlocked }) {
+    const data = await request("/api/block-groups", {
+        method: "POST",
+        body: { name, targets, appsBlocked, domainsBlocked },
+    });
+    return data.blockGroup;
+}
+
+async function updateBlockGroup({ id, name, targets, appsBlocked, domainsBlocked }) {
+    const data = await request(`/api/block-groups/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: { name, targets, appsBlocked, domainsBlocked },
+    });
+    return data.blockGroup;
+}
+
+async function deleteBlockGroup(groupId) {
+    await request(`/api/block-groups/${encodeURIComponent(groupId)}`, {
+        method: "DELETE",
+    });
+    return true;
 }
 
 async function loadOnboarding() {
@@ -196,6 +224,10 @@ module.exports = {
     joinGroup,
     getGroupLeaderboard,
     syncDefaultGroups,
+    listBlockGroups,
+    createBlockGroup,
+    updateBlockGroup,
+    deleteBlockGroup,
     loadOnboarding,
     saveOnboarding,
     saveSessionPoints,
