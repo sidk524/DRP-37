@@ -2,18 +2,33 @@ package com.drp37.blocker.remote.webserver
 
 import com.drp37.blocker.BuildConfig
 import com.drp37.blocker.auth.AuthService
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.android.Android
+import io.ktor.client.request.header
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
 import java.net.URLEncoder
-import java.net.URL
 import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object WebServerService {
+    private val httpClient by lazy {
+        HttpClient(Android) {
+            engine {
+                connectTimeout = 10_000
+                socketTimeout = 10_000
+            }
+        }
+    }
     suspend fun getCurrentSession(): BlockSessionRecord? {
         val response = request(method = "GET", path = "/api/session/current")
         val session = response.optJSONObject("session") ?: return null
@@ -178,56 +193,65 @@ object WebServerService {
         path: String,
         body: JSONObject? = null
     ): JSONObject = withContext(Dispatchers.IO) {
-        val baseUrl = BuildConfig.WEB_SERVER_URL.trimEnd('/')
-        if (baseUrl.isBlank()) throw IOException("WEB_SERVER_URL is not configured.")
-
+        val baseUrl = webServerBaseUrl()
         val accessToken = AuthService.currentAccessToken()
             ?: throw IOException("No active Supabase session.")
-        val connection = (URL("$baseUrl$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = 10_000
-            readTimeout = 10_000
-            setRequestProperty("Authorization", "Bearer $accessToken")
-            setRequestProperty("Accept", "application/json")
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
+        val url = "$baseUrl$path"
+        val httpMethod = when (method.uppercase()) {
+            "GET" -> HttpMethod.Get
+            "POST" -> HttpMethod.Post
+            "PUT" -> HttpMethod.Put
+            "DELETE" -> HttpMethod.Delete
+            else -> HttpMethod.parse(method)
         }
 
-        try {
-            if (body != null) {
-                OutputStreamWriter(connection.outputStream).use { writer ->
-                    writer.write(body.toString())
+        val response = try {
+            httpClient.request(url) {
+                this.method = httpMethod
+                header("Authorization", "Bearer $accessToken")
+                header("Accept", "application/json")
+                if (body != null) {
+                    contentType(ContentType.Application.Json)
+                    setBody(body.toString())
                 }
             }
-
-            val responseCode = connection.responseCode
-            val stream = if (responseCode in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-            if (stream == null) {
-                if (responseCode in 200..299) return@withContext JSONObject()
-                throw IOException("Server returned HTTP $responseCode.")
-            }
-
-            val responseText = stream.bufferedReader().use { it.readText() }
-            if (responseCode in 200..299 && responseText.isBlank()) {
-                return@withContext JSONObject()
-            }
-            if (responseCode !in 200..299) {
-                val errorMessage = runCatching {
-                    JSONObject(responseText).optString("error")
-                }.getOrNull().orEmpty()
-                throw IOException(errorMessage.ifBlank { "Server returned HTTP $responseCode." })
-            }
-            JSONObject(responseText)
-        } finally {
-            connection.disconnect()
+        } catch (error: Exception) {
+            throw mapNetworkError(error, baseUrl)
         }
+
+        val responseCode = response.status.value
+        val responseText = response.bodyAsText()
+        if (response.status.isSuccess() && responseText.isBlank()) {
+            return@withContext JSONObject()
+        }
+        if (!response.status.isSuccess()) {
+            val errorMessage = runCatching {
+                JSONObject(responseText).optString("error")
+            }.getOrNull().orEmpty()
+            throw IOException(errorMessage.ifBlank { "Server returned HTTP $responseCode." })
+        }
+        JSONObject(responseText)
     }
+}
+
+private fun webServerBaseUrl(): String {
+    val raw = BuildConfig.WEB_SERVER_URL.trim()
+    if (raw.isBlank()) throw IOException("WEB_SERVER_URL is not configured.")
+    val withScheme = when {
+        raw.startsWith("http://", ignoreCase = true) || raw.startsWith("https://", ignoreCase = true) -> raw
+        else -> "http://$raw"
+    }
+    return withScheme.trimEnd('/')
+}
+
+private fun mapNetworkError(cause: Throwable, baseUrl: String): IOException {
+    val message = cause.message.orEmpty()
+    val hint = if (message.contains("connect", ignoreCase = true)) {
+        "Cannot reach $baseUrl. Rebuild after editing local.properties, try Wi‑Fi, and ensure the server allows inbound TCP 3000."
+    } else {
+        "Cannot reach $baseUrl."
+    }
+    return IOException(hint, cause)
 }
 
 private fun normalizeStrictness(strictness: String): String {

@@ -27,6 +27,12 @@ import com.drp37.blocker.ui.screens.OnboardingScreen
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.launch
 
+private enum class OnboardingGate {
+    Loading,
+    Required,
+    Complete
+}
+
 @Composable
 fun AuthGate(
     pendingFrictionPackage: String?,
@@ -34,56 +40,73 @@ fun AuthGate(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var authLoading by remember { mutableStateOf(AuthService.isConfigured) }
     var isAuthenticated by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var onboardingSettings by remember { mutableStateOf<OnboardingSettings?>(null) }
-    var isLoadingOnboarding by remember { mutableStateOf(false) }
-    var hasLoadedOnboarding by remember { mutableStateOf(false) }
+    var onboardingGate by remember { mutableStateOf(OnboardingGate.Loading) }
     var syncedDefaultGroups by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (AuthService.isConfigured) {
             AuthService.sessionStatus.collect { status ->
-                isAuthenticated = status is SessionStatus.Authenticated
-                if (isAuthenticated) {
-                    isLoading = false
-                    errorMessage = null
-                } else {
-                    onboardingSettings = null
-                    hasLoadedOnboarding = false
-                    syncedDefaultGroups = false
+                when (status) {
+                    is SessionStatus.Authenticated -> {
+                        authLoading = false
+                        isAuthenticated = true
+                        isLoading = false
+                        errorMessage = null
+                    }
+                    is SessionStatus.NotAuthenticated -> {
+                        authLoading = false
+                        isAuthenticated = false
+                        isLoading = false
+                        onboardingSettings = null
+                        onboardingGate = OnboardingGate.Loading
+                        syncedDefaultGroups = false
+                    }
+                    else -> {
+                        authLoading = true
+                    }
                 }
             }
         } else {
+            authLoading = false
             errorMessage = "Supabase is not configured."
         }
     }
 
     LaunchedEffect(isAuthenticated) {
-        if (isAuthenticated) {
-            isLoadingOnboarding = true
-            hasLoadedOnboarding = false
-            onboardingSettings = runCatching { WebServerService.loadOnboarding() }
-                .getOrElse { error ->
-                    errorMessage = error.message ?: "Could not load friction settings."
-                    null
+        if (!isAuthenticated) return@LaunchedEffect
+        onboardingGate = OnboardingGate.Loading
+        runCatching { WebServerService.loadOnboarding() }
+            .onSuccess { settings ->
+                onboardingSettings = settings
+                onboardingGate = if (settings == null) {
+                    OnboardingGate.Required
+                } else {
+                    OnboardingGate.Complete
                 }
-            hasLoadedOnboarding = true
-            isLoadingOnboarding = false
-            onboardingSettings?.let { settings ->
-                if (!syncedDefaultGroups) {
-                    runCatching { WebServerService.syncDefaultGroups(settings.scrollingWorst) }
-                    syncedDefaultGroups = true
+                settings?.let { loaded ->
+                    if (!syncedDefaultGroups) {
+                        runCatching { WebServerService.syncDefaultGroups(loaded.scrollingWorst) }
+                        syncedDefaultGroups = true
+                    }
                 }
             }
-        }
+            .onFailure { error ->
+                errorMessage = error.message ?: "Could not load friction settings."
+                onboardingGate = OnboardingGate.Complete
+            }
     }
 
-    if (isAuthenticated) {
+    if (authLoading) {
+        LoadingScreen("Loading...")
+    } else if (isAuthenticated) {
         val packageName = pendingFrictionPackage
         if (packageName != null) {
-            if (isLoadingOnboarding || !hasLoadedOnboarding) {
+            if (onboardingGate == OnboardingGate.Loading) {
                 LoadingScreen("Loading friction...")
             } else {
                 FrictionScreen(
@@ -109,17 +132,16 @@ fun AuthGate(
                     onCancel = onClearFriction
                 )
             }
-        } else if (isLoadingOnboarding || !hasLoadedOnboarding) {
-            LoadingScreen("Loading onboarding...")
-        } else if (onboardingSettings == null) {
-            OnboardingScreen(
+        } else when (onboardingGate) {
+            OnboardingGate.Loading -> LoadingScreen("Loading...")
+            OnboardingGate.Required -> OnboardingScreen(
                 onComplete = { settings ->
                     onboardingSettings = settings
+                    onboardingGate = OnboardingGate.Complete
                     syncedDefaultGroups = true
                 }
             )
-        } else {
-            BlockerSetupScreen(
+            OnboardingGate.Complete -> BlockerSetupScreen(
                 onboardingSettings = onboardingSettings,
                 onLogout = {
                     coroutineScope.launch {
@@ -130,7 +152,7 @@ fun AuthGate(
                             isLoading = false
                             errorMessage = null
                             onboardingSettings = null
-                            hasLoadedOnboarding = false
+                            onboardingGate = OnboardingGate.Loading
                             syncedDefaultGroups = false
                         }.onFailure { error ->
                             errorMessage = error.message ?: "Logout failed."
