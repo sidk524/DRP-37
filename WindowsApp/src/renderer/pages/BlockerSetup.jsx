@@ -22,6 +22,13 @@ const WEBSITE_GROUPS = [
     },
 ];
 
+const PRESET_WEBSITES = [
+    { label: "Instagram", domain: "instagram.com" },
+    { label: "TikTok", domain: "tiktok.com" },
+    { label: "Facebook", domain: "facebook.com" },
+    { label: "YouTube", domain: "youtube.com" },
+];
+
 export function strictnessToMode(strictness) {
     if (strictness === "gentle") return "breathing";
     if (strictness === "moderate") return "reflect";
@@ -38,6 +45,9 @@ function formatDurationPill(hours, minutes) {
 
 function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }) {
     const [view, setView] = useState("duration");
+    const availablePresetDomains = new Set(WEBSITE_GROUPS.flatMap((group) => group.domains));
+    const visiblePresetWebsites = PRESET_WEBSITES.filter((preset) => availablePresetDomains.has(preset.domain));
+
     const {
         websites,
         urlInput,
@@ -165,38 +175,17 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                     {urlError && <p className="tether-error">{urlError}</p>}
 
                     <div className="tether-presets">
-                        <button
-                            type="button"
-                            className="tether-preset-btn"
-                            onClick={() => addPresetWebsite("instagram.com")}
-                            disabled={sessionRunning}
-                        >
-                            Instagram
-                        </button>
-                        <button
-                            type="button"
-                            className="tether-preset-btn"
-                            onClick={() => addPresetWebsite("tiktok.com")}
-                            disabled={sessionRunning}
-                        >
-                            TikTok
-                        </button>
-                        <button
-                            type="button"
-                            className="tether-preset-btn"
-                            onClick={() => addPresetWebsite("facebook.com")}
-                            disabled={sessionRunning}
-                        >
-                            Facebook
-                        </button>
-                        <button
-                            type="button"
-                            className="tether-preset-btn"
-                            onClick={() => addPresetWebsite("youtube.com")}
-                            disabled={sessionRunning}
-                        >
-                            YouTube
-                        </button>
+                        {visiblePresetWebsites.map((preset) => (
+                            <button
+                                key={preset.domain}
+                                type="button"
+                                className="tether-preset-btn"
+                                onClick={() => addPresetWebsite(preset.domain)}
+                                disabled={sessionRunning}
+                            >
+                                {preset.label}
+                            </button>
+                        ))}
                     </div>
 
                     <div className="tether-groups">
