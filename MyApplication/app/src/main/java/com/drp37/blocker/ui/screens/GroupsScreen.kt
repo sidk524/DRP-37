@@ -127,7 +127,7 @@ fun GroupsScreen(onBack: () -> Unit) {
                     Text(text = "Back", color = Color(0xFF0A84FF))
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                Text(text = "Groups", color = Color(0xFF8E8E96), fontSize = 16.sp)
+                Text(text = "Social", color = Color(0xFF8E8E96), fontSize = 16.sp)
                 Spacer(modifier = Modifier.weight(1f))
                 Box(modifier = Modifier)
             }
@@ -186,7 +186,7 @@ fun GroupsScreen(onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             if (loading) {
-                Text(text = "Loading groups...", color = Color(0xFF8E8E96))
+                Text(text = "Loading social...", color = Color(0xFF8E8E96))
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item {

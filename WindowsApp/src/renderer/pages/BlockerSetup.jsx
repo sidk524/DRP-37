@@ -67,7 +67,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         selectBlockGroup,
         refreshBlockGroups,
         handleLockIn,
-        handleStopSession,
         handleSignOut,
         handleSettingsSaved,
         lastCompletedSession,
@@ -464,7 +463,7 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                         className="tether-header-action"
                         onClick={() => setView("groups")}
                     >
-                        Groups
+                        Social
                     </button>
                     <button
                         type="button"
@@ -512,16 +511,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                             : "Choose a block group"}
                     </span>
                 </button>
-
-                {sessionRunning && active?.mode === "hard" ? (
-                    <p className="tether-session-hint">
-                        Hard session — hold tight until the timer runs out.
-                    </p>
-                ) : sessionRunning && active?.mode !== "hard" ? (
-                    <button type="button" className="tether-end-early" onClick={handleStopSession}>
-                        End session early
-                    </button>
-                ) : null}
 
                 {sessionError && (
                     <p className="tether-error tether-session-error">{sessionError}</p>

@@ -168,7 +168,7 @@ function Groups({ onBack }) {
                         <span className="tether-back-chevron" aria-hidden />
                         Back
                     </button>
-                    <span className="tether-topbar-duration">Groups</span>
+                    <span className="tether-topbar-duration">Social</span>
                     <span className="tether-topbar-spacer" aria-hidden />
                 </div>
 
@@ -183,7 +183,7 @@ function Groups({ onBack }) {
                     <section className="groups-card">
                         <p className="onboarding-section">My groups</p>
                         {loadingGroups ? (
-                            <p className="groups-muted">Loading groups...</p>
+                            <p className="groups-muted">Loading social...</p>
                         ) : groups.length === 0 ? (
                             <p className="groups-muted">Create a group or enter an invite code to get started.</p>
                         ) : (

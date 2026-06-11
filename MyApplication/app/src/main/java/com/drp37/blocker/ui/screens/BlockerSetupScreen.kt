@@ -264,7 +264,6 @@ fun BlockerSetupScreen(
                     isStartingSession = sessionState.isStartingSession,
                     remainingSeconds = sessionState.remainingSeconds,
                     errorMessage = sessionState.errorMessage,
-                    mode = sessionState.mode,
                     onHoursChange = sessionViewModel::setHours,
                     onMinutesChange = sessionViewModel::setMinutes,
                     onSecondsChange = sessionViewModel::setSeconds,
@@ -278,7 +277,6 @@ fun BlockerSetupScreen(
                     onSelectApps = { screen = BlockerFlowScreen.GroupPicker },
                     onGroups = { screen = BlockerFlowScreen.Groups },
                     onSettings = { screen = BlockerFlowScreen.Settings },
-                    onStopSession = { sessionViewModel.stopSessionManually() },
                     onLogout = { sessionViewModel.stopSessionManually(onLogout) }
                 )
             }
@@ -495,7 +493,6 @@ private fun DurationLockScreen(
     isStartingSession: Boolean,
     remainingSeconds: Int,
     errorMessage: String?,
-    mode: String,
     onHoursChange: (Int) -> Unit,
     onMinutesChange: (Int) -> Unit,
     onSecondsChange: (Int) -> Unit,
@@ -503,7 +500,6 @@ private fun DurationLockScreen(
     onSelectApps: () -> Unit,
     onGroups: () -> Unit,
     onSettings: () -> Unit,
-    onStopSession: () -> Unit,
     onLogout: () -> Unit
 ) {
     val selectedDurationSeconds = hours * 3600 + minutes * 60 + seconds
@@ -553,7 +549,7 @@ private fun DurationLockScreen(
                             .clickable(onClick = onGroups)
                     ) {
                         Text(
-                            text = "Groups",
+                            text = "Social",
                             color = Color(0xFF0A84FF),
                             fontSize = layout.logoutTextSize.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -583,6 +579,7 @@ private fun DurationLockScreen(
                     fontSize = layout.titleTextSize.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.sp,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -596,6 +593,7 @@ private fun DurationLockScreen(
                     },
                     color = Color(0xFF8E8E96),
                     fontSize = layout.subtitleTextSize.sp,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -671,22 +669,6 @@ private fun DurationLockScreen(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.sp
                     )
-                }
-
-                if (sessionRunning) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    if (mode == "hard") {
-                        Text(
-                            text = "Hard sessions cannot be ended early.",
-                            color = Color(0xFF8E8E96),
-                            fontSize = layout.errorTextSize.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    } else {
-                        TextButton(onClick = onStopSession) {
-                            Text(text = "End session early", color = Color(0xFF8E8E96))
-                        }
-                    }
                 }
             }
         }

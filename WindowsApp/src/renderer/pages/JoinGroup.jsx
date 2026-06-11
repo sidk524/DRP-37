@@ -67,7 +67,7 @@ function JoinGroup({ session, onBack, onJoined }) {
                         <span className="tether-back-chevron" aria-hidden />
                         Back
                     </button>
-                    <span className="tether-topbar-duration">Groups</span>
+                    <span className="tether-topbar-duration">Social</span>
                     <span className="tether-topbar-spacer" aria-hidden />
                 </div>
 
