@@ -152,9 +152,9 @@ function DurationScrollPicker({
     }
 
     const wheelConfigs = [
-        { value: hours, max: MAX_HOURS, onChange: onHoursChange },
-        { value: minutes, max: MAX_MINUTES, onChange: onMinutesChange },
-        { value: seconds, max: MAX_SECONDS, onChange: onSecondsChange },
+        { id: "hours", value: hours, max: MAX_HOURS, onChange: onHoursChange },
+        { id: "minutes", value: minutes, max: MAX_MINUTES, onChange: onMinutesChange },
+        { id: "seconds", value: seconds, max: MAX_SECONDS, onChange: onSecondsChange },
     ];
 
     return (
@@ -167,7 +167,7 @@ function DurationScrollPicker({
                 <div className="duration-picker-wheels">
                     {wheelConfigs.map((config) => (
                         <DurationWheel
-                            key={`${config.max}-${config.value}`}
+                            key={config.id}
                             value={config.value}
                             min={0}
                             max={config.max}
