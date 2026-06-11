@@ -1,91 +1,82 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import DurationWheel from "./DurationWheel";
 import useCssVarNumber from "../hooks/useCssVarNumber";
 import "../styles/DurationScrollPicker.css";
 
-function DurationWheel({ value, min, max, onChange, locked, rowHeight }) {
-    const items = useMemo(
-        () => Array.from({ length: max - min + 1 }, (_, index) => min + index),
-        [min, max],
+const MAX_HOURS = 23;
+const MAX_MINUTES = 59;
+const MAX_SECONDS = 59;
+const TYPED_DURATION_ERROR_TEXT = "Use HH:MM:SS, MM:SS, or 1h 30m";
+const TYPED_DURATION_PLACEHOLDER = "e.g. 00:25:00 or 25m";
+const TYPED_DURATION_HINT = "Enter `HH:MM:SS`, `MM:SS`, or values like `1h 30m`, `90`.";
+
+function formatDuration(hours, minutes, seconds) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function normalizeDurationUnits({ hours, minutes, seconds }) {
+    const normalizedMinutes = minutes + Math.floor(seconds / 60);
+    const normalizedSeconds = seconds % 60;
+    const normalizedHours = hours + Math.floor(normalizedMinutes / 60);
+
+    return {
+        hours: normalizedHours,
+        minutes: normalizedMinutes % 60,
+        seconds: normalizedSeconds,
+    };
+}
+
+function isDurationInRange({ hours, minutes, seconds }) {
+    return (
+        hours >= 0 &&
+        hours <= MAX_HOURS &&
+        minutes >= 0 &&
+        minutes <= MAX_MINUTES &&
+        seconds >= 0 &&
+        seconds <= MAX_SECONDS
     );
-    const columnRef = useRef(null);
-    const listRef = useRef(null);
-    const syncingRef = useRef(false);
+}
 
-    const scrollToValue = useCallback(
-        (nextValue, behavior = "auto") => {
-            const list = listRef.current;
-            if (!list) return;
-            const index = Math.min(Math.max(nextValue - min, 0), items.length - 1);
-            syncingRef.current = true;
-            list.scrollTo({
-                top: index * rowHeight,
-                behavior,
-            });
-            requestAnimationFrame(() => {
-                syncingRef.current = false;
-            });
-        },
-        [items.length, min, rowHeight],
-    );
+function parseUnitBasedDuration(value) {
+    if (!/^[\dhms\s]+$/i.test(value) || !/[hms]/i.test(value)) return null;
 
-    useEffect(() => {
-        scrollToValue(value);
-    }, [value, scrollToValue]);
+    const matches = value.matchAll(/(\d+)\s*([hms])/gi);
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
 
-    useEffect(() => {
-        const column = columnRef.current;
-        if (!column || locked) return;
-
-        function handleWheel(event) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const direction = Math.sign(event.deltaY);
-            if (direction === 0) return;
-
-            const next = Math.min(max, Math.max(min, value + direction));
-            if (next !== value) {
-                onChange(next);
-            }
-        }
-
-        column.addEventListener("wheel", handleWheel, { passive: false });
-        return () => column.removeEventListener("wheel", handleWheel);
-    }, [locked, max, min, onChange, value]);
-
-    function handleScroll() {
-        if (locked || syncingRef.current) return;
-        const list = listRef.current;
-        if (!list) return;
-
-        const index = Math.round(list.scrollTop / rowHeight);
-        const next = min + Math.min(Math.max(index, 0), items.length - 1);
-        if (next !== value) {
-            onChange(next);
-        }
+    for (const match of matches) {
+        const amount = Number(match[1]);
+        const unit = match[2].toLowerCase();
+        if (unit === "h") hours += amount;
+        if (unit === "m") minutes += amount;
+        if (unit === "s") seconds += amount;
     }
 
-    return (
-        <div
-            ref={columnRef}
-            className={`duration-wheel-column ${locked ? "locked" : ""}`}
-        >
-            <div
-                className="duration-wheel-list"
-                ref={listRef}
-                onScroll={handleScroll}
-            >
-                {items.map((item) => (
-                    <div
-                        key={item}
-                        className={`duration-wheel-row ${item === value ? "selected" : ""}`}
-                    >
-                        {String(item).padStart(2, "0")}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
+    const normalized = normalizeDurationUnits({ hours, minutes, seconds });
+    return isDurationInRange(normalized) ? normalized : null;
+}
+
+function parseColonDuration(value) {
+    const segments = value.split(":").map((part) => part.trim());
+    if (segments.length === 0 || segments.length > 3) return null;
+    if (segments.some((part) => !/^\d+$/.test(part))) return null;
+
+    const segmentValues = segments.map((part) => Number(part));
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
+
+    if (segmentValues.length === 3) {
+        [hours, minutes, seconds] = segmentValues;
+    } else if (segmentValues.length === 2) {
+        [minutes, seconds] = segmentValues;
+    } else {
+        [minutes] = segmentValues;
+    }
+
+    const normalized = normalizeDurationUnits({ hours, minutes, seconds });
+    return isDurationInRange(normalized) ? normalized : null;
 }
 
 function DurationScrollPicker({
@@ -105,9 +96,7 @@ function DurationScrollPicker({
 
     useEffect(() => {
         if (editing) return;
-        setTypedDuration(
-            `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-        );
+        setTypedDuration(formatDuration(hours, minutes, seconds));
     }, [editing, hours, minutes, seconds]);
 
     useEffect(() => {
@@ -120,76 +109,20 @@ function DurationScrollPicker({
         const normalized = value.trim();
         if (!normalized) return null;
 
-        if (/^[\dhms\s]+$/i.test(normalized) && /[hms]/i.test(normalized)) {
-            const matches = normalized.matchAll(/(\d+)\s*([hms])/gi);
-            let nextHours = 0;
-            let nextMinutes = 0;
-            let nextSeconds = 0;
-
-            for (const match of matches) {
-                const amount = Number(match[1]);
-                const unit = match[2].toLowerCase();
-                if (unit === "h") nextHours += amount;
-                if (unit === "m") nextMinutes += amount;
-                if (unit === "s") nextSeconds += amount;
-            }
-
-            nextMinutes += Math.floor(nextSeconds / 60);
-            nextSeconds %= 60;
-            nextHours += Math.floor(nextMinutes / 60);
-            nextMinutes %= 60;
-
-            if (nextHours > 23) return null;
-            return { nextHours, nextMinutes, nextSeconds };
-        }
-
-        const parts = normalized.split(":").map((part) => part.trim());
-        if (parts.length === 0 || parts.length > 3) return null;
-        if (parts.some((part) => !/^\d+$/.test(part))) return null;
-
-        const nums = parts.map((part) => Number(part));
-        let nextHours = 0;
-        let nextMinutes = 0;
-        let nextSeconds = 0;
-
-        if (nums.length === 3) {
-            [nextHours, nextMinutes, nextSeconds] = nums;
-        } else if (nums.length === 2) {
-            [nextMinutes, nextSeconds] = nums;
-        } else {
-            [nextMinutes] = nums;
-        }
-
-        nextMinutes += Math.floor(nextSeconds / 60);
-        nextSeconds %= 60;
-        nextHours += Math.floor(nextMinutes / 60);
-        nextMinutes %= 60;
-
-        if (
-            nextHours < 0 ||
-            nextHours > 23 ||
-            nextMinutes < 0 ||
-            nextMinutes > 59 ||
-            nextSeconds < 0 ||
-            nextSeconds > 59
-        ) {
-            return null;
-        }
-
-        return { nextHours, nextMinutes, nextSeconds };
+        return parseUnitBasedDuration(normalized) ?? parseColonDuration(normalized);
     }
 
     function applyTypedDuration() {
         const parsed = parseTypedDuration(typedDuration);
         if (!parsed) {
-            setTypedError("Use HH:MM:SS, MM:SS, or 1h 30m");
+            setTypedError(TYPED_DURATION_ERROR_TEXT);
             return;
         }
 
         setTypedError("");
-        onHoursChange(parsed.nextHours);
-        onMinutesChange(parsed.nextMinutes);
-        onSecondsChange(parsed.nextSeconds);
+        onHoursChange(parsed.hours);
+        onMinutesChange(parsed.minutes);
+        onSecondsChange(parsed.seconds);
         setEditing(false);
     }
 
@@ -198,42 +131,51 @@ function DurationScrollPicker({
         setEditing(false);
     }
 
+    function handleStartEditing() {
+        if (locked) return;
+        setTypedError("");
+        setEditing(true);
+    }
+
+    function handleInputChange(event) {
+        setTypedDuration(event.target.value);
+        if (typedError) setTypedError("");
+    }
+
+    function handleInputKeyDown(event) {
+        if (event.key === "Enter") {
+            applyTypedDuration();
+        }
+        if (event.key === "Escape") {
+            cancelTypedDuration();
+        }
+    }
+
+    const wheelConfigs = [
+        { value: hours, max: MAX_HOURS, onChange: onHoursChange },
+        { value: minutes, max: MAX_MINUTES, onChange: onMinutesChange },
+        { value: seconds, max: MAX_SECONDS, onChange: onSecondsChange },
+    ];
+
     return (
         <div className="duration-picker">
             <div
                 className={`duration-picker-frame ${editing ? "editing" : ""}`}
-                onDoubleClick={() => {
-                    if (locked) return;
-                    setTypedError("");
-                    setEditing(true);
-                }}
+                onDoubleClick={handleStartEditing}
             >
                 <div className="duration-picker-highlight" aria-hidden />
                 <div className="duration-picker-wheels">
-                    <DurationWheel
-                        value={hours}
-                        min={0}
-                        max={23}
-                        locked={locked}
-                        rowHeight={rowHeight}
-                        onChange={onHoursChange}
-                    />
-                    <DurationWheel
-                        value={minutes}
-                        min={0}
-                        max={59}
-                        locked={locked}
-                        rowHeight={rowHeight}
-                        onChange={onMinutesChange}
-                    />
-                    <DurationWheel
-                        value={seconds}
-                        min={0}
-                        max={59}
-                        locked={locked}
-                        rowHeight={rowHeight}
-                        onChange={onSecondsChange}
-                    />
+                    {wheelConfigs.map((config) => (
+                        <DurationWheel
+                            key={`${config.max}-${config.value}`}
+                            value={config.value}
+                            min={0}
+                            max={config.max}
+                            locked={locked}
+                            rowHeight={rowHeight}
+                            onChange={config.onChange}
+                        />
+                    ))}
                 </div>
                 <div className="duration-picker-labels">
                     <span>hours</span>
@@ -248,24 +190,14 @@ function DurationScrollPicker({
                                 className="duration-picker-edit-input"
                                 type="text"
                                 value={typedDuration}
-                                onChange={(event) => {
-                                    setTypedDuration(event.target.value);
-                                    if (typedError) setTypedError("");
-                                }}
+                                onChange={handleInputChange}
                                 onBlur={applyTypedDuration}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter") {
-                                        applyTypedDuration();
-                                    }
-                                    if (event.key === "Escape") {
-                                        cancelTypedDuration();
-                                    }
-                                }}
-                                placeholder="e.g. 00:25:00 or 25m"
+                                onKeyDown={handleInputKeyDown}
+                                placeholder={TYPED_DURATION_PLACEHOLDER}
                                 aria-label="Type duration"
                             />
                             <p className="duration-picker-edit-hint">
-                                Enter `HH:MM:SS`, `MM:SS`, or values like `1h 30m`, `90`.
+                                {TYPED_DURATION_HINT}
                             </p>
                             {typedError && (
                                 <p className="duration-picker-edit-error">{typedError}</p>
