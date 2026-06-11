@@ -1,5 +1,3 @@
-/* Groups & leaderboards — stacked translucent cards. */
-
 .groups-screen {
     width: 100%;
     height: 100%;
@@ -36,10 +34,11 @@
     margin-bottom: clamp(12px, 2vh, 16px);
 }
 
-.groups-stack {
-    display: flex;
-    flex-direction: column;
-    gap: clamp(10px, 2vh, 14px);
+.groups-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--section-gap);
+    align-items: start;
 }
 
 .groups-card {
@@ -52,6 +51,71 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
+}
+
+.groups-panel {
+    min-width: 0;
+}
+
+.groups-panel-section {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 2vh, 12px);
+}
+
+.groups-panel-actions {
+    gap: clamp(8px, 1.5vh, 10px);
+}
+
+.groups-panel-divider {
+    height: 1px;
+    background: var(--border);
+    margin: clamp(2px, 0.5vh, 4px) 0;
+}
+
+.groups-panel-label {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: clamp(0.72rem, 2vw, 0.78rem);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.groups-panel-group-name {
+    margin: 4px 0 0;
+    font-size: clamp(1.05rem, 2.5vw, 1.2rem);
+    letter-spacing: -0.015em;
+    font-weight: 700;
+}
+
+.groups-leaderboard-panel {
+    min-width: 0;
+    min-height: 0;
+}
+
+.groups-leaderboard-title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.groups-leaderboard-group-name {
+    margin: 0;
+    font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+    letter-spacing: -0.015em;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.groups-leaderboard-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 2vh, 12px);
+    min-height: 0;
 }
 
 .groups-muted {
@@ -172,12 +236,6 @@
     flex-wrap: wrap;
 }
 
-.groups-card-heading h2 {
-    margin: 6px 0 0;
-    font-size: clamp(1.05rem, 2.5vw, 1.2rem);
-    letter-spacing: -0.015em;
-}
-
 .groups-copy {
     min-height: var(--control-height-sm);
     padding: clamp(8px, 1.5vh, 10px) clamp(12px, 2.5vw, 14px);
@@ -190,23 +248,18 @@
     background: rgba(255, 255, 255, 0.04);
     border: 1px dashed var(--border-strong);
     color: var(--text-primary);
-    font-size: clamp(1.15rem, 4vw, 1.45rem);
+    font-size: clamp(1.05rem, 3.5vw, 1.35rem);
     font-weight: 700;
     letter-spacing: 0.18em;
     text-align: center;
     font-variant-numeric: tabular-nums;
 }
 
-.groups-leaderboard-card {
-    margin-bottom: clamp(14px, 2.5vh, 18px);
-}
-
 .groups-leaderboard-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: clamp(8px, 2vw, 12px);
-    margin-bottom: clamp(10px, 2vh, 14px);
     flex-wrap: wrap;
 }
 
@@ -214,7 +267,6 @@
     margin: 0;
 }
 
-/* iOS segmented control */
 .groups-metric-toggle {
     display: inline-flex;
     padding: 3px;
@@ -247,7 +299,7 @@
 }
 
 .groups-points-unavailable {
-    margin: 0 0 clamp(10px, 2vh, 14px);
+    margin: 0;
 }
 
 .groups-leaderboard {
@@ -282,7 +334,6 @@
     border-color: rgba(10, 132, 255, 0.5);
 }
 
-/* Medal tints for the podium */
 .groups-leaderboard li:nth-child(1) .groups-rank { color: #ffd60a; }
 .groups-leaderboard li:nth-child(2) .groups-rank { color: #d8d8de; }
 .groups-leaderboard li:nth-child(3) .groups-rank { color: #d29a63; }
@@ -306,6 +357,41 @@
     font-weight: 700;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 720px) {
+    .groups-frame {
+        max-width: min(960px, 94vw);
+    }
+
+    .groups-layout {
+        grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+        align-items: stretch;
+    }
+
+    .groups-panel {
+        position: sticky;
+        top: 0;
+    }
+
+    .groups-leaderboard-panel {
+        display: flex;
+        flex-direction: column;
+        min-height: min(520px, calc(100dvh - 220px));
+    }
+
+    .groups-leaderboard-scroll {
+        flex: 1;
+        overflow-y: auto;
+        max-height: min(420px, calc(100dvh - 280px));
+        padding-right: 2px;
+    }
+}
+
+@media (min-width: 960px) {
+    .groups-leaderboard-scroll {
+        max-height: min(560px, calc(100dvh - 260px));
+    }
 }
 
 @media (max-width: 560px) {

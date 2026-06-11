@@ -179,33 +179,99 @@ function Groups({ onBack }) {
 
                 {visibleError && <p className="tether-error groups-error">{visibleError}</p>}
 
-                <div className="groups-stack">
-                    <section className="groups-card">
-                        <p className="onboarding-section">My groups</p>
-                        {loadingGroups ? (
-                            <p className="groups-muted">Loading social...</p>
-                        ) : groups.length === 0 ? (
-                            <p className="groups-muted">Create a group or enter an invite code to get started.</p>
-                        ) : (
-                            <div className="groups-list">
-                                {groups.map((group) => (
-                                    <button
-                                        key={group.id}
-                                        type="button"
-                                        className={`groups-list-item ${selectedGroupId === group.id ? "selected" : ""}`}
-                                        onClick={() => setSelectedGroupId(group.id)}
-                                    >
-                                        <span>{group.name}</span>
-                                        <span>{group.memberCount} member{group.memberCount === 1 ? "" : "s"}</span>
-                                    </button>
-                                ))}
+                <div className="groups-layout">
+                    <section className="groups-card groups-panel">
+                        <p className="onboarding-section">Groups</p>
+
+                        <div className="groups-panel-section">
+                            {loadingGroups ? (
+                                <p className="groups-muted">Loading social...</p>
+                            ) : groups.length === 0 ? (
+                                <p className="groups-muted">Create a group or enter an invite code to get started.</p>
+                            ) : (
+                                <div className="groups-list">
+                                    {groups.map((group) => (
+                                        <button
+                                            key={group.id}
+                                            type="button"
+                                            className={`groups-list-item ${selectedGroupId === group.id ? "selected" : ""}`}
+                                            onClick={() => setSelectedGroupId(group.id)}
+                                        >
+                                            <span>{group.name}</span>
+                                            <span>{group.memberCount} member{group.memberCount === 1 ? "" : "s"}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="groups-panel-divider" aria-hidden />
+
+                        <div className="groups-panel-section">
+                            {selectedGroup ? (
+                                <>
+                                    <div className="groups-card-heading">
+                                        <div>
+                                            <p className="groups-panel-label">Invite</p>
+                                            <h2 className="groups-panel-group-name">{selectedGroup.name}</h2>
+                                        </div>
+                                        <button type="button" className="groups-copy" onClick={handleCopyInvite}>
+                                            {copied ? "Copied" : "Copy code"}
+                                        </button>
+                                    </div>
+                                    <div className="groups-invite-code">{selectedGroup.inviteCode}</div>
+                                </>
+                            ) : (
+                                <p className="groups-muted">Select a group to view its invite code.</p>
+                            )}
+                        </div>
+
+                        <div className="groups-panel-divider" aria-hidden />
+
+                        <div className="groups-panel-section groups-panel-actions">
+                            <div className="groups-form-row">
+                                <input
+                                    type="text"
+                                    value={groupName}
+                                    onChange={(event) => setGroupName(event.target.value)}
+                                    placeholder="Group name"
+                                    maxLength={80}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleCreateGroup}
+                                    disabled={!groupName.trim() || saving}
+                                >
+                                    Create
+                                </button>
                             </div>
-                        )}
+                            <div className="groups-form-row">
+                                <input
+                                    type="text"
+                                    value={inviteCode}
+                                    onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                                    placeholder="Invite code"
+                                    maxLength={16}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleJoinGroup}
+                                    disabled={!normalizeInviteCode(inviteCode) || saving}
+                                >
+                                    Join
+                                </button>
+                            </div>
+                        </div>
                     </section>
 
-                    <section className="groups-card groups-leaderboard-card">
+                    <section className="groups-card groups-leaderboard-panel">
                         <div className="groups-leaderboard-header">
-                            <p className="onboarding-section">Leaderboard</p>
+                            <div className="groups-leaderboard-title">
+                                <p className="onboarding-section">Leaderboard</p>
+                                {selectedGroup && (
+                                    <h2 className="groups-leaderboard-group-name">{selectedGroup.name}</h2>
+                                )}
+                            </div>
                             <div className="groups-metric-toggle" role="tablist" aria-label="Leaderboard ranking">
                                 <button
                                     type="button"
@@ -228,87 +294,34 @@ function Groups({ onBack }) {
                                 </button>
                             </div>
                         </div>
-                        {!focusPointsAvailable && (
-                            <p className="groups-muted groups-points-unavailable">
-                                Points ranking is unavailable until the focus_session_points database table is set up.
-                            </p>
-                        )}
-                        {!selectedGroup ? (
-                            <p className="groups-muted">Select or create a group to see the leaderboard.</p>
-                        ) : loadingLeaderboard ? (
-                            <p className="groups-muted">Loading leaderboard...</p>
-                        ) : rankedLeaderboard.length === 0 ? (
-                            <p className="groups-muted">No completed sessions yet.</p>
-                        ) : (
-                            <ol className="groups-leaderboard">
-                                {rankedLeaderboard.map((entry) => (
-                                    <li
-                                        key={entry.userId}
-                                        className={entry.isCurrentUser ? "current-user" : ""}
-                                    >
-                                        <span className="groups-rank">#{entry.rank}</span>
-                                        <span className="groups-name">{entry.displayName}</span>
-                                        <span className="groups-time">
-                                            {formatLeaderboardScore(entry, leaderboardMetric)}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ol>
-                        )}
-                    </section>
-
-                    {selectedGroup && (
-                        <section className="groups-card">
-                            <div className="groups-card-heading">
-                                <div>
-                                    <p className="onboarding-section">Invite</p>
-                                    <h2>{selectedGroup.name}</h2>
-                                </div>
-                                <button type="button" className="groups-copy" onClick={handleCopyInvite}>
-                                    {copied ? "Copied" : "Copy code"}
-                                </button>
-                            </div>
-                            <div className="groups-invite-code">{selectedGroup.inviteCode}</div>
-                        </section>
-                    )}
-
-                    <section className="groups-card">
-                        <p className="onboarding-section">Create</p>
-                        <div className="groups-form-row">
-                            <input
-                                type="text"
-                                value={groupName}
-                                onChange={(event) => setGroupName(event.target.value)}
-                                placeholder="Group name"
-                                maxLength={80}
-                            />
-                            <button
-                                type="button"
-                                onClick={handleCreateGroup}
-                                disabled={!groupName.trim() || saving}
-                            >
-                                Create
-                            </button>
-                        </div>
-                    </section>
-
-                    <section className="groups-card">
-                        <p className="onboarding-section">Join</p>
-                        <div className="groups-form-row">
-                            <input
-                                type="text"
-                                value={inviteCode}
-                                onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
-                                placeholder="Invite code"
-                                maxLength={16}
-                            />
-                            <button
-                                type="button"
-                                onClick={handleJoinGroup}
-                                disabled={!normalizeInviteCode(inviteCode) || saving}
-                            >
-                                Join
-                            </button>
+                        <div className="groups-leaderboard-scroll">
+                            {!focusPointsAvailable && (
+                                <p className="groups-muted groups-points-unavailable">
+                                    Points ranking is unavailable until the focus_session_points database table is set up.
+                                </p>
+                            )}
+                            {!selectedGroup ? (
+                                <p className="groups-muted">Select or create a group to see the leaderboard.</p>
+                            ) : loadingLeaderboard ? (
+                                <p className="groups-muted">Loading leaderboard...</p>
+                            ) : rankedLeaderboard.length === 0 ? (
+                                <p className="groups-muted">No completed sessions yet in {selectedGroup.name}.</p>
+                            ) : (
+                                <ol className="groups-leaderboard">
+                                    {rankedLeaderboard.map((entry) => (
+                                        <li
+                                            key={entry.userId}
+                                            className={entry.isCurrentUser ? "current-user" : ""}
+                                        >
+                                            <span className="groups-rank">#{entry.rank}</span>
+                                            <span className="groups-name">{entry.displayName}</span>
+                                            <span className="groups-time">
+                                                {formatLeaderboardScore(entry, leaderboardMetric)}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            )}
                         </div>
                     </section>
                 </div>
