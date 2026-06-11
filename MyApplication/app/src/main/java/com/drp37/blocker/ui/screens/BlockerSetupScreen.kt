@@ -77,6 +77,7 @@ import com.drp37.blocker.ui.session.BlockerSessionViewModel
 import com.drp37.blocker.util.loadLaunchableApps
 import com.drp37.blocker.model.InstalledApp
 import com.drp37.blocker.ui.theme.MyApplicationTheme
+import com.drp37.blocker.ui.theme.formatDurationPill
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -103,6 +104,7 @@ fun BlockerSetupScreen(
     var editorName by remember { mutableStateOf("") }
     var editorPackages by remember { mutableStateOf(setOf<String>()) }
     var editorEntries by remember { mutableStateOf(listOf<String>()) }
+    var pickerDraftGroupId by remember { mutableStateOf<String?>(null) }
     val defaultMode = strictnessToMode(onboardingSettings?.strictness ?: "moderate")
 
     LaunchedEffect(installedPackages) {
@@ -153,6 +155,12 @@ fun BlockerSetupScreen(
         }
     }
 
+    LaunchedEffect(screen) {
+        if (screen == BlockerFlowScreen.GroupPicker) {
+            pickerDraftGroupId = sessionState.selectedBlockGroupId
+        }
+    }
+
     when (screen) {
         BlockerFlowScreen.Settings -> {
             OnboardingSettingsScreen(
@@ -181,20 +189,22 @@ fun BlockerSetupScreen(
             BlockGroupPickerScreen(
                 groups = sessionState.blockGroups,
                 loading = sessionState.blockGroupsLoading,
-                selectedGroupId = sessionState.selectedBlockGroupId,
+                draftGroupId = pickerDraftGroupId,
                 deviceAppCount = { group -> sessionViewModel.deviceAppsForGroup(group).size },
                 errorMessage = sessionState.errorMessage,
-                onSelect = { group ->
-                    sessionViewModel.selectBlockGroup(group.id)
-                    screen = BlockerFlowScreen.Duration
-                },
+                durationLabel = formatDurationPill(sessionState.hours, sessionState.minutes),
+                onDraftSelect = { group -> pickerDraftGroupId = group.id },
                 onManageGroups = { screen = BlockerFlowScreen.GroupManager },
-                onBack = { screen = BlockerFlowScreen.Duration }
+                onBack = {
+                    pickerDraftGroupId?.let { sessionViewModel.selectBlockGroup(it) }
+                    screen = BlockerFlowScreen.Duration
+                }
             )
         }
         BlockerFlowScreen.GroupManager -> {
             BlockGroupManagerScreen(
                 groups = sessionState.blockGroups,
+                loading = sessionState.blockGroupsLoading,
                 errorMessage = sessionState.errorMessage,
                 onEdit = { group -> openGroupEditor(group) },
                 onDelete = { group -> sessionViewModel.deleteBlockGroup(group.id) },
@@ -228,7 +238,7 @@ fun BlockerSetupScreen(
                         packages = editorPackages.toList(),
                         domains = emptyList(),
                         targets = editorEntries,
-                        onSaved = { screen = BlockerFlowScreen.GroupPicker }
+                        onSaved = { screen = BlockerFlowScreen.GroupManager }
                     )
                 },
                 onBack = { screen = BlockerFlowScreen.GroupManager }
@@ -411,29 +421,42 @@ private fun AppSelectionScreen(
 
                 Spacer(modifier = Modifier.height(layout.searchToGridGap))
 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(bottom = layout.gridBottomPadding),
-                    horizontalArrangement = Arrangement.spacedBy(layout.gridColumnGap),
-                    verticalArrangement = Arrangement.spacedBy(layout.gridRowGap)
+                        .weight(1f)
                 ) {
-                    items(visibleApps, key = { it.packageName }) { app ->
-                        val selected = app.packageName in selectedPackages
-                        AppGridItem(
-                            app = app,
-                            selected = selected,
-                            layout = layout,
-                            onClick = {
-                                if (locked) {
-                                    lockedWarningNonce += 1
-                                } else {
-                                    onTogglePackage(app.packageName)
-                                }
-                            }
+                    if (query.isNotBlank() && visibleApps.isEmpty()) {
+                        Text(
+                            text = "No apps found",
+                            color = Color(0xFF92929A),
+                            fontSize = (layout.bodyTextSize * 0.92f).sp,
+                            modifier = Modifier.align(Alignment.TopStart)
                         )
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(4),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = layout.gridBottomPadding),
+                            horizontalArrangement = Arrangement.spacedBy(layout.gridColumnGap),
+                            verticalArrangement = Arrangement.spacedBy(layout.gridRowGap)
+                        ) {
+                            items(visibleApps, key = { it.packageName }) { app ->
+                                val selected = app.packageName in selectedPackages
+                                AppGridItem(
+                                    app = app,
+                                    selected = selected,
+                                    layout = layout,
+                                    onClick = {
+                                        if (locked) {
+                                            lockedWarningNonce += 1
+                                        } else {
+                                            onTogglePackage(app.packageName)
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 

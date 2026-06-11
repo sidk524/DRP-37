@@ -1,6 +1,9 @@
 package com.drp37.blocker.ui.screens
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,16 +11,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -32,71 +36,370 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drp37.blocker.remote.webserver.BlockGroup
-
-private val ScreenBackground = Color.Black
-private val CardBackground = Color(0xFF1F1F22)
-private val AccentBlue = Color(0xFF0A84FF)
-private val MutedText = Color(0xFF8E8E96)
-private val ErrorRed = Color(0xFFFF453A)
+import com.drp37.blocker.ui.theme.TetherColors
+import com.drp37.blocker.ui.theme.TetherDimens
+import com.drp37.blocker.ui.theme.TetherShapes
 
 @Composable
 private fun BlockGroupScaffold(
     title: String,
     onBack: () -> Unit,
     errorMessage: String?,
+    durationLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Surface(modifier = Modifier.fillMaxSize(), color = ScreenBackground) {
-        Column(
+    Surface(modifier = Modifier.fillMaxSize(), color = TetherColors.Background) {
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 32.dp)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0x1F0A84FF),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width / 2f, 0f),
+                            radius = size.width * 0.9f
+                        )
+                    )
+                }
         ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = TetherDimens.FramePaddingHorizontal,
+                        vertical = TetherDimens.FramePaddingVertical
+                    )
+            ) {
+                BlockGroupTopBar(onBack = onBack, durationLabel = durationLabel)
+
+                Spacer(modifier = Modifier.height(TetherDimens.SectionGap))
+
                 Text(
-                    text = "Back",
-                    color = AccentBlue,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .clickable(onClick = onBack)
+                    text = title,
+                    color = TetherColors.TextPrimary,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.5).sp
                 )
+
+                if (!errorMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = errorMessage,
+                        color = TetherColors.Danger,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(TetherDimens.SectionGap))
+
+                content()
             }
-
-            Spacer(modifier = Modifier.height(22.dp))
-
-            Text(
-                text = title,
-                color = Color.White,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            if (!errorMessage.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = errorMessage,
-                    color = ErrorRed,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            content()
         }
     }
+}
+
+@Composable
+private fun BlockGroupTopBar(
+    onBack: () -> Unit,
+    durationLabel: String?
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onBack),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BackChevron()
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "Back",
+                color = TetherColors.Accent,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        if (durationLabel != null) {
+            Text(
+                text = durationLabel,
+                color = TetherColors.TextSecondary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(TetherShapes.Pill)
+                    .background(TetherColors.Surface)
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+            )
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun BackChevron() {
+    Box(
+        modifier = Modifier.size(width = 8.dp, height = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = 2.4.dp.toPx()
+            val color = TetherColors.Accent
+            drawLine(
+                color = color,
+                start = Offset(size.width * 0.65f, size.height * 0.12f),
+                end = Offset(size.width * 0.15f, size.height * 0.5f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = color,
+                start = Offset(size.width * 0.15f, size.height * 0.5f),
+                end = Offset(size.width * 0.65f, size.height * 0.88f),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+@Composable
+private fun BlockGroupListCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .clip(TetherShapes.Lg)
+            .background(TetherColors.Surface)
+            .border(1.dp, TetherColors.Border, TetherShapes.Lg)
+            .padding(TetherDimens.CardPadding),
+        verticalArrangement = Arrangement.spacedBy(TetherDimens.ListGap),
+        content = content
+    )
+}
+
+@Composable
+private fun BlockGroupPickerRow(
+    name: String,
+    meta: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val background = if (selected) TetherColors.AccentSoft else TetherColors.RowFill
+    val borderColor = if (selected) TetherColors.Accent else TetherColors.Border
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TetherDimens.ControlHeightSm)
+            .clip(TetherShapes.Default)
+            .background(background)
+            .border(
+                width = 1.dp,
+                color = borderColor,
+                shape = TetherShapes.Default
+            )
+            .then(
+                if (selected) {
+                    Modifier.border(1.dp, TetherColors.AccentRing, TetherShapes.Default)
+                } else {
+                    Modifier
+                }
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(if (selected) TetherColors.Accent else TetherColors.DotInactive)
+                .then(
+                    if (selected) {
+                        Modifier.drawBehind {
+                            drawCircle(
+                                color = Color(0xCC0A84FF),
+                                radius = size.width * 1.6f
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                color = TetherColors.TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = meta,
+                color = TetherColors.TextSecondary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun BlockGroupManageRow(
+    name: String,
+    isDefault: Boolean,
+    onEdit: () -> Unit,
+    onDelete: (() -> Unit)?
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = TetherDimens.ControlHeightSm)
+            .clip(TetherShapes.Default)
+            .background(TetherColors.RowFill)
+            .border(1.dp, TetherColors.Border, TetherShapes.Default)
+            .padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(vertical = 12.dp)
+        ) {
+            Text(
+                text = name,
+                color = TetherColors.TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (isDefault) {
+                Text(
+                    text = "Default group",
+                    color = TetherColors.TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            TextButton(onClick = onEdit) {
+                Text(
+                    text = "Edit",
+                    color = TetherColors.Accent,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
+            }
+            if (onDelete != null) {
+                TextButton(onClick = onDelete) {
+                    Text(
+                        text = "Delete",
+                        color = TetherColors.Danger,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TetherSecondaryButton(
+    text: String,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TetherDimens.ControlHeight),
+        shape = TetherShapes.Lg,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = TetherColors.Surface,
+            contentColor = TetherColors.TextPrimary
+        ),
+        border = BorderStroke(1.dp, TetherColors.Border)
+    ) {
+        Text(text = text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun TetherPrimaryButton(
+    text: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TetherDimens.ControlHeight),
+        shape = TetherShapes.Lg,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = TetherColors.Accent,
+            contentColor = TetherColors.TextPrimary,
+            disabledContainerColor = TetherColors.SurfaceBtn,
+            disabledContentColor = TetherColors.TextTertiary
+        )
+    ) {
+        Text(text = text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun BlockGroupListPlaceholder(text: String) {
+    Text(
+        text = text,
+        color = TetherColors.TextSecondary,
+        fontSize = 15.sp,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 24.dp)
+    )
 }
 
 @Composable
@@ -109,9 +412,10 @@ private fun EditorField(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(CardBackground)
+            .height(TetherDimens.ControlHeightSm)
+            .clip(TetherShapes.Default)
+            .background(TetherColors.InputSurface)
+            .border(1.dp, TetherColors.Border, TetherShapes.Default)
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -120,17 +424,17 @@ private fun EditorField(
             onValueChange = onValueChange,
             modifier = Modifier.weight(1f),
             singleLine = true,
-            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+            textStyle = TextStyle(color = TetherColors.TextPrimary, fontSize = 16.sp),
             decorationBox = { innerTextField ->
                 if (value.isEmpty()) {
-                    Text(text = placeholder, color = MutedText, fontSize = 16.sp)
+                    Text(text = placeholder, color = TetherColors.TextSecondary, fontSize = 16.sp)
                 }
                 innerTextField()
             }
         )
         if (value.isNotBlank()) {
             TextButton(onClick = onSubmit) {
-                Text(text = "Add", color = AccentBlue, fontWeight = FontWeight.SemiBold)
+                Text(text = "Add", color = TetherColors.Accent, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -140,58 +444,38 @@ private fun EditorField(
 fun BlockGroupPickerScreen(
     groups: List<BlockGroup>,
     loading: Boolean,
-    selectedGroupId: String?,
+    draftGroupId: String?,
     deviceAppCount: (BlockGroup) -> Int,
     errorMessage: String?,
-    onSelect: (BlockGroup) -> Unit,
+    durationLabel: String,
+    onDraftSelect: (BlockGroup) -> Unit,
     onManageGroups: () -> Unit,
     onBack: () -> Unit
 ) {
-    BlockGroupScaffold(title = "Choose a block group", onBack = onBack, errorMessage = errorMessage) {
-        if (loading && groups.isEmpty()) {
-            Text(
-                text = "Loading block groups…",
-                color = MutedText,
-                fontSize = 15.sp,
-                modifier = Modifier.weight(1f)
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(groups, key = { it.id }) { group ->
-                    val selected = group.id == selectedGroupId
-                    val appCount = deviceAppCount(group)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(CardBackground)
-                            .clickable { onSelect(group) }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+    BlockGroupScaffold(
+        title = "Choose a block group",
+        onBack = onBack,
+        errorMessage = errorMessage,
+        durationLabel = durationLabel
+    ) {
+        BlockGroupListCard(modifier = Modifier.weight(1f)) {
+            when {
+                loading && groups.isEmpty() -> BlockGroupListPlaceholder("Loading block groups…")
+                groups.isEmpty() -> BlockGroupListPlaceholder("No block groups yet")
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(TetherDimens.ListGap)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(if (selected) AccentBlue else Color(0xFF48484F))
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = group.name,
-                                color = Color.White,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = blockGroupSummary(appCount, group.expandedDomainsBlocked.size),
-                                color = MutedText,
-                                fontSize = 13.sp
+                        items(groups, key = { it.id }) { group ->
+                            val selected = group.id == draftGroupId
+                            val appCount = deviceAppCount(group)
+                            BlockGroupPickerRow(
+                                name = group.name,
+                                meta = blockGroupSummary(appCount, group.expandedDomainsBlocked.size),
+                                selected = selected,
+                                enabled = true,
+                                onClick = { onDraftSelect(group) }
                             )
                         }
                     }
@@ -201,64 +485,45 @@ fun BlockGroupPickerScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        Button(
-            onClick = onManageGroups,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = CardBackground,
-                contentColor = Color.White
-            )
-        ) {
-            Text(text = "Manage groups", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
+        TetherSecondaryButton(text = "Manage groups", onClick = onManageGroups)
     }
 }
 
 @Composable
 fun BlockGroupManagerScreen(
     groups: List<BlockGroup>,
+    loading: Boolean,
     errorMessage: String?,
     onEdit: (BlockGroup) -> Unit,
     onDelete: (BlockGroup) -> Unit,
     onCreate: () -> Unit,
     onBack: () -> Unit
 ) {
-    BlockGroupScaffold(title = "Manage block groups", onBack = onBack, errorMessage = errorMessage) {
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(groups, key = { it.id }) { group ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(CardBackground)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = group.name,
-                            color = Color.White,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (group.systemKey != null) {
-                            Text(text = "Default group", color = MutedText, fontSize = 12.sp)
-                        }
-                    }
-                    TextButton(onClick = { onEdit(group) }) {
-                        Text(text = "Edit", color = AccentBlue, fontWeight = FontWeight.SemiBold)
-                    }
-                    if (group.systemKey == null) {
-                        TextButton(onClick = { onDelete(group) }) {
-                            Text(text = "Delete", color = ErrorRed, fontWeight = FontWeight.SemiBold)
+    BlockGroupScaffold(
+        title = "Manage block groups",
+        onBack = onBack,
+        errorMessage = errorMessage
+    ) {
+        BlockGroupListCard(modifier = Modifier.weight(1f)) {
+            when {
+                loading && groups.isEmpty() -> BlockGroupListPlaceholder("Loading block groups…")
+                groups.isEmpty() -> BlockGroupListPlaceholder("No block groups yet")
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(TetherDimens.ListGap)
+                    ) {
+                        items(groups, key = { it.id }) { group ->
+                            BlockGroupManageRow(
+                                name = group.name,
+                                isDefault = group.systemKey != null,
+                                onEdit = { onEdit(group) },
+                                onDelete = if (group.systemKey == null) {
+                                    { onDelete(group) }
+                                } else {
+                                    null
+                                }
+                            )
                         }
                     }
                 }
@@ -267,19 +532,7 @@ fun BlockGroupManagerScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        Button(
-            onClick = onCreate,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AccentBlue,
-                contentColor = Color.White
-            )
-        ) {
-            Text(text = "New block group", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
+        TetherPrimaryButton(text = "New block group", onClick = onCreate)
     }
 }
 
@@ -319,9 +572,10 @@ fun BlockGroupEditorScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(CardBackground)
+                .height(TetherDimens.ControlHeightSm)
+                .clip(TetherShapes.Default)
+                .background(TetherColors.InputSurface)
+                .border(1.dp, TetherColors.Border, TetherShapes.Default)
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -330,10 +584,10 @@ fun BlockGroupEditorScreen(
                 onValueChange = onNameChange,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                textStyle = TextStyle(color = TetherColors.TextPrimary, fontSize = 16.sp),
                 decorationBox = { innerTextField ->
                     if (name.isEmpty()) {
-                        Text(text = "Group name", color = MutedText, fontSize = 16.sp)
+                        Text(text = "Group name", color = TetherColors.TextSecondary, fontSize = 16.sp)
                     }
                     innerTextField()
                 }
@@ -342,29 +596,16 @@ fun BlockGroupEditorScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(
-            onClick = onChooseApps,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = CardBackground,
-                contentColor = Color.White
-            )
-        ) {
-            Text(
-                text = "Choose apps · $deviceAppCount on this device",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        TetherSecondaryButton(
+            text = "Choose apps · $deviceAppCount on this device",
+            onClick = onChooseApps
+        )
 
         Spacer(modifier = Modifier.height(18.dp))
 
         Text(
             text = "Websites (blocks on desktop)",
-            color = MutedText,
+            color = TetherColors.TextSecondary,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold
         )
@@ -385,10 +626,10 @@ fun BlockGroupEditorScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (entries.isEmpty()) {
-                items(listOf("empty")) {
+                item {
                     Text(
                         text = "No websites added yet",
-                        color = MutedText,
+                        color = TetherColors.TextSecondary,
                         fontSize = 14.sp
                     )
                 }
@@ -397,21 +638,22 @@ fun BlockGroupEditorScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(CardBackground)
-                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                            .clip(TetherShapes.Sm)
+                            .background(TetherColors.RowFill)
+                            .border(1.dp, TetherColors.Border, TetherShapes.Sm)
+                            .padding(start = 14.dp, end = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = entry,
-                            color = Color.White,
+                            color = TetherColors.TextPrimary,
                             fontSize = 15.sp,
                             modifier = Modifier.weight(1f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         TextButton(onClick = { onRemoveEntry(entry) }) {
-                            Text(text = "Remove", color = ErrorRed, fontSize = 13.sp)
+                            Text(text = "Remove", color = TetherColors.Danger, fontSize = 13.sp)
                         }
                     }
                 }
@@ -420,26 +662,11 @@ fun BlockGroupEditorScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        Button(
-            onClick = onSave,
+        TetherPrimaryButton(
+            text = if (saving) "Saving…" else "Save group",
             enabled = !saving,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AccentBlue,
-                contentColor = Color.White,
-                disabledContainerColor = CardBackground,
-                disabledContentColor = MutedText
-            )
-        ) {
-            Text(
-                text = if (saving) "Saving…" else "Save group",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+            onClick = onSave
+        )
     }
 }
 

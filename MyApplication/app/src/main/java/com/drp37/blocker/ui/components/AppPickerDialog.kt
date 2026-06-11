@@ -92,9 +92,9 @@ fun AppPickerDialog(
                 ) {
                     if (filteredApps.isEmpty() && searchQuery.isNotBlank()) {
                         Text(
-                            text = "App doesn't exist",
+                            text = "No apps found",
                             color = Color(0xFF8A8A8A),
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
                     } else {
