@@ -90,12 +90,21 @@ fun AppPickerDialog(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    filteredApps.forEach { app ->
-                        AppCheckboxRow(
-                            app = app,
-                            checked = selectedPackages[app.packageName] == true,
-                            onCheckedChange = { selectedPackages[app.packageName] = it }
+                    if (filteredApps.isEmpty() && searchQuery.isNotBlank()) {
+                        Text(
+                            text = "App doesn't exist",
+                            color = Color(0xFF8A8A8A),
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
+                    } else {
+                        filteredApps.forEach { app ->
+                            AppCheckboxRow(
+                                app = app,
+                                checked = selectedPackages[app.packageName] == true,
+                                onCheckedChange = { selectedPackages[app.packageName] = it }
+                            )
+                        }
                     }
                 }
             }
