@@ -335,20 +335,20 @@ private fun AppSelectionScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     appPresets.forEach { preset ->
-                        val installed = installedByPackage[preset.packageName] != null
-                        val selected = preset.packageName in selectedPackages
-                        PresetChip(
-                            label = preset.label,
-                            selected = selected,
-                            installed = installed,
-                            onClick = {
-                                if (locked) {
-                                    lockedWarningNonce += 1
-                                } else if (installed) {
-                                    onSelectPackage(preset.packageName)
+                        if (installedByPackage[preset.packageName] != null) {
+                            val selected = preset.packageName in selectedPackages
+                            PresetChip(
+                                label = preset.label,
+                                selected = selected,
+                                onClick = {
+                                    if (locked) {
+                                        lockedWarningNonce += 1
+                                    } else {
+                                        onSelectPackage(preset.packageName)
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
 
@@ -422,25 +422,20 @@ private data class AppPreset(
 private fun PresetChip(
     label: String,
     selected: Boolean,
-    installed: Boolean,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
             .background(
-                when {
-                    selected -> Color(0xFF0A84FF)
-                    installed -> Color(0xFF1F1F22)
-                    else -> Color(0xFF101014)
-                }
+                if (selected) Color(0xFF0A84FF) else Color(0xFF1F1F22)
             )
-            .clickable(enabled = installed, onClick = onClick)
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp)
     ) {
         Text(
             text = label,
-            color = if (installed) Color.White else Color(0xFF5F5F65),
+            color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1
