@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.drp37.blocker.accountability.AccountabilityAlerts
 import com.drp37.blocker.remote.webserver.AccountabilityInboxItem
 import com.drp37.blocker.remote.webserver.SessionSyncClient
 import com.drp37.blocker.remote.webserver.WebServerService
@@ -55,6 +56,11 @@ fun AccountabilityInboxScreen(onBack: () -> Unit) {
                     error = throwable.message ?: "Could not load notifications."
                 }
         }
+    }
+
+    fun removeAttemptItem(item: AccountabilityInboxItem) {
+        inbox = inbox.filter { it.id != item.id }
+        if (item.unread) unreadCount = (unreadCount - 1).coerceAtLeast(0)
     }
 
     LaunchedEffect(Unit) {
@@ -135,6 +141,10 @@ fun AccountabilityInboxScreen(onBack: () -> Unit) {
                         onPreset = { key ->
                             coroutineScope.launch {
                                 runCatching { WebServerService.sendAccountabilityPreset(item.attemptId, key) }
+                                    .onSuccess {
+                                        AccountabilityAlerts.clearAttemptAfterReply(item.attemptId, item.id)
+                                        removeAttemptItem(item)
+                                    }
                             }
                         },
                         onSend = {
@@ -142,7 +152,11 @@ fun AccountabilityInboxScreen(onBack: () -> Unit) {
                             if (body.isNotEmpty()) {
                                 coroutineScope.launch {
                                     runCatching { WebServerService.sendAccountabilityMessage(item.attemptId, body) }
-                                    messageDrafts = messageDrafts - item.attemptId
+                                        .onSuccess {
+                                            AccountabilityAlerts.clearAttemptAfterReply(item.attemptId, item.id)
+                                            messageDrafts = messageDrafts - item.attemptId
+                                            removeAttemptItem(item)
+                                        }
                                 }
                             }
                         }

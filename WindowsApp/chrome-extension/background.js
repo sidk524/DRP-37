@@ -23,6 +23,16 @@ let lastStateKey = "";
 let currentState = { active: false, domains: [], mode: "breathing", friction: {} };
 const notificationAttempts = new Map();
 
+function dismissAttemptNotifications(attemptId) {
+    if (!attemptId) return;
+    for (const [notificationId, storedAttemptId] of notificationAttempts.entries()) {
+        if (storedAttemptId === attemptId) {
+            chrome.notifications.clear(notificationId);
+            notificationAttempts.delete(notificationId);
+        }
+    }
+}
+
 function normalizeHost(value) {
     return String(value || "")
         .trim()
@@ -291,11 +301,15 @@ function connectAccountabilityStream() {
     accountabilityStream.onmessage = (event) => {
         let message;
         try { message = JSON.parse(event.data); } catch { return; }
+        if (message?.type === "accountability.attempt.dismiss") {
+            dismissAttemptNotifications(message.attemptId);
+            return;
+        }
         const isReply = message?.type === "accountability.message";
         const notificationId = `accountability-${Date.now()}-${Math.random()}`;
         chrome.notifications.create(notificationId, {
             type: "basic",
-            iconUrl: "icon.svg",
+            iconUrl: "icons/icon128.png",
             title: isReply
                 ? `${message.message?.senderDisplayName || "A friend"} sent encouragement`
                 : `${message.notification?.actorDisplayName || "A friend"} needs accountability`,
@@ -320,6 +334,8 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ presetKey }),
+    }).then((response) => {
+        if (response.ok) dismissAttemptNotifications(attemptId);
     }).catch(() => {});
 });
 

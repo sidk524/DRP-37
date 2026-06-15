@@ -8,7 +8,9 @@ import {
     onAccountabilityEvent,
     sendAccountabilityMessage,
 } from "../services/AccountabilityRepository";
+import "../styles/Onboarding.css";
 import "../styles/Settings.css";
+import "../styles/AccountabilityInbox.css";
 
 const PRESETS = [
     ["lock_in", "Lock in"],
@@ -75,10 +77,21 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
         }
     }
 
-    async function reply(attemptId, payload) {
+    async function reply(attemptItem, payload) {
         try {
-            await sendAccountabilityMessage(attemptId, payload);
-            setDrafts((value) => ({ ...value, [attemptId]: "" }));
+            await sendAccountabilityMessage(attemptItem.attempt_id, payload);
+            setDrafts((value) => ({ ...value, [attemptItem.attempt_id]: "" }));
+            if (attemptItem.kind === "attempt") {
+                await markAccountabilityNotificationRead(attemptItem.id);
+                setItems((current) => current.filter((entry) => entry.id !== attemptItem.id));
+                if (!attemptItem.read_at) {
+                    setUnread((value) => {
+                        const next = Math.max(0, value - 1);
+                        onUnreadChange?.(next);
+                        return next;
+                    });
+                }
+            }
         } catch (err) { setError(err.message || "Could not send message."); }
     }
 
@@ -104,7 +117,11 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
                 <div className="settings-stack">
                     {items.length === 0 && <p className="settings-status">No accountability notifications yet.</p>}
                     {items.map((item) => (
-                        <section key={`${item.kind}-${item.id}`} className="settings-card" onClick={() => markRead(item)}>
+                        <section
+                            key={`${item.kind}-${item.id}`}
+                            className="settings-card accountability-card"
+                            onClick={() => markRead(item)}
+                        >
                             {item.kind === "message" ? (
                                 <>
                                     <p className="onboarding-section">Encouragement</p>
@@ -118,21 +135,53 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
                                         {item.actorDisplayName} opened {item.attempt?.target_label}
                                     </h2>
                                     <p className="settings-subtitle">
-                                        {item.attempt?.mode} · {(item.shared_groups || []).map((group) => group.name).join(", ")}
+                                        {item.attempt?.mode}
+                                        {(item.shared_groups || []).length > 0
+                                            ? ` · ${(item.shared_groups || []).map((group) => group.name).join(", ")}`
+                                            : ""}
                                     </p>
-                                    <div className="groups-form-row">
+                                    <div className="accountability-presets" role="group" aria-label="Quick replies">
                                         {PRESETS.map(([key, label]) => (
-                                            <button key={key} type="button" onClick={() => reply(item.attempt_id, { presetKey: key })}>{label}</button>
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                className="accountability-preset-btn"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    reply(item, { presetKey: key });
+                                                }}
+                                            >
+                                                {label}
+                                            </button>
                                         ))}
                                     </div>
-                                    <div className="groups-form-row">
+                                    <div className="accountability-compose">
                                         <input
                                             value={drafts[item.attempt_id] || ""}
                                             maxLength={280}
                                             placeholder="Write a private message"
+                                            onClick={(event) => event.stopPropagation()}
                                             onChange={(event) => setDrafts((value) => ({ ...value, [item.attempt_id]: event.target.value }))}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter" && !event.shiftKey) {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    const body = (drafts[item.attempt_id] || "").trim();
+                                                    if (body) reply(item, { body });
+                                                }
+                                            }}
                                         />
-                                        <button type="button" onClick={() => reply(item.attempt_id, { body: drafts[item.attempt_id] || "" })}>Send</button>
+                                        <button
+                                            type="button"
+                                            className="accountability-send-btn"
+                                            disabled={!(drafts[item.attempt_id] || "").trim()}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                reply(item, { body: drafts[item.attempt_id] || "" });
+                                            }}
+                                        >
+                                            Send
+                                        </button>
                                     </div>
                                 </>
                             )}

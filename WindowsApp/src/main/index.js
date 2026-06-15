@@ -107,7 +107,13 @@ function registerAllIpcHandlers() {
     ipcMain.handle(CHANNELS.ACCOUNTABILITY_MARK_READ, (_e, id) => webServerService.markAccountabilityNotificationRead(id));
     ipcMain.handle(CHANNELS.ACCOUNTABILITY_MARK_MESSAGE_READ, (_e, id) => webServerService.markAccountabilityMessageRead(id));
     ipcMain.handle(CHANNELS.ACCOUNTABILITY_CLEAR_INBOX, () => webServerService.clearAccountabilityInbox());
-    ipcMain.handle(CHANNELS.ACCOUNTABILITY_SEND_MESSAGE, (_e, data) => webServerService.sendAccountabilityMessage(data?.attemptId, data?.payload));
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_SEND_MESSAGE, async (_e, data) => {
+        const result = await webServerService.sendAccountabilityMessage(data?.attemptId, data?.payload);
+        if (data?.attemptId) {
+            extensionBridge.notifyAccountability({ type: "accountability.attempt.dismiss", attemptId: data.attemptId });
+        }
+        return result;
+    });
     ipcMain.handle(CHANNELS.WEBSERVER_SYNC_DEFAULT_GROUPS, (_e, payload) =>
         webServerService.syncDefaultGroups(payload)
     );
@@ -156,6 +162,7 @@ function createWindow() {
             height: 800,
             minWidth: 400,
             minHeight: 560,
+            icon: path.join(__dirname, "../../build/icon.png"),
             webPreferences: {
                 preload: path.join(__dirname, "preload.js"),
                 contextIsolation: true,
@@ -222,7 +229,13 @@ if (gotSingleInstanceLock) {
                 const body = message?.type === "accountability.message"
                     ? message.message?.body
                     : `${message.notification?.attempt?.target_label || "Blocked app"} · ${message.notification?.attempt?.mode || "focus"}`;
-                if (Notification.isSupported()) new Notification({ title, body }).show();
+                if (Notification.isSupported()) {
+                    new Notification({
+                        title,
+                        body,
+                        icon: path.join(__dirname, "../../build/icon.png"),
+                    }).show();
+                }
             },
         });
         authService.initialize({ onSessionChange: broadcastAuthSession });
@@ -231,7 +244,11 @@ if (gotSingleInstanceLock) {
             extensionBridge,
         });
         extensionBridge.setAttemptReporter((payload) => webServerService.reportAccountabilityAttempt(payload));
-        extensionBridge.setMessageSender((attemptId, payload) => webServerService.sendAccountabilityMessage(attemptId, payload));
+        extensionBridge.setMessageSender(async (attemptId, payload) => {
+            const result = await webServerService.sendAccountabilityMessage(attemptId, payload);
+            extensionBridge.notifyAccountability({ type: "accountability.attempt.dismiss", attemptId });
+            return result;
+        });
         registerAllIpcHandlers();
         createWindow();
     });

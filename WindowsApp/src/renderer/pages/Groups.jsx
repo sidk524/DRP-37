@@ -43,6 +43,13 @@ function formatLeaderboardScore(entry, metric) {
     return formatLockedTime(entry.lockedSeconds);
 }
 
+function formatSessionRemaining(endsAt) {
+    if (!endsAt) return null;
+    const remainingMs = Math.max(0, new Date(endsAt).getTime() - Date.now());
+    if (remainingMs <= 0) return null;
+    return `In session · ${formatLockedTime(Math.floor(remainingMs / 1000))} left`;
+}
+
 function normalizeInviteCode(value) {
     return value.trim().toUpperCase().replace(/\s+/g, "");
 }
@@ -75,6 +82,10 @@ function Groups({ onBack }) {
     const rankedLeaderboard = useMemo(
         () => rankLeaderboard(leaderboard, leaderboardMetric),
         [leaderboard, leaderboardMetric]
+    );
+    const presenceByUserId = useMemo(
+        () => new Map(presence.map((member) => [member.userId, member])),
+        [presence]
     );
 
     async function refreshGroups(preferredGroupId = selectedGroupId) {
@@ -306,18 +317,6 @@ function Groups({ onBack }) {
                             </div>
                         </div>
                         <div className="groups-leaderboard-scroll">
-                            {selectedGroup && !selectedGroup.isDefault && presence.length > 0 && (
-                                <div className="groups-panel-section">
-                                    <p className="groups-panel-label">Live sessions</p>
-                                    {presence.map((member) => (
-                                        <p key={member.userId} className="groups-muted">
-                                            {member.displayName}: {member.active
-                                                ? `${member.mode} until ${new Date(member.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                                                : "not in a session"}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
                             {!focusPointsAvailable && (
                                 <p className="groups-muted groups-points-unavailable">
                                     Points ranking is unavailable until the focus_session_points database table is set up.
@@ -331,18 +330,29 @@ function Groups({ onBack }) {
                                 <p className="groups-muted">No completed sessions yet in {selectedGroup.name}.</p>
                             ) : (
                                 <ol className="groups-leaderboard">
-                                    {rankedLeaderboard.map((entry) => (
-                                        <li
-                                            key={entry.userId}
-                                            className={entry.isCurrentUser ? "current-user" : ""}
-                                        >
-                                            <span className="groups-rank">#{entry.rank}</span>
-                                            <span className="groups-name">{entry.displayName}</span>
-                                            <span className="groups-time">
-                                                {formatLeaderboardScore(entry, leaderboardMetric)}
-                                            </span>
-                                        </li>
-                                    ))}
+                                    {rankedLeaderboard.map((entry) => {
+                                        const member = presenceByUserId.get(entry.userId);
+                                        const sessionLabel = member?.active
+                                            ? formatSessionRemaining(member.endsAt)
+                                            : null;
+                                        return (
+                                            <li
+                                                key={entry.userId}
+                                                className={entry.isCurrentUser ? "current-user" : ""}
+                                            >
+                                                <span className="groups-rank">#{entry.rank}</span>
+                                                <div className="groups-leaderboard-main">
+                                                    <span className="groups-name">{entry.displayName}</span>
+                                                    {sessionLabel && (
+                                                        <span className="groups-session">{sessionLabel}</span>
+                                                    )}
+                                                </div>
+                                                <span className="groups-time">
+                                                    {formatLeaderboardScore(entry, leaderboardMetric)}
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
                                 </ol>
                             )}
                         </div>

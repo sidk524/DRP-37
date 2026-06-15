@@ -110,6 +110,7 @@ object SessionSyncClient {
                 val attempt = notification.optJSONObject("attempt")
                 AccountabilityNotifier.showAttemptNotification(
                     attemptId = notification.optString("attempt_id"),
+                    notificationRowId = notification.optString("id"),
                     actorDisplayName = notification.optString("actorDisplayName", "A friend"),
                     targetLabel = attempt?.optString("target_label", "Blocked app") ?: "Blocked app",
                     mode = attempt?.optString("mode", "focus") ?: "focus"

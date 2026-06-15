@@ -13,8 +13,9 @@ import com.drp37.blocker.R
 object AccountabilityNotifier {
     const val EXTRA_ATTEMPT_ID = "attempt_id"
     const val EXTRA_PRESET_KEY = "preset_key"
-    const val EXTRA_MESSAGE_ID = "message_id"
     const val EXTRA_NOTIFICATION_ID = "notification_id"
+    const val EXTRA_NOTIFICATION_ROW_ID = "notification_row_id"
+    const val EXTRA_MESSAGE_ID = "message_id"
     const val ACTION_REPLY_PRESET = "com.drp37.blocker.accountability.REPLY_PRESET"
     const val ACTION_REPLY_CUSTOM = "com.drp37.blocker.accountability.REPLY_CUSTOM"
     const val ACTION_DISMISS_MESSAGE = "com.drp37.blocker.accountability.DISMISS_MESSAGE"
@@ -38,6 +39,7 @@ object AccountabilityNotifier {
 
     fun showAttemptNotification(
         attemptId: String,
+        notificationRowId: String,
         actorDisplayName: String,
         targetLabel: String,
         mode: String
@@ -46,28 +48,16 @@ object AccountabilityNotifier {
         val notificationId = notificationIdForAttempt(attemptId)
         val title = "$actorDisplayName needs accountability"
         val body = "$targetLabel · $mode"
-        val builder = NotificationCompat.Builder(context, CHANNEL_ATTEMPTS)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setContentIntent(openAppIntent(notificationId))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setAutoCancel(true)
-        listOf(
-            "lock_in" to "Lock in",
-            "stay_focused" to "Stay focused",
-            "youve_got_this" to "You've got this"
-        ).forEach { (presetKey, label) ->
-            builder.addAction(presetAction(attemptId, notificationId, presetKey, label))
-        }
+        val messagingStyle = NotificationCompat.MessagingStyle("You")
+            .setConversationTitle(title)
+            .addMessage(body, System.currentTimeMillis(), actorDisplayName)
         val remoteInput = RemoteInput.Builder(REMOTE_INPUT_KEY)
-            .setLabel("Reply")
+            .setLabel("Write a message")
             .build()
         val replyIntent = Intent(context, AccountabilityReplyReceiver::class.java).apply {
             action = ACTION_REPLY_CUSTOM
             putExtra(EXTRA_ATTEMPT_ID, attemptId)
+            putExtra(EXTRA_NOTIFICATION_ROW_ID, notificationRowId)
             putExtra(EXTRA_NOTIFICATION_ID, notificationId)
         }
         val replyPendingIntent = PendingIntent.getBroadcast(
@@ -76,9 +66,24 @@ object AccountabilityNotifier {
             replyIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
+        val builder = NotificationCompat.Builder(context, CHANNEL_ATTEMPTS)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(messagingStyle)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+        listOf(
+            "lock_in" to "Lock in",
+            "stay_focused" to "Stay focused",
+            "youve_got_this" to "You've got this"
+        ).forEach { (presetKey, label) ->
+            builder.addAction(presetAction(attemptId, notificationId, notificationRowId, presetKey, label))
+        }
         builder.addAction(
-            NotificationCompat.Action.Builder(R.mipmap.ic_launcher, "Reply", replyPendingIntent)
+            NotificationCompat.Action.Builder(0, "Message", replyPendingIntent)
                 .addRemoteInput(remoteInput)
+                .setShowsUserInterface(false)
                 .build()
         )
         context.getSystemService(NotificationManager::class.java).notify(notificationId, builder.build())
@@ -142,6 +147,7 @@ object AccountabilityNotifier {
     private fun presetAction(
         attemptId: String,
         notificationId: Int,
+        notificationRowId: String,
         presetKey: String,
         label: String
     ): NotificationCompat.Action {
@@ -149,6 +155,7 @@ object AccountabilityNotifier {
             action = ACTION_REPLY_PRESET
             putExtra(EXTRA_ATTEMPT_ID, attemptId)
             putExtra(EXTRA_PRESET_KEY, presetKey)
+            putExtra(EXTRA_NOTIFICATION_ROW_ID, notificationRowId)
             putExtra(EXTRA_NOTIFICATION_ID, notificationId)
         }
         val pendingIntent = PendingIntent.getBroadcast(
@@ -157,15 +164,8 @@ object AccountabilityNotifier {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return NotificationCompat.Action.Builder(R.mipmap.ic_launcher, label, pendingIntent).build()
-    }
-
-    private fun openAppIntent(requestCode: Int): PendingIntent {
-        return PendingIntent.getActivity(
-            context,
-            requestCode,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        return NotificationCompat.Action.Builder(0, label, pendingIntent)
+            .setShowsUserInterface(false)
+            .build()
     }
 }

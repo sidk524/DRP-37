@@ -19,11 +19,13 @@ class AccountabilityReplyReceiver : BroadcastReceiver() {
                     AccountabilityNotifier.ACTION_REPLY_PRESET -> {
                         val attemptId = intent.getStringExtra(AccountabilityNotifier.EXTRA_ATTEMPT_ID) ?: return@launch
                         val presetKey = intent.getStringExtra(AccountabilityNotifier.EXTRA_PRESET_KEY) ?: return@launch
+                        val notificationRowId = intent.getStringExtra(AccountabilityNotifier.EXTRA_NOTIFICATION_ROW_ID)
                         runCatching { WebServerService.sendAccountabilityPreset(attemptId, presetKey) }
-                            .onSuccess { AccountabilityNotifier.cancelAttemptNotification(attemptId) }
+                            .onSuccess { AccountabilityAlerts.clearAttemptAfterReply(attemptId, notificationRowId) }
                     }
                     AccountabilityNotifier.ACTION_REPLY_CUSTOM -> {
                         val attemptId = intent.getStringExtra(AccountabilityNotifier.EXTRA_ATTEMPT_ID) ?: return@launch
+                        val notificationRowId = intent.getStringExtra(AccountabilityNotifier.EXTRA_NOTIFICATION_ROW_ID)
                         val body = RemoteInput.getResultsFromIntent(intent)
                             ?.getCharSequence(AccountabilityNotifier.REMOTE_INPUT_KEY)
                             ?.toString()
@@ -31,7 +33,7 @@ class AccountabilityReplyReceiver : BroadcastReceiver() {
                             .orEmpty()
                         if (body.isEmpty()) return@launch
                         runCatching { WebServerService.sendAccountabilityMessage(attemptId, body) }
-                            .onSuccess { AccountabilityNotifier.cancelAttemptNotification(attemptId) }
+                            .onSuccess { AccountabilityAlerts.clearAttemptAfterReply(attemptId, notificationRowId) }
                     }
                     AccountabilityNotifier.ACTION_DISMISS_MESSAGE -> {
                         val messageId = intent.getStringExtra(AccountabilityNotifier.EXTRA_MESSAGE_ID)

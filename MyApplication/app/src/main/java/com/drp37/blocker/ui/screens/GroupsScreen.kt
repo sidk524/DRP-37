@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.drp37.blocker.accountability.AccountabilityAlerts
 import com.drp37.blocker.remote.webserver.AccountabilityInboxItem
 import com.drp37.blocker.remote.webserver.GroupPresence
 import com.drp37.blocker.remote.webserver.GroupSummary
@@ -74,6 +75,9 @@ fun GroupsScreen(onBack: () -> Unit) {
 
     val rankedLeaderboard = remember(leaderboard, leaderboardMetric) {
         rankLeaderboard(leaderboard, leaderboardMetric)
+    }
+    val presenceByUserId = remember(presence) {
+        presence.associateBy { it.userId }
     }
 
     fun refreshGroups(preferredGroupId: String? = selectedGroupId) {
@@ -284,8 +288,17 @@ fun GroupsScreen(onBack: () -> Unit) {
                             Text(text = item.detail, color = Color(0xFF8E8E96))
                             if (item.kind == "attempt") {
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    listOf("lock_in" to "Lock in", "stay_focused" to "Stay focused").forEach { (key, label) ->
-                                        TextButton(onClick = { coroutineScope.launch { runCatching { WebServerService.sendAccountabilityPreset(item.attemptId, key) } } }) {
+                                    listOf("lock_in" to "Lock in", "stay_focused" to "Stay focused", "youve_got_this" to "You've got this").forEach { (key, label) ->
+                                        TextButton(onClick = {
+                                            coroutineScope.launch {
+                                                runCatching { WebServerService.sendAccountabilityPreset(item.attemptId, key) }
+                                                    .onSuccess {
+                                                        AccountabilityAlerts.clearAttemptAfterReply(item.attemptId, item.id)
+                                                        inbox = inbox.filter { it.id != item.id }
+                                                        if (item.unread) unreadCount = (unreadCount - 1).coerceAtLeast(0)
+                                                    }
+                                            }
+                                        }) {
                                             Text(label)
                                         }
                                     }
@@ -300,7 +313,12 @@ fun GroupsScreen(onBack: () -> Unit) {
                                     val body = messageDrafts[item.attemptId].orEmpty().trim()
                                     if (body.isNotEmpty()) coroutineScope.launch {
                                         runCatching { WebServerService.sendAccountabilityMessage(item.attemptId, body) }
-                                        messageDrafts = messageDrafts - item.attemptId
+                                            .onSuccess {
+                                                AccountabilityAlerts.clearAttemptAfterReply(item.attemptId, item.id)
+                                                messageDrafts = messageDrafts - item.attemptId
+                                                inbox = inbox.filter { it.id != item.id }
+                                                if (item.unread) unreadCount = (unreadCount - 1).coerceAtLeast(0)
+                                            }
                                     }
                                 }) { Text("Send") }
                             }
@@ -330,20 +348,6 @@ fun GroupsScreen(onBack: () -> Unit) {
                                 group = selectedGroup,
                                 onCopy = { clipboard.setText(AnnotatedString(selectedGroup.inviteCode)) }
                             )
-                        }
-                    }
-                    if (selectedGroup != null && !selectedGroup.isDefault && presence.isNotEmpty()) {
-                        item {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(text = "Live sessions", color = Color.White, fontWeight = FontWeight.Bold)
-                                presence.forEach { member ->
-                                    Text(
-                                        text = "${member.displayName}: ${if (member.active) member.mode ?: "active" else "not in a session"}",
-                                        color = Color(0xFF8E8E96),
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
                         }
                     }
                     item {
@@ -376,7 +380,13 @@ fun GroupsScreen(onBack: () -> Unit) {
                         }
                     } else {
                         items(rankedLeaderboard, key = { it.userId }) { entry ->
-                            LeaderboardRow(entry = entry, metric = leaderboardMetric)
+                            LeaderboardRow(
+                                entry = entry,
+                                metric = leaderboardMetric,
+                                sessionLabel = presenceByUserId[entry.userId]?.let { member ->
+                                    formatSessionLabel(member)
+                                }
+                            )
                         }
                     }
                 }
@@ -524,7 +534,11 @@ private fun InviteCard(
 }
 
 @Composable
-private fun LeaderboardRow(entry: LeaderboardEntry, metric: LeaderboardMetric) {
+private fun LeaderboardRow(
+    entry: LeaderboardEntry,
+    metric: LeaderboardMetric,
+    sessionLabel: String? = null
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -537,13 +551,22 @@ private fun LeaderboardRow(entry: LeaderboardEntry, metric: LeaderboardMetric) {
         Spacer(modifier = Modifier.padding(horizontal = 8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = entry.displayName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                text = formatLeaderboardScore(entry, metric),
-                color = Color(0xFF8E8E96),
-                fontSize = 13.sp
-            )
+            if (!sessionLabel.isNullOrBlank()) {
+                Text(
+                    text = sessionLabel,
+                    color = Color(0xFF8E8E96),
+                    fontSize = 13.sp
+                )
+            }
         }
+        Text(
+            text = formatLeaderboardScore(entry, metric),
+            color = Color.White,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
         if (entry.isCurrentUser) {
+            Spacer(modifier = Modifier.padding(horizontal = 8.dp))
             Text(text = "You", color = Color(0xFF0A84FF), fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
@@ -578,8 +601,22 @@ private fun formatLeaderboardScore(entry: LeaderboardEntry, metric: LeaderboardM
 private fun formatLockedTime(seconds: Int): String {
     val hours = seconds / 3600
     val minutes = (seconds % 3600) / 60
+    val remainingSeconds = seconds % 60
     return when {
-        hours > 0 -> "${hours}h ${minutes}m locked"
-        else -> "${minutes}m locked"
+        hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+        hours > 0 -> "${hours}h"
+        minutes > 0 -> "${minutes}m"
+        else -> "${remainingSeconds}s"
     }
+}
+
+private fun formatSessionLabel(member: GroupPresence): String? {
+    if (!member.active) return null
+    val endsAt = member.endsAt ?: return null
+    val remainingSeconds = runCatching {
+        val endEpoch = java.time.Instant.parse(endsAt).epochSecond
+        (endEpoch - java.time.Instant.now().epochSecond).toInt()
+    }.getOrDefault(0)
+    if (remainingSeconds <= 0) return null
+    return "In session · ${formatLockedTime(remainingSeconds)} left"
 }

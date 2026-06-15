@@ -348,9 +348,25 @@
     font-variant-numeric: tabular-nums;
 }
 
+.groups-leaderboard-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
 .groups-name {
     color: var(--text-primary);
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.groups-session {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -409,11 +425,10 @@
     }
 
     .groups-leaderboard li {
-        grid-template-columns: 40px 1fr;
+        grid-template-columns: 40px 1fr auto;
     }
 
     .groups-time {
-        grid-column: 2;
         color: var(--text-secondary);
     }
 
