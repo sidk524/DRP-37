@@ -133,6 +133,7 @@ function createSessionSyncHub({ verifyToken, getSnapshot, path = SYNC_PATH }) {
                 revision,
                 originDeviceId: null,
                 session: session || null,
+                completed: null,
             });
         } catch (err) {
             console.warn(`[session-sync] snapshot failed: ${err?.message || err}`);
@@ -143,13 +144,14 @@ function createSessionSyncHub({ verifyToken, getSnapshot, path = SYNC_PATH }) {
      * Push a session update to every connected device for a user, optionally
      * skipping the device that originated the change (echo suppression).
      */
-    function broadcastSession(userId, session, { excludeDeviceId = null } = {}) {
+    function broadcastSession(userId, session, { excludeDeviceId = null, completed = null } = {}) {
         revision += 1;
         const payload = {
             type: "session.sync",
             revision,
             originDeviceId: excludeDeviceId || null,
             session: session || null,
+            completed: completed || null,
         };
         const set = connectionsByUser.get(userId);
         if (!set) return;

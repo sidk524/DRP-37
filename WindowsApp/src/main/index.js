@@ -84,8 +84,8 @@ function registerAllIpcHandlers() {
     ipcMain.handle(CHANNELS.WEBSERVER_CREATE_SESSION, (_e, payload) =>
         webServerService.createSession(payload)
     );
-    ipcMain.handle(CHANNELS.WEBSERVER_END_SESSION, (_e, sessionId) =>
-        webServerService.endSession(sessionId)
+    ipcMain.handle(CHANNELS.WEBSERVER_END_SESSION, (_e, payload) =>
+        webServerService.endSession(payload?.sessionId, payload?.reason)
     );
     ipcMain.handle(CHANNELS.WEBSERVER_LIST_GROUPS, () => webServerService.listGroups());
     ipcMain.handle(CHANNELS.WEBSERVER_CREATE_GROUP, (_e, payload) =>

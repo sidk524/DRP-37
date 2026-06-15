@@ -73,15 +73,16 @@ async function patchSessionMode(mode) {
     return data.session || null;
 }
 
-async function endSession(sessionId) {
+async function endSession(sessionId, reason = "manual") {
     const data = await request("/api/session/current", {
         method: "PUT",
         body: {
             active: false,
             sessionId,
+            reason: reason === "expired" ? "expired" : "manual",
         },
     });
-    return data.sessions || [];
+    return { sessions: data.sessions || [], completed: data.completed || null };
 }
 
 async function listGroups() {

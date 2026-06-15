@@ -10,7 +10,7 @@ import {
     loadLastBlockGroupId,
     saveLastBlockGroupId,
 } from "../services/BlockGroupRepository";
-import { getUserTotalPoints, loadOnboarding, saveSessionPoints, signOut } from "../services/SupabaseClient";
+import { getUserTotalPoints, loadOnboarding, signOut } from "../services/SupabaseClient";
 import {
     getTetherSession,
     isTetherBridgeAvailable,
@@ -243,36 +243,25 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         return onTetherSessionUpdate(async (s) => {
             const wasActive = wasActiveRef.current;
             const isActive = !!s?.active;
-            const endedByExpiry = s?.lastStop?.reason === "expired";
+            const reason = s?.lastStop?.reason;
             const endedAt = s?.lastStop?.endedAt;
 
             if (wasActive && !isActive && endedAt && endedAt !== lastAwardedEndedAtRef.current) {
                 try {
-                    if (endedByExpiry) {
-                        try {
-                            const summary = await saveSessionPoints({
-                                userId,
-                                mode: s.lastStop.mode,
-                                actualMs: s.lastStop.actualMs,
-                                plannedMs: s.lastStop.plannedMs,
-                                blockedAppsCount: s.lastStop.blockedAppsCount,
-                                endedAt: new Date(endedAt).toISOString(),
-                            });
-                            if (summary) {
-                                setLastCompletedSession(summary);
-                                await refreshPoints();
-                            }
-                        } catch (err) {
-                            console.error("Failed to save session points:", err);
-                            setSessionError(
-                                err?.message || "Session ended, but focus points could not be saved."
-                            );
+                    if (reason === "expired" && remoteSessionId) {
+                        // Server computes + awards points once and returns the record.
+                        const { completed } = await endSession(remoteSessionId, "expired");
+                        setRemoteSessionId(null);
+                        if (completed) {
+                            setLastCompletedSession(completed);
+                            await refreshPoints();
                         }
-                    }
-                    if (remoteSessionId) {
-                        await endSession(remoteSessionId);
+                    } else if (reason === "manual" && remoteSessionId) {
+                        await endSession(remoteSessionId, "manual");
                         setRemoteSessionId(null);
                     }
+                    // reason === "remote": the server already closed the session and
+                    // applyRemoteSync handled any completion summary — nothing to do.
                     lastAwardedEndedAtRef.current = endedAt;
                 } catch (error) {
                     console.error("Failed to close focus session:", error);
@@ -294,11 +283,27 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         const serverSession = message?.session || null;
 
         if (!serverSession) {
-            if (!sessionRunning && !active) return;
+            const completed = message?.completed || null;
+            if (!sessionRunning && !active) {
+                // Already idle, but still surface a completion the other device
+                // earned (e.g. it expired while we were on the setup screen).
+                if (completed) {
+                    setLastCompletedSession(completed);
+                    await refreshPoints();
+                }
+                return;
+            }
             setRemoteSessionId(null);
             const res = await stopTetherSession({ reason: "remote" });
             if (res && !res.ok) {
                 console.error("Failed to apply remote stop:", res.error);
+            }
+            // If the other device completed the session (expiry), show the same
+            // completion screen with the server-awarded points; a manual remote
+            // stop carries no record and simply returns to setup.
+            if (completed) {
+                setLastCompletedSession(completed);
+                await refreshPoints();
             }
             return;
         }
@@ -394,14 +399,14 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             return;
         }
         if (remoteSessionId) {
-            await endSession(remoteSessionId);
+            await endSession(remoteSessionId, "manual");
             setRemoteSessionId(null);
         }
     }
 
     async function handleSignOut() {
         if (remoteSessionId) {
-            await endSession(remoteSessionId);
+            await endSession(remoteSessionId, "manual");
             setRemoteSessionId(null);
         }
         await stopTetherSession();

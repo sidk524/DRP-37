@@ -33,7 +33,8 @@ contextBridge.exposeInMainWorld("tether", {
 
     getCurrentSession: () => invoke(CHANNELS.WEBSERVER_GET_CURRENT_SESSION),
     createSession: (payload) => invoke(CHANNELS.WEBSERVER_CREATE_SESSION, payload),
-    endSession: (sessionId) => invoke(CHANNELS.WEBSERVER_END_SESSION, sessionId),
+    endSession: (sessionId, reason) =>
+        invoke(CHANNELS.WEBSERVER_END_SESSION, { sessionId, reason }),
     listGroups: () => invoke(CHANNELS.WEBSERVER_LIST_GROUPS),
     createGroup: (payload) => invoke(CHANNELS.WEBSERVER_CREATE_GROUP, payload),
     joinGroup: (payload) => invoke(CHANNELS.WEBSERVER_JOIN_GROUP, payload),

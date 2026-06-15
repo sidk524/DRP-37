@@ -171,8 +171,13 @@ const getCurrentSessionForUser = async (userId) => {
     if (error) throw error;
 
     if (data && isExpired(data)) {
-        const { error: closeExpiredError } = await closeSession(userId, data.id);
+        const { data: closedRows, error: closeExpiredError } = await closeSession(userId, data.id);
         if (closeExpiredError) throw closeExpiredError;
+        // Completed by running out the clock — award points once (idempotent).
+        const closed = closedRows?.[0] || { ...data, ended_at: new Date().toISOString() };
+        await awardSessionPoints(userId, closed).catch((err) =>
+            console.error(`[session-sync] lazy award failed: ${err?.message || err}`)
+        );
         return null;
     }
 
@@ -555,6 +560,55 @@ const publicFocusPointRecord = (row) => ({
     created_at: row.created_at,
 });
 
+// Device-independent "blocked apps" count for points: the shared canonical
+// targets the user chose, falling back to the distinct apps+domains on the row.
+const universalBlockedCount = (session) => {
+    const canonical = Array.isArray(session?.canonical_targets) ? session.canonical_targets : [];
+    if (canonical.length > 0) return canonical.length;
+    const apps = Array.isArray(session?.apps_blocked) ? session.apps_blocked : [];
+    const domains = Array.isArray(session?.domains_blocked) ? session.domains_blocked : [];
+    return Math.max(1, new Set([...apps, ...domains]).size);
+};
+
+// Award focus points for a completed session exactly once. Idempotent on
+// block_session_id (insert-on-conflict-do-nothing), so concurrent expiry calls
+// from multiple devices all converge on — and return — the same record.
+// Everything is computed from the session row, never from client input.
+const awardSessionPoints = async (userId, session) => {
+    if (!session?.id) return null;
+    const mode = normalizeSessionMode(session.mode);
+    const plannedMs = Math.max(0, Math.round((Number(session.total_duration_seconds) || 0) * 1000));
+    const actualMs = lockedSecondsForSession(session) * 1000;
+    const blockedAppsCount = universalBlockedCount(session);
+    const points = calculateFocusPoints(mode, actualMs, blockedAppsCount);
+    const endedAt = session.ended_at || new Date().toISOString();
+
+    const { error: insertError } = await supabaseAdmin
+        .from("focus_session_points")
+        .upsert(
+            {
+                user_id: userId,
+                block_session_id: session.id,
+                mode,
+                actual_ms: actualMs,
+                planned_ms: plannedMs,
+                blocked_apps_count: blockedAppsCount,
+                points,
+                ended_at: endedAt
+            },
+            { onConflict: "block_session_id", ignoreDuplicates: true }
+        );
+    if (insertError) throw insertError;
+
+    const { data, error } = await supabaseAdmin
+        .from("focus_session_points")
+        .select("id,user_id,mode,actual_ms,planned_ms,blocked_apps_count,points,ended_at,created_at")
+        .eq("block_session_id", session.id)
+        .maybeSingle();
+    if (error) throw error;
+    return data ? publicFocusPointRecord(data) : null;
+};
+
 app.post("/api/focus-points", requireSupabase, requireUser, async (req, res, next) => {
     try {
         const mode = normalizeSessionMode(String(req.body?.mode || "breathing"));
@@ -857,7 +911,8 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
             blockGroupId,
             totalDurationSeconds,
             sessionId,
-            mode
+            mode,
+            reason
         } = req.body || {};
         const sessionMode = normalizeSessionModeForSession(mode);
         const originDeviceId = deviceIdFromRequest(req);
@@ -966,8 +1021,34 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
 
             if (error) throw error;
 
-            res.json({ sessions: data });
-            broadcastSessionUpdate(req.user.id, originDeviceId);
+            // Only a session run to completion (expiry) earns points; a manual
+            // early stop earns nothing. Points are computed server-side and once.
+            let completed = null;
+            if (reason === "expired") {
+                let sessionRow = data?.[0] || null;
+                if (!sessionRow && sessionId) {
+                    // Already closed by another device — load it to award/return.
+                    const { data: fetched, error: fetchError } = await supabaseAdmin
+                        .from("block_sessions")
+                        .select(SESSION_FIELDS)
+                        .eq("user_id", req.user.id)
+                        .eq("id", sessionId)
+                        .maybeSingle();
+                    if (fetchError) throw fetchError;
+                    sessionRow = fetched;
+                }
+                if (sessionRow) {
+                    completed = await awardSessionPoints(req.user.id, sessionRow);
+                }
+            }
+
+            res.json({ sessions: data, completed });
+            if (sessionSyncHub.getConnectedCount(req.user.id) > 0) {
+                sessionSyncHub.broadcastSession(req.user.id, null, {
+                    excludeDeviceId: originDeviceId,
+                    completed
+                });
+            }
             return;
         }
 

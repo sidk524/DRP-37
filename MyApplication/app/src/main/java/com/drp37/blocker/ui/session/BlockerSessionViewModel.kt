@@ -295,7 +295,7 @@ class BlockerSessionViewModel : ViewModel() {
         timerJob?.cancel()
         viewModelScope.launch {
             current.activeSessionId?.let { sessionId ->
-                runCatching { WebServerService.endSession(sessionId) }
+                runCatching { WebServerService.endSession(sessionId, reason = "manual") }
             }
             clearActiveSessionState()
             onStopped?.invoke()
@@ -318,16 +318,20 @@ class BlockerSessionViewModel : ViewModel() {
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            while (_state.value.sessionRunning && _state.value.remainingSeconds > 0) {
-                delay(1000)
-                _state.update { current ->
-                    if (!current.sessionRunning) current else current.copy(
-                        remainingSeconds = (current.remainingSeconds - 1).coerceAtLeast(0)
-                    )
+            // Recompute remaining time from the session's wall-clock end each tick
+            // (rather than decrementing a counter) so every device counts down to
+            // the same instant and they stay in sync.
+            while (_state.value.sessionRunning) {
+                val current = _state.value
+                val endsAtMillis = current.activeStartedAtEpochMillis + current.activeDurationSeconds * 1000L
+                val remaining = ((endsAtMillis - System.currentTimeMillis()) / 1000L).toInt()
+                if (remaining <= 0) {
+                    _state.update { it.copy(remainingSeconds = 0) }
+                    expireSession()
+                    break
                 }
-            }
-            if (_state.value.sessionRunning && _state.value.remainingSeconds <= 0) {
-                expireSession()
+                _state.update { it.copy(remainingSeconds = remaining) }
+                delay(1000)
             }
         }
     }
@@ -335,24 +339,10 @@ class BlockerSessionViewModel : ViewModel() {
     private suspend fun expireSession() {
         val current = _state.value
         val sessionId = current.activeSessionId
-        val endedAt = Instant.now()
-        val plannedMs = current.activeDurationSeconds * 1000L
-        val actualMs = if (current.activeStartedAtEpochMillis > 0L) {
-            endedAt.toEpochMilli() - current.activeStartedAtEpochMillis
-        } else {
-            plannedMs
-        }
-        if (sessionId != null) {
-            runCatching { WebServerService.endSession(sessionId) }
-        }
+        // The server computes and awards points once per session (idempotent),
+        // returning the completed record. Clients no longer calculate points.
         val pointsResult = runCatching {
-            WebServerService.saveSessionPoints(
-                mode = current.mode,
-                actualMs = actualMs,
-                plannedMs = plannedMs,
-                blockedAppsCount = current.activeBlockedAppsCount.coerceAtLeast(1),
-                endedAt = endedAt.toString()
-            )
+            WebServerService.endSession(sessionId, reason = "expired")
         }
         val points = pointsResult.getOrNull()
         val pointsError = pointsResult.exceptionOrNull()?.message
@@ -405,7 +395,7 @@ class BlockerSessionViewModel : ViewModel() {
         }
     }
 
-    private fun applyRemoteSync(event: RemoteSessionSync) {
+    private suspend fun applyRemoteSync(event: RemoteSessionSync) {
         val localDeviceId = TetherLocalStore.getOrCreateDeviceId()
         if (event.originDeviceId != null && event.originDeviceId == localDeviceId) return
 
@@ -418,6 +408,15 @@ class BlockerSessionViewModel : ViewModel() {
             if (!current.sessionRunning && current.activeSessionId == null) return
             timerJob?.cancel()
             clearActiveSessionState()
+            // If the other device completed the session (expiry), show the same
+            // completion screen with the server-awarded points. A manual remote
+            // stop carries no record and simply returns to setup.
+            if (event.completed != null) {
+                _state.update {
+                    it.copy(hours = 0, minutes = 0, seconds = 0, lastCompletedSession = event.completed)
+                }
+                refreshTotalPoints()
+            }
             return
         }
 

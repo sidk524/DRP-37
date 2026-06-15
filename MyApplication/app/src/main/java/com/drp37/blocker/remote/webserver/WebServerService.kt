@@ -107,12 +107,16 @@ object WebServerService {
         request(method = "DELETE", path = "/api/block-groups/$encodedId")
     }
 
-    suspend fun endSession(sessionId: String?) {
-        val body = JSONObject().put("active", false)
+    suspend fun endSession(sessionId: String?, reason: String = "manual"): FocusPointsRecord? {
+        val body = JSONObject()
+            .put("active", false)
+            .put("reason", if (reason == "expired") "expired" else "manual")
         if (!sessionId.isNullOrBlank()) {
             body.put("sessionId", sessionId)
         }
-        request(method = "PUT", path = "/api/session/current", body = body)
+        val response = request(method = "PUT", path = "/api/session/current", body = body)
+        val completed = response.optJSONObject("completed") ?: return null
+        return completed.toFocusPointsRecord()
     }
 
     suspend fun loadOnboarding(): OnboardingSettings? {
@@ -132,26 +136,6 @@ object WebServerService {
         val onboarding = response.optJSONObject("onboarding")
             ?: throw IOException("Server did not return onboarding settings.")
         return onboarding.toOnboardingSettings()
-    }
-
-    suspend fun saveSessionPoints(
-        mode: String,
-        actualMs: Long,
-        plannedMs: Long,
-        blockedAppsCount: Int,
-        endedAt: String
-    ): FocusPointsRecord {
-        val body = JSONObject()
-            .put("mode", normalizeMode(mode))
-            .put("actualMs", actualMs.coerceAtLeast(0L))
-            .put("plannedMs", plannedMs.coerceAtLeast(0L))
-            .put("blockedAppsCount", blockedAppsCount.coerceAtLeast(1))
-            .put("endedAt", endedAt)
-
-        val response = request(method = "POST", path = "/api/focus-points", body = body)
-        val record = response.optJSONObject("record")
-            ?: throw IOException("Server did not return focus points.")
-        return record.toFocusPointsRecord()
     }
 
     suspend fun getUserTotalPoints(): Int {
@@ -307,7 +291,7 @@ private fun JSONObject.toOnboardingSettings(): OnboardingSettings {
     )
 }
 
-private fun JSONObject.toFocusPointsRecord(): FocusPointsRecord {
+internal fun JSONObject.toFocusPointsRecord(): FocusPointsRecord {
     return FocusPointsRecord(
         id = getString("id"),
         userId = getString("user_id"),

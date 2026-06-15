@@ -26,6 +26,7 @@ import org.json.JSONObject
  */
 data class RemoteSessionSync(
     val session: BlockSessionRecord?,
+    val completed: FocusPointsRecord?,
     val originDeviceId: String?,
     val revision: Long
 )
@@ -102,9 +103,18 @@ object SessionSyncClient {
         if (json.optString("type") != "session.sync") return
         val sessionJson = json.optJSONObject("session")
         val session = sessionJson?.let { runCatching { it.toBlockSessionRecord() }.getOrNull() }
+        val completedJson = json.optJSONObject("completed")
+        val completed = completedJson?.let { runCatching { it.toFocusPointsRecord() }.getOrNull() }
         val originDeviceId = json.optString("originDeviceId").takeUnless { it.isBlank() || it == "null" }
         val revision = json.optLong("revision", 0L)
-        _events.emit(RemoteSessionSync(session = session, originDeviceId = originDeviceId, revision = revision))
+        _events.emit(
+            RemoteSessionSync(
+                session = session,
+                completed = completed,
+                originDeviceId = originDeviceId,
+                revision = revision
+            )
+        )
     }
 
     private fun helloMessage(): String {
