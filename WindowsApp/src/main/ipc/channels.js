@@ -25,6 +25,7 @@ module.exports = {
     ACCOUNTABILITY_GET_INBOX: "accountability:getInbox",
     ACCOUNTABILITY_MARK_READ: "accountability:markRead",
     ACCOUNTABILITY_MARK_MESSAGE_READ: "accountability:markMessageRead",
+    ACCOUNTABILITY_CLEAR_INBOX: "accountability:clearInbox",
     ACCOUNTABILITY_SEND_MESSAGE: "accountability:sendMessage",
     ACCOUNTABILITY_EVENT: "accountability:event",
     WEBSERVER_SYNC_DEFAULT_GROUPS: "webserver:syncDefaultGroups",

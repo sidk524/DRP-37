@@ -5,6 +5,7 @@ import LockGraphic from "../components/LockGraphic";
 import Groups from "./Groups";
 import Settings from "./Settings";
 import AccountabilityInbox, { useAccountabilityUnread } from "./AccountabilityInbox";
+import NotificationBellIcon from "../components/NotificationBellIcon";
 import SessionComplete from "./SessionComplete";
 import { useBlockerSessionController, normalizeWebsite } from "../hooks/useBlockerSessionController";
 import { createBlockGroup, deleteBlockGroup, updateBlockGroup } from "../services/BlockGroupRepository";
@@ -424,19 +425,24 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                     >
                         Social
                     </button>
-                    <button type="button" className="tether-header-action" onClick={() => setView("inbox")}>
-                        Notifications{accountabilityUnread ? ` (${accountabilityUnread})` : ""}
-                    </button>
-                    <button
-                        type="button"
-                        className="tether-header-action"
-                        onClick={() => setView("settings")}
-                    >
-                        Settings
-                    </button>
-                    <button type="button" className="tether-header-action" onClick={handleSignOut}>
-                        Log out
-                    </button>
+                    <div className="tether-header-actions-end">
+                        <button
+                            type="button"
+                            className="tether-header-action"
+                            onClick={() => setView("settings")}
+                        >
+                            Settings
+                        </button>
+                        <button type="button" className="tether-header-action" onClick={handleSignOut}>
+                            Log out
+                        </button>
+                        <button type="button" className="tether-header-action tether-header-bell" onClick={() => setView("inbox")} aria-label="Notifications">
+                            <NotificationBellIcon className="tether-bell-icon" />
+                            {accountabilityUnread > 0 && (
+                                <span className="tether-bell-badge">{accountabilityUnread > 9 ? "9+" : accountabilityUnread}</span>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 <h1 className="tether-brand">Tether</h1>

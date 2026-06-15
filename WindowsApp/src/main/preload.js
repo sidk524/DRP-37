@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld("tether", {
     getAccountabilityInbox: () => invoke(CHANNELS.ACCOUNTABILITY_GET_INBOX),
     markAccountabilityNotificationRead: (id) => invoke(CHANNELS.ACCOUNTABILITY_MARK_READ, id),
     markAccountabilityMessageRead: (id) => invoke(CHANNELS.ACCOUNTABILITY_MARK_MESSAGE_READ, id),
+    clearAccountabilityInbox: () => invoke(CHANNELS.ACCOUNTABILITY_CLEAR_INBOX),
     sendAccountabilityMessage: (attemptId, payload) =>
         invoke(CHANNELS.ACCOUNTABILITY_SEND_MESSAGE, { attemptId, payload }),
     syncDefaultGroups: (payload) =>

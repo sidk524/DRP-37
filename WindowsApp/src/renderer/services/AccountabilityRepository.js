@@ -8,5 +8,6 @@ export const updateAccountabilityPreferences = (value) => api().updateAccountabi
 export const getAccountabilityInbox = () => api().getAccountabilityInbox();
 export const markAccountabilityNotificationRead = (id) => api().markAccountabilityNotificationRead(id);
 export const markAccountabilityMessageRead = (id) => api().markAccountabilityMessageRead(id);
+export const clearAccountabilityInbox = () => api().clearAccountabilityInbox();
 export const sendAccountabilityMessage = (attemptId, payload) => api().sendAccountabilityMessage(attemptId, payload);
 export const onAccountabilityEvent = (callback) => api().onAccountabilityEvent(callback);

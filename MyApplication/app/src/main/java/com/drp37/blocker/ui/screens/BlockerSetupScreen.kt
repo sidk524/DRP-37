@@ -83,10 +83,13 @@ import androidx.compose.ui.unit.sp
 import com.drp37.blocker.blocking.isAppBlockingServiceEnabled
 import com.drp37.blocker.blocking.openAppBlockingSettings
 import com.drp37.blocker.remote.webserver.OnboardingSettings
+import com.drp37.blocker.remote.webserver.SessionSyncClient
+import com.drp37.blocker.remote.webserver.WebServerService
 import com.drp37.blocker.remote.webserver.strictnessToMode
 import com.drp37.blocker.ui.session.BlockerSessionViewModel
 import com.drp37.blocker.util.loadLaunchableApps
 import com.drp37.blocker.model.InstalledApp
+import com.drp37.blocker.ui.components.NotificationBellButton
 import com.drp37.blocker.ui.theme.MyApplicationTheme
 import com.drp37.blocker.ui.theme.formatDurationPill
 import androidx.lifecycle.Lifecycle
@@ -116,7 +119,14 @@ fun BlockerSetupScreen(
     var editorPackages by remember { mutableStateOf(setOf<String>()) }
     var editorEntries by remember { mutableStateOf(listOf<String>()) }
     var pickerDraftGroupId by remember { mutableStateOf<String?>(null) }
+    var accountabilityUnread by remember { mutableStateOf(0) }
     val defaultMode = strictnessToMode(onboardingSettings?.strictness ?: "moderate")
+
+    LaunchedEffect(Unit) {
+        runCatching { WebServerService.getAccountabilityInbox() }
+            .onSuccess { accountabilityUnread = it.second }
+        SessionSyncClient.unreadCount.collect { accountabilityUnread = it }
+    }
 
     LaunchedEffect(installedPackages) {
         sessionViewModel.setInstalledPackages(installedPackages)
@@ -249,6 +259,9 @@ fun BlockerSetupScreen(
         BlockerFlowScreen.Groups -> {
             GroupsScreen(onBack = { screen = BlockerFlowScreen.Duration })
         }
+        BlockerFlowScreen.Inbox -> {
+            AccountabilityInboxScreen(onBack = { screen = BlockerFlowScreen.Duration })
+        }
         BlockerFlowScreen.Duration -> {
             val completedSession = sessionState.lastCompletedSession
             if (completedSession != null) {
@@ -278,6 +291,8 @@ fun BlockerSetupScreen(
                     },
                     onSelectApps = { screen = BlockerFlowScreen.GroupPicker },
                     onGroups = { screen = BlockerFlowScreen.Groups },
+                    onNotifications = { screen = BlockerFlowScreen.Inbox },
+                    accountabilityUnread = accountabilityUnread,
                     onSettings = { screen = BlockerFlowScreen.Settings },
                     onLogout = { sessionViewModel.stopSessionManually(onLogout) }
                 )
@@ -501,6 +516,8 @@ private fun DurationLockScreen(
     onStartSession: () -> Unit,
     onSelectApps: () -> Unit,
     onGroups: () -> Unit,
+    onNotifications: () -> Unit,
+    accountabilityUnread: Int,
     onSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -531,44 +548,40 @@ private fun DurationLockScreen(
                     .height(contentHeight),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .clickable(onClick = onSettings)
-                    ) {
-                        Text(
-                            text = "Settings",
-                            color = Color(0xFF0A84FF),
-                            fontSize = layout.logoutTextSize.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.sp
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .clickable(onClick = onGroups)
-                    ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TextButton(onClick = onGroups) {
                         Text(
                             text = "Social",
                             color = Color(0xFF0A84FF),
                             fontSize = layout.logoutTextSize.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.sp
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .clickable(onClick = onLogout)
-                    ) {
-                        Text(
-                            text = "Log out",
-                            color = Color(0xFF0A84FF),
-                            fontSize = layout.logoutTextSize.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.sp
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = onSettings) {
+                            Text(
+                                text = "Settings",
+                                color = Color(0xFF0A84FF),
+                                fontSize = layout.logoutTextSize.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        TextButton(onClick = onLogout) {
+                            Text(
+                                text = "Log out",
+                                color = Color(0xFF0A84FF),
+                                fontSize = layout.logoutTextSize.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        NotificationBellButton(
+                            unreadCount = accountabilityUnread,
+                            onClick = onNotifications,
+                            tint = Color(0xFF0A84FF)
                         )
                     }
                 }
@@ -1580,6 +1593,7 @@ private enum class BlockerFlowScreen {
     GroupPicker,
     GroupEditor,
     Groups,
+    Inbox,
     Settings,
     Duration
 }

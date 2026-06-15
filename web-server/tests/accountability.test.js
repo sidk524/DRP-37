@@ -184,6 +184,25 @@ describe("accountability presence", () => {
     });
 });
 
+describe("accountability inbox clear", () => {
+    afterEach(() => {
+        jest.dontMock("@supabase/supabase-js");
+        delete process.env.SUPABASE_URL;
+        delete process.env.SUPABASE_PUBLISHABLE_KEY;
+        delete process.env.SUPABASE_SECRET_KEY;
+    });
+
+    it("marks all inbox items as read", async () => {
+        const notifUpdate = makeQuery({ data: [{ id: "n-1" }, { id: "n-2" }], error: null });
+        const msgUpdate = makeQuery({ data: [{ id: "m-1" }], error: null });
+        const app = loadApp([notifUpdate, msgUpdate]);
+        const response = await authorized(app, "post", "/api/accountability/inbox/clear");
+        expect(response.status).toBe(200);
+        expect(response.body.unreadCount).toBe(0);
+        expect(response.body.clearedCount).toBe(3);
+    });
+});
+
 describe("accountability message read", () => {
     afterEach(() => {
         jest.dontMock("@supabase/supabase-js");

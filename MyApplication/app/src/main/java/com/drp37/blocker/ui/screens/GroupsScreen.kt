@@ -44,6 +44,7 @@ import com.drp37.blocker.remote.webserver.GroupSummary
 import com.drp37.blocker.remote.webserver.LeaderboardEntry
 import com.drp37.blocker.remote.webserver.SessionSyncClient
 import com.drp37.blocker.remote.webserver.WebServerService
+import com.drp37.blocker.ui.components.NotificationBellButton
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
@@ -164,9 +165,33 @@ fun GroupsScreen(onBack: () -> Unit) {
                 Spacer(modifier = Modifier.weight(1f))
                 Text(text = "Social", color = Color(0xFF8E8E96), fontSize = 16.sp)
                 Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = { showInbox = !showInbox }) {
-                    Text(text = "Bell${if (unreadCount > 0) " ($unreadCount)" else ""}", color = Color(0xFF0A84FF))
+                NotificationBellButton(
+                    unreadCount = unreadCount,
+                    onClick = { showInbox = !showInbox }
+                )
+            }
+            if (showInbox) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Notifications", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    if (unreadCount > 0) {
+                        TextButton(onClick = {
+                            coroutineScope.launch {
+                                runCatching { WebServerService.clearAccountabilityInbox() }
+                                    .onSuccess {
+                                        inbox = inbox.map { it.copy(unread = false) }
+                                        unreadCount = 0
+                                    }
+                            }
+                        }) {
+                            Text(text = "Clear all", color = Color(0xFF0A84FF))
+                        }
+                    }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
             }
             Spacer(modifier = Modifier.height(18.dp))
             Text(text = "Leaderboards", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
@@ -232,9 +257,15 @@ fun GroupsScreen(onBack: () -> Unit) {
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color(0xFF1F1F22))
                                 .clickable {
-                                    if (item.kind == "attempt" && item.unread) {
+                                    if (item.unread) {
                                         coroutineScope.launch {
-                                            runCatching { WebServerService.markAccountabilityNotificationRead(item.id) }
+                                            runCatching {
+                                                if (item.kind == "attempt") {
+                                                    WebServerService.markAccountabilityNotificationRead(item.id)
+                                                } else {
+                                                    WebServerService.markAccountabilityMessageRead(item.id)
+                                                }
+                                            }
                                             inbox = inbox.map { if (it.id == item.id) it.copy(unread = false) else it }
                                             unreadCount = (unreadCount - 1).coerceAtLeast(0)
                                         }

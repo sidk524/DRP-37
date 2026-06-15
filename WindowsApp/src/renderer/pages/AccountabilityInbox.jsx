@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import NotificationBellIcon from "../components/NotificationBellIcon";
 import {
+    clearAccountabilityInbox,
     getAccountabilityInbox,
     markAccountabilityMessageRead,
     markAccountabilityNotificationRead,
@@ -28,6 +30,7 @@ export function useAccountabilityUnread() {
 
 export default function AccountabilityInbox({ onBack, onUnreadChange }) {
     const [items, setItems] = useState([]);
+    const [unread, setUnread] = useState(0);
     const [error, setError] = useState("");
     const [drafts, setDrafts] = useState({});
 
@@ -35,13 +38,22 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
         try {
             const data = await getAccountabilityInbox();
             setItems(data.items || []);
+            setUnread(data.unreadCount || 0);
             onUnreadChange?.(data.unreadCount || 0);
         } catch (err) { setError(err.message || "Could not load notifications."); }
     }
 
     useEffect(() => {
         refresh();
-        return onAccountabilityEvent(() => refresh());
+        return onAccountabilityEvent((event) => {
+            if (event?.type === "accountability.unread") {
+                setUnread(event.unreadCount || 0);
+                onUnreadChange?.(event.unreadCount || 0);
+                refresh();
+            } else if (event?.type?.startsWith("accountability.")) {
+                refresh();
+            }
+        });
     }, []);
 
     async function markRead(item) {
@@ -49,6 +61,17 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
         if (item.kind === "attempt") await markAccountabilityNotificationRead(item.id);
         else if (item.kind === "message") await markAccountabilityMessageRead(item.id);
         refresh();
+    }
+
+    async function clearAll() {
+        try {
+            await clearAccountabilityInbox();
+            setUnread(0);
+            onUnreadChange?.(0);
+            await refresh();
+        } catch (err) {
+            setError(err.message || "Could not clear notifications.");
+        }
     }
 
     async function reply(attemptId, payload) {
@@ -63,8 +86,17 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
             <div className="settings-frame">
                 <div className="tether-topbar">
                     <button type="button" className="tether-back" onClick={onBack}>Back</button>
-                    <span className="tether-topbar-duration">Notifications</span>
-                    <span className="tether-topbar-spacer" />
+                    <span className="tether-topbar-duration tether-topbar-with-icon">
+                        <NotificationBellIcon className="tether-bell-icon" />
+                        Notifications
+                    </span>
+                    {unread > 0 ? (
+                        <button type="button" className="tether-clear-notifications" onClick={clearAll}>
+                            Clear all
+                        </button>
+                    ) : (
+                        <span className="tether-topbar-spacer" />
+                    )}
                 </div>
                 <h1 className="settings-title">Accountability inbox</h1>
                 {error && <p className="tether-error">{error}</p>}

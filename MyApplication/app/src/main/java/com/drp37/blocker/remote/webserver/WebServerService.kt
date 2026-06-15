@@ -248,6 +248,10 @@ object WebServerService {
         request(method = "POST", path = "/api/accountability/messages/${URLEncoder.encode(id, StandardCharsets.UTF_8.name())}/read")
     }
 
+    suspend fun clearAccountabilityInbox() {
+        request(method = "POST", path = "/api/accountability/inbox/clear")
+    }
+
     suspend fun sendAccountabilityPreset(attemptId: String, presetKey: String) {
         request(
             method = "POST",

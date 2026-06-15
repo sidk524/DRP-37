@@ -145,6 +145,10 @@ async function markAccountabilityMessageRead(messageId) {
     return request(`/api/accountability/messages/${encodeURIComponent(messageId)}/read`, { method: "POST" });
 }
 
+async function clearAccountabilityInbox() {
+    return request("/api/accountability/inbox/clear", { method: "POST" });
+}
+
 async function sendAccountabilityMessage(attemptId, payload) {
     return request(`/api/accountability/attempts/${encodeURIComponent(attemptId)}/messages`, { method: "POST", body: payload });
 }
@@ -278,6 +282,7 @@ module.exports = {
     getAccountabilityInbox,
     markAccountabilityNotificationRead,
     markAccountabilityMessageRead,
+    clearAccountabilityInbox,
     sendAccountabilityMessage,
     syncDefaultGroups,
     listBlockGroups,

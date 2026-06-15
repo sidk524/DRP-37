@@ -106,6 +106,7 @@ function registerAllIpcHandlers() {
     ipcMain.handle(CHANNELS.ACCOUNTABILITY_GET_INBOX, () => webServerService.getAccountabilityInbox());
     ipcMain.handle(CHANNELS.ACCOUNTABILITY_MARK_READ, (_e, id) => webServerService.markAccountabilityNotificationRead(id));
     ipcMain.handle(CHANNELS.ACCOUNTABILITY_MARK_MESSAGE_READ, (_e, id) => webServerService.markAccountabilityMessageRead(id));
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_CLEAR_INBOX, () => webServerService.clearAccountabilityInbox());
     ipcMain.handle(CHANNELS.ACCOUNTABILITY_SEND_MESSAGE, (_e, data) => webServerService.sendAccountabilityMessage(data?.attemptId, data?.payload));
     ipcMain.handle(CHANNELS.WEBSERVER_SYNC_DEFAULT_GROUPS, (_e, payload) =>
         webServerService.syncDefaultGroups(payload)

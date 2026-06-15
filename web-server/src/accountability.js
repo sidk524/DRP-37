@@ -255,6 +255,21 @@ function registerAccountabilityRoutes(app, deps) {
         } catch (error) { next(error); }
     });
 
+    app.post("/api/accountability/inbox/clear", requireSupabase, requireUser, async (req, res, next) => {
+        try {
+            const readAt = new Date().toISOString();
+            const notifications = await supabaseAdmin.from("accountability_notifications")
+                .update({ read_at: readAt }).eq("recipient_user_id", req.user.id).is("read_at", null).select("id");
+            if (notifications.error) throw notifications.error;
+            const messages = await supabaseAdmin.from("accountability_messages")
+                .update({ read_at: readAt }).eq("recipient_user_id", req.user.id).is("read_at", null).select("id");
+            if (messages.error) throw messages.error;
+            const clearedCount = (notifications.data || []).length + (messages.data || []).length;
+            res.json({ unreadCount: 0, clearedCount });
+            hub.broadcastEvent(req.user.id, { type: "accountability.unread", unreadCount: 0 });
+        } catch (error) { next(error); }
+    });
+
     app.post("/api/accountability/attempts/:attemptId/messages", requireSupabase, requireUser, async (req, res, next) => {
         try {
             const presetKey = req.body?.presetKey == null ? null : String(req.body.presetKey);

@@ -50,7 +50,15 @@
     align-items: center;
     margin-bottom: var(--section-gap);
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    width: 100%;
+}
+
+.tether-header-actions-end {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
 }
 
 .tether-header-action,
@@ -69,6 +77,59 @@
 .tether-header-action:hover {
     background: var(--surface-raised);
     color: var(--text-primary);
+}
+
+.tether-header-bell {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    padding-inline: 12px;
+    flex-shrink: 0;
+}
+
+.tether-bell-icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.tether-bell-badge {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 99px;
+    background: #ff453a;
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+}
+
+.tether-topbar-with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tether-clear-notifications {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.tether-clear-notifications:hover {
+    opacity: 0.85;
 }
 
 .tether-brand {
