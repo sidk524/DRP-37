@@ -246,10 +246,11 @@ private fun webServerBaseUrl(): String {
 
 private fun mapNetworkError(cause: Throwable, baseUrl: String): IOException {
     val message = cause.message.orEmpty()
+    val causeType = cause::class.simpleName.orEmpty()
     val hint = if (message.contains("connect", ignoreCase = true)) {
-        "Cannot reach $baseUrl. Rebuild after editing local.properties, try Wi‑Fi, and ensure the server allows inbound TCP 3000."
+        "Cannot reach $baseUrl ($causeType: $message). Rebuild after editing local.properties, try Wi‑Fi, and ensure the server allows inbound TCP 3000."
     } else {
-        "Cannot reach $baseUrl."
+        "Cannot reach $baseUrl ($causeType: $message)."
     }
     return IOException(hint, cause)
 }

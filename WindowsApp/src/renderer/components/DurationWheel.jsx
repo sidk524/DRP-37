@@ -1,19 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+const REPEAT_COUNT = 5;
+
+function wrapValue(nextValue, min, max) {
+    const count = max - min + 1;
+    return ((nextValue - min) % count + count) % count + min;
+}
+
 function DurationWheel({ value, min, max, onChange, locked, rowHeight }) {
-    const items = useMemo(
-        () => Array.from({ length: max - min + 1 }, (_, index) => min + index),
-        [min, max],
-    );
+    const cycleLength = max - min + 1;
+    const middleCycle = Math.floor(REPEAT_COUNT / 2);
+    const items = useMemo(() => {
+        const result = [];
+        for (let repeat = 0; repeat < REPEAT_COUNT; repeat += 1) {
+            for (let item = min; item <= max; item += 1) {
+                result.push({ value: item, id: `${repeat}-${item}` });
+            }
+        }
+        return result;
+    }, [min, max]);
     const columnRef = useRef(null);
     const listRef = useRef(null);
     const syncingRef = useRef(false);
 
-    const scrollToValue = useCallback(
-        (nextValue, behavior = "auto") => {
+    const indexForValue = useCallback(
+        (nextValue) => middleCycle * cycleLength + wrapValue(nextValue, min, max) - min,
+        [cycleLength, middleCycle, min, max],
+    );
+
+    const scrollToIndex = useCallback(
+        (index, behavior = "auto") => {
             const list = listRef.current;
             if (!list) return;
-            const index = Math.min(Math.max(nextValue - min, 0), items.length - 1);
             syncingRef.current = true;
             list.scrollTo({
                 top: index * rowHeight,
@@ -23,7 +41,14 @@ function DurationWheel({ value, min, max, onChange, locked, rowHeight }) {
                 syncingRef.current = false;
             });
         },
-        [items.length, min, rowHeight],
+        [rowHeight],
+    );
+
+    const scrollToValue = useCallback(
+        (nextValue, behavior = "auto") => {
+            scrollToIndex(indexForValue(nextValue), behavior);
+        },
+        [indexForValue, scrollToIndex],
     );
 
     useEffect(() => {
@@ -41,7 +66,7 @@ function DurationWheel({ value, min, max, onChange, locked, rowHeight }) {
             const direction = Math.sign(event.deltaY);
             if (direction === 0) return;
 
-            const next = Math.min(max, Math.max(min, value + direction));
+            const next = wrapValue(value + direction, min, max);
             if (next !== value) {
                 onChange(next);
             }
@@ -57,7 +82,16 @@ function DurationWheel({ value, min, max, onChange, locked, rowHeight }) {
         if (!list) return;
 
         const index = Math.round(list.scrollTop / rowHeight);
-        const next = min + Math.min(Math.max(index, 0), items.length - 1);
+        const boundedIndex = Math.min(Math.max(index, 0), items.length - 1);
+        const next = items[boundedIndex]?.value ?? value;
+
+        const lowerBound = cycleLength;
+        const upperBound = cycleLength * (REPEAT_COUNT - 1);
+        if (index < lowerBound || index >= upperBound) {
+            const normalized = wrapValue(next, min, max) - min;
+            scrollToIndex(middleCycle * cycleLength + normalized);
+        }
+
         if (next !== value) {
             onChange(next);
         }
@@ -75,10 +109,10 @@ function DurationWheel({ value, min, max, onChange, locked, rowHeight }) {
             >
                 {items.map((item) => (
                     <div
-                        key={item}
-                        className={`duration-wheel-row ${item === value ? "selected" : ""}`}
+                        key={item.id}
+                        className={`duration-wheel-row ${item.value === value ? "selected" : ""}`}
                     >
-                        {String(item).padStart(2, "0")}
+                        {String(item.value).padStart(2, "0")}
                     </div>
                 ))}
             </div>

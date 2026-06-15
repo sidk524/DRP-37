@@ -46,7 +46,7 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
     const [editorSaving, setEditorSaving] = useState(false);
     const [urlInput, setUrlInput] = useState("");
     const [managerError, setManagerError] = useState("");
-    const [editorReturnView, setEditorReturnView] = useState("groupManager");
+    const [editorReturnView, setEditorReturnView] = useState("groupPicker");
     const [pickerDraftGroupId, setPickerDraftGroupId] = useState(null);
 
     const {
@@ -90,7 +90,7 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         setView("duration");
     }
 
-    function openEditor(group, returnView = "groupManager") {
+    function openEditor(group, returnView = "groupPicker") {
         setEditingGroup(group);
         setEditorName(group?.name || "");
         setEditorEntries(group ? groupEntries(group) : []);
@@ -163,7 +163,11 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         setManagerError("");
         try {
             await deleteBlockGroup(group.id);
-            await refreshBlockGroups();
+            const groups = await refreshBlockGroups();
+            setPickerDraftGroupId((current) => {
+                if (current !== group.id) return current;
+                return groups[0]?.id ?? null;
+            });
         } catch (error) {
             setManagerError(error.message || "Could not delete block group.");
         }
@@ -304,81 +308,6 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
         );
     }
 
-    if (view === "groupManager") {
-        return (
-            <div className="tether-screen">
-                <div className="tether-frame tether-frame-subscreen">
-                    <div className="tether-topbar">
-                        <button
-                            type="button"
-                            className="tether-back"
-                            onClick={() => setView("groupPicker")}
-                        >
-                            <span className="tether-back-chevron" aria-hidden />
-                            Back
-                        </button>
-                        <span className="tether-topbar-spacer" aria-hidden />
-                    </div>
-
-                    <h1 className="tether-title">Manage block groups</h1>
-
-                    {(managerError || blockGroupsError) && (
-                        <p className="tether-error">{managerError || blockGroupsError}</p>
-                    )}
-
-                    <div className="tether-groups">
-                        <div className="tether-groups-card">
-                            <div className="tether-group-list">
-                                {blockGroupsLoading ? (
-                                    <p className="tether-url-empty">Loading block groups…</p>
-                                ) : blockGroups.length === 0 ? (
-                                    <p className="tether-url-empty">No block groups yet</p>
-                                ) : (
-                                    blockGroups.map((group) => (
-                                        <div key={group.id} className="tether-group-manage-row">
-                                            <div className="tether-group-item-body">
-                                                <span className="tether-group-item-name">
-                                                    {group.name}
-                                                </span>
-                                                {group.systemKey && (
-                                                    <span className="tether-group-item-meta">
-                                                        Default group
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="tether-group-actions">
-                                                <button
-                                                    type="button"
-                                                    className="tether-group-action"
-                                                    onClick={() => openEditor(group)}
-                                                >
-                                                    Edit
-                                                </button>
-                                                {!group.systemKey && (
-                                                    <button
-                                                        type="button"
-                                                        className="tether-group-action danger"
-                                                        onClick={() => handleDeleteGroup(group)}
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="button" className="tether-done" onClick={() => openEditor(null)}>
-                        New block group
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
     if (view === "groupPicker") {
         return (
             <div className="tether-screen">
@@ -400,7 +329,9 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
 
                     <h1 className="tether-title">Choose a block group</h1>
 
-                    {blockGroupsError && <p className="tether-error">{blockGroupsError}</p>}
+                    {(managerError || blockGroupsError) && (
+                        <p className="tether-error">{managerError || blockGroupsError}</p>
+                    )}
 
                     <div className="tether-groups">
                         <div className="tether-groups-card">
@@ -414,27 +345,49 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                                         const selected = group.id === pickerDraftGroupId;
                                         const websiteCount = groupWebsiteCount(group);
                                         return (
-                                            <button
+                                            <div
                                                 key={group.id}
-                                                type="button"
-                                                className={`tether-group-item${selected ? " selected" : ""}`}
-                                                onClick={() => setPickerDraftGroupId(group.id)}
-                                                disabled={sessionRunning}
+                                                className={`tether-group-picker-row${selected ? " selected" : ""}`}
                                             >
-                                                <span
-                                                    className={`tether-group-dot${selected ? " selected" : ""}`}
-                                                    aria-hidden
-                                                />
-                                                <span className="tether-group-item-body">
-                                                    <span className="tether-group-item-name">
-                                                        {group.name}
+                                                <button
+                                                    type="button"
+                                                    className="tether-group-picker-select"
+                                                    onClick={() => setPickerDraftGroupId(group.id)}
+                                                    disabled={sessionRunning}
+                                                >
+                                                    <span
+                                                        className={`tether-group-dot${selected ? " selected" : ""}`}
+                                                        aria-hidden
+                                                    />
+                                                    <span className="tether-group-item-body">
+                                                        <span className="tether-group-item-name">
+                                                            {group.name}
+                                                        </span>
+                                                        <span className="tether-group-item-meta">
+                                                            {websiteCount} website
+                                                            {websiteCount === 1 ? "" : "s"}
+                                                        </span>
                                                     </span>
-                                                    <span className="tether-group-item-meta">
-                                                        {websiteCount} website
-                                                        {websiteCount === 1 ? "" : "s"}
-                                                    </span>
-                                                </span>
-                                            </button>
+                                                </button>
+                                                <div className="tether-group-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="tether-group-action"
+                                                        onClick={() => openEditor(group, "groupPicker")}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    {!group.systemKey && (
+                                                        <button
+                                                            type="button"
+                                                            className="tether-group-action danger"
+                                                            onClick={() => handleDeleteGroup(group)}
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
                                         );
                                     })
                                 )}
@@ -444,10 +397,10 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
 
                     <button
                         type="button"
-                        className="tether-group-secondary"
-                        onClick={() => setView("groupManager")}
+                        className="tether-done"
+                        onClick={() => openEditor(null, "groupPicker")}
                     >
-                        Manage groups
+                        New block group
                     </button>
                 </div>
             </div>

@@ -8,7 +8,7 @@ const MAX_MINUTES = 59;
 const MAX_SECONDS = 59;
 const TYPED_DURATION_ERROR_TEXT = "Use HH:MM:SS, MM:SS, or 1h 30m";
 const TYPED_DURATION_PLACEHOLDER = "e.g. 00:25:00 or 25m";
-const TYPED_DURATION_HINT = "Enter `HH:MM:SS`, `MM:SS`, or values like `1h 30m`, `90`.";
+const TYPED_DURATION_HINT = "HH:MM:SS, MM:SS, or 1h 30m";
 
 function formatDuration(hours, minutes, seconds) {
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
@@ -163,7 +163,11 @@ function DurationScrollPicker({
                 className={`duration-picker-frame ${editing ? "editing" : ""}`}
                 onDoubleClick={handleStartEditing}
             >
-                <div className="duration-picker-highlight" aria-hidden />
+                {!locked && !editing ? (
+                    <div className="duration-picker-type-target" aria-hidden />
+                ) : (
+                    <div className="duration-picker-highlight" aria-hidden />
+                )}
                 <div className="duration-picker-wheels">
                     {wheelConfigs.map((config) => (
                         <DurationWheel
@@ -206,6 +210,11 @@ function DurationScrollPicker({
                     </div>
                 )}
             </div>
+            <p
+                className={`duration-picker-type-hint${locked || editing ? " is-hidden" : ""}`}
+            >
+                Double tap to type a time
+            </p>
         </div>
     );
 }

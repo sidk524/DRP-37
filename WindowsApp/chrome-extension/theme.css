@@ -1,0 +1,435 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --frame-padding-x: 16px;
+    --frame-padding-y: 16px;
+    --control-height-sm: 44px;
+    --title-size-lg: 1.6rem;
+    --section-gap: 16px;
+    --bg: #000000;
+    --surface: rgba(255, 255, 255, 0.07);
+    --surface-raised: rgba(255, 255, 255, 0.10);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --text-primary: #ffffff;
+    --text-secondary: rgba(235, 235, 245, 0.62);
+    --text-tertiary: rgba(235, 235, 245, 0.32);
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.14);
+    --accent-gradient: linear-gradient(180deg, #2f96ff 0%, #0a84ff 100%);
+    --success: #30d158;
+    --danger: #ff453a;
+    --radius-sm: 12px;
+    --radius: 16px;
+    --radius-lg: 22px;
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
+    --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.44, 1);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+        "Segoe UI", "Inter", system-ui, sans-serif;
+}
+
+body {
+    margin: 0;
+    background:
+        radial-gradient(ellipse 90% 55% at 50% -15%, rgba(10, 132, 255, 0.12), transparent 70%),
+        var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+}
+
+.tether-popup-body {
+    min-width: 300px;
+}
+
+.tether-popup {
+    padding: var(--frame-padding-y) var(--frame-padding-x);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tether-brand {
+    font-size: var(--title-size-lg);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.tether-connection {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    align-self: center;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.tether-connection-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(48, 209, 88, 0.8);
+    flex-shrink: 0;
+}
+
+.tether-connection.is-error .tether-connection-dot {
+    background: var(--danger);
+    box-shadow: 0 0 8px rgba(255, 69, 58, 0.6);
+}
+
+.tether-status-card {
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.45;
+    text-align: center;
+}
+
+.tether-status-card.is-error {
+    color: #ffb4ab;
+    border-color: rgba(255, 69, 58, 0.35);
+    background: rgba(255, 69, 58, 0.08);
+}
+
+.tether-active-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tether-selected-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    align-self: center;
+    padding: 9px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text-primary);
+    font-size: 0.92rem;
+    font-weight: 600;
+    font-family: inherit;
+}
+
+.tether-selected-pill.tether-readonly {
+    cursor: default;
+}
+
+.tether-selected-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(10, 132, 255, 0.8);
+    flex-shrink: 0;
+}
+
+.strictness-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: var(--control-height-sm);
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font);
+}
+
+.strictness-card.tether-readonly {
+    cursor: default;
+}
+
+.strictness-gentle {
+    background: rgba(48, 209, 88, 0.1);
+}
+
+.strictness-firm {
+    background: rgba(10, 132, 255, 0.1);
+}
+
+.strictness-hard {
+    background: rgba(255, 69, 58, 0.1);
+}
+
+.strictness-gentle.selected {
+    border-color: rgba(48, 209, 88, 0.75);
+    box-shadow: 0 0 0 1px rgba(48, 209, 88, 0.35), 0 4px 16px rgba(48, 209, 88, 0.15);
+}
+
+.strictness-firm.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.35), 0 4px 16px rgba(10, 132, 255, 0.15);
+}
+
+.strictness-hard.selected {
+    border-color: rgba(255, 69, 58, 0.85);
+    box-shadow: 0 0 0 1px rgba(255, 69, 58, 0.35), 0 4px 16px rgba(255, 69, 58, 0.15);
+}
+
+.strictness-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.strictness-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tether-session-meta {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.tether-groups-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+}
+
+.tether-domain-heading {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.tether-domain-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 140px;
+    overflow-y: auto;
+}
+
+.tether-domain-list li {
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-raised);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.tether-blocked-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.tether-blocked-main {
+    text-align: center;
+    max-width: 460px;
+    width: 100%;
+    padding: 24px;
+    animation: tetherFadeIn 0.6s var(--ease-out) both;
+}
+
+.tether-blocked-context {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 22px;
+}
+
+.tether-blocked-app-label {
+    color: var(--text-secondary);
+    font-size: 1.02rem;
+    margin: 0 0 24px;
+}
+
+.tether-blocked-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 12px;
+}
+
+.tether-blocked-hint {
+    margin: 0 0 20px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.tether-blocked-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 16px 0 8px;
+}
+
+.tether-btn {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.tether-btn-chip {
+    background: var(--surface-raised);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+}
+
+.tether-btn-primary {
+    margin-top: 8px;
+    background: var(--accent-gradient);
+    border: none;
+    color: #ffffff;
+}
+
+.tether-btn-primary:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.tether-btn-quiet {
+    width: auto;
+    align-self: center;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    font-weight: 500;
+}
+
+.tether-breath-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 320px;
+    height: 320px;
+    max-width: 80vw;
+    max-height: 80vw;
+    margin: 0 auto 24px;
+}
+
+.tether-breath-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 260px;
+    height: 260px;
+    max-width: 68vw;
+    max-height: 68vw;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle at 50% 45%,
+        rgba(10, 132, 255, 0.35) 0%,
+        rgba(10, 132, 255, 0.12) 55%,
+        rgba(10, 132, 255, 0) 75%
+    );
+    box-shadow: 0 0 80px 10px rgba(10, 132, 255, 0.15);
+    animation: tetherBreathe 8s ease-in-out infinite;
+}
+
+.tether-breath-label {
+    font-size: 1.2rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+
+.tether-message-quote {
+    padding: 14px 16px;
+    margin: 4px 0 12px;
+    border-left: 4px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--accent-soft);
+    color: var(--text-primary);
+    line-height: 1.5;
+    text-align: left;
+    font-style: italic;
+}
+
+.tether-task-card {
+    padding: 14px 16px;
+    margin: 12px 0 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.tether-lock-wrap {
+    display: flex;
+    justify-content: center;
+    width: min(34vw, 172px);
+    height: min(34vw, 172px);
+    margin: 0 auto 18px;
+    color: var(--danger);
+}
+
+.tether-lock-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.tether-lock-body {
+    fill: currentColor;
+}
+
+.tether-lock-shackle {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 9.5;
+    stroke-linecap: round;
+}
+
+.tether-lock-keyhole-top,
+.tether-lock-keyhole-bottom {
+    fill: #000000;
+}
+
+.tether-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+@keyframes tetherBreathe {
+    0% { transform: scale(0.55); opacity: 0.6; }
+    50% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.55); opacity: 0.6; }
+}
+
+@keyframes tetherFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}

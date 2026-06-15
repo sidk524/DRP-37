@@ -29,6 +29,8 @@ function extensionBlockState() {
         endsAt: session.endsAt,
         mode: session.mode,
         friction: session.friction,
+        blockGroupId: session.blockGroupId,
+        blockGroupName: session.blockGroupName,
     };
 }
 
@@ -66,6 +68,8 @@ function scheduleExpiry() {
 
 function startSession({
     sessionId = null,
+    blockGroupId = null,
+    blockGroupName = null,
     appLabels = [],
     domains = [],
     mode = "breathing",
@@ -76,6 +80,8 @@ function startSession({
 } = {}) {
     const created = createActiveSession({
         sessionId,
+        blockGroupId,
+        blockGroupName,
         appLabels,
         domains,
         mode,
@@ -104,7 +110,12 @@ function startSession({
     return { ok: true, session: sessionView(session, lastStop) };
 }
 
-function updateSession({ mode, friction } = {}) {
+function normalizeOptionalString(value) {
+    const normalized = String(value ?? "").trim();
+    return normalized || null;
+}
+
+function updateSession({ mode, friction, blockGroupId, blockGroupName } = {}) {
     if (!session.active) {
         return { ok: false, error: "No active session to update." };
     }
@@ -115,6 +126,14 @@ function updateSession({ mode, friction } = {}) {
 
     if (friction !== undefined) {
         session.friction = normalizeFriction(friction);
+    }
+
+    if (blockGroupId !== undefined) {
+        session.blockGroupId = normalizeOptionalString(blockGroupId);
+    }
+
+    if (blockGroupName !== undefined) {
+        session.blockGroupName = normalizeOptionalString(blockGroupName);
     }
 
     console.log(`[blocker] session updated · ${session.mode}`);

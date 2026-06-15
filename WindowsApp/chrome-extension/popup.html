@@ -2,23 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <style>
-    body {
-      margin: 0;
-      min-width: 220px;
-      padding: 12px 14px;
-      font: 13px system-ui, sans-serif;
-      color: #202124;
-    }
-    .ok { color: #137333; }
-    .warn { color: #b06000; }
-    .err { color: #c5221f; }
-    ul { margin: 8px 0 0; padding-left: 18px; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tether</title>
+  <link rel="stylesheet" href="theme.css" />
 </head>
-<body>
-  <div id="status">Checking desktop app…</div>
-  <ul id="domains" hidden></ul>
+<body class="tether-popup-body">
+  <div class="tether-popup">
+    <h1 class="tether-brand">Tether</h1>
+    <div id="connection" class="tether-connection hidden">
+      <span class="tether-connection-dot" aria-hidden="true"></span>
+      <span id="connection-label">Connected</span>
+    </div>
+    <div id="error-panel" class="tether-status-card is-error hidden"></div>
+    <div id="idle-panel" class="tether-status-card hidden">No active block session.</div>
+    <div id="active-panel" class="tether-active-panel hidden">
+      <div class="tether-selected-pill tether-readonly">
+        <span class="tether-selected-dot" aria-hidden="true"></span>
+        <span id="block-group-label">Block group · Active session</span>
+      </div>
+      <div id="strictness-card" class="strictness-card tether-readonly selected">
+        <span id="strictness-icon" class="strictness-icon" aria-hidden="true"></span>
+        <span id="strictness-label" class="strictness-label"></span>
+      </div>
+      <p id="session-meta" class="tether-session-meta"></p>
+      <div id="domains-panel" class="tether-groups-card hidden">
+        <p class="tether-domain-heading">Blocked sites</p>
+        <ul id="domains" class="tether-domain-list"></ul>
+      </div>
+    </div>
+  </div>
+  <script src="sessionDisplay.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -212,7 +212,9 @@ private fun BlockGroupPickerRow(
     meta: String,
     selected: Boolean,
     enabled: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: (() -> Unit)?
 ) {
     val background = if (selected) TetherColors.AccentSoft else TetherColors.RowFill
     val borderColor = if (selected) TetherColors.Accent else TetherColors.Border
@@ -220,7 +222,7 @@ private fun BlockGroupPickerRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(TetherDimens.ControlHeightSm)
+            .heightIn(min = TetherDimens.ControlHeightSm)
             .clip(TetherShapes.Default)
             .background(background)
             .border(
@@ -235,86 +237,51 @@ private fun BlockGroupPickerRow(
                     Modifier
                 }
             )
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(if (selected) TetherColors.Accent else TetherColors.DotInactive)
-                .then(
-                    if (selected) {
-                        Modifier.drawBehind {
-                            drawCircle(
-                                color = Color(0xCC0A84FF),
-                                radius = size.width * 1.6f
-                            )
-                        }
-                    } else {
-                        Modifier
-                    }
-                )
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = name,
-                color = TetherColors.TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = meta,
-                color = TetherColors.TextSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun BlockGroupManageRow(
-    name: String,
-    isDefault: Boolean,
-    onEdit: () -> Unit,
-    onDelete: (() -> Unit)?
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = TetherDimens.ControlHeightSm)
-            .clip(TetherShapes.Default)
-            .background(TetherColors.RowFill)
-            .border(1.dp, TetherColors.Border, TetherShapes.Default)
             .padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .weight(1f)
-                .padding(vertical = 12.dp)
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = name,
-                color = TetherColors.TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) TetherColors.Accent else TetherColors.DotInactive)
+                    .then(
+                        if (selected) {
+                            Modifier.drawBehind {
+                                drawCircle(
+                                    color = Color(0xCC0A84FF),
+                                    radius = size.width * 1.6f
+                                )
+                            }
+                        } else {
+                            Modifier
+                        }
+                    )
             )
-            if (isDefault) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Default group",
+                    text = name,
+                    color = TetherColors.TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = meta,
                     color = TetherColors.TextSecondary,
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -449,7 +416,9 @@ fun BlockGroupPickerScreen(
     errorMessage: String?,
     durationLabel: String,
     onDraftSelect: (BlockGroup) -> Unit,
-    onManageGroups: () -> Unit,
+    onEdit: (BlockGroup) -> Unit,
+    onDelete: (BlockGroup) -> Unit,
+    onCreate: () -> Unit,
     onBack: () -> Unit
 ) {
     BlockGroupScaffold(
@@ -475,48 +444,7 @@ fun BlockGroupPickerScreen(
                                 meta = blockGroupSummary(appCount, group.expandedDomainsBlocked.size),
                                 selected = selected,
                                 enabled = true,
-                                onClick = { onDraftSelect(group) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        TetherSecondaryButton(text = "Manage groups", onClick = onManageGroups)
-    }
-}
-
-@Composable
-fun BlockGroupManagerScreen(
-    groups: List<BlockGroup>,
-    loading: Boolean,
-    errorMessage: String?,
-    onEdit: (BlockGroup) -> Unit,
-    onDelete: (BlockGroup) -> Unit,
-    onCreate: () -> Unit,
-    onBack: () -> Unit
-) {
-    BlockGroupScaffold(
-        title = "Manage block groups",
-        onBack = onBack,
-        errorMessage = errorMessage
-    ) {
-        BlockGroupListCard(modifier = Modifier.weight(1f)) {
-            when {
-                loading && groups.isEmpty() -> BlockGroupListPlaceholder("Loading block groups…")
-                groups.isEmpty() -> BlockGroupListPlaceholder("No block groups yet")
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(TetherDimens.ListGap)
-                    ) {
-                        items(groups, key = { it.id }) { group ->
-                            BlockGroupManageRow(
-                                name = group.name,
-                                isDefault = group.systemKey != null,
+                                onClick = { onDraftSelect(group) },
                                 onEdit = { onEdit(group) },
                                 onDelete = if (group.systemKey == null) {
                                     { onDelete(group) }

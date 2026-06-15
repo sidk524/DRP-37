@@ -5,10 +5,17 @@ const EMPTY_FRICTION = Object.freeze({
     goals: [],
 });
 
+function normalizeOptionalString(value) {
+    const normalized = String(value ?? "").trim();
+    return normalized || null;
+}
+
 function createInactiveSession() {
     return {
         active: false,
         sessionId: null,
+        blockGroupId: null,
+        blockGroupName: null,
         appLabels: [],
         domains: [],
         mode: "breathing",
@@ -61,6 +68,8 @@ function createActiveSession(config = {}, now = Date.now()) {
         session: {
             active: true,
             sessionId: config.sessionId ?? null,
+            blockGroupId: normalizeOptionalString(config.blockGroupId),
+            blockGroupName: normalizeOptionalString(config.blockGroupName),
             appLabels: normalizeStringArray(config.appLabels),
             domains,
             mode: normalizeMode(config.mode, "breathing"),
@@ -76,6 +85,8 @@ function sessionView(session, lastStop) {
     return {
         active: session.active,
         sessionId: session.sessionId,
+        blockGroupId: session.blockGroupId,
+        blockGroupName: session.blockGroupName,
         mode: session.mode,
         appLabels: session.appLabels,
         domains: session.domains,

@@ -88,7 +88,7 @@ function isBlockedPageUrl(url) {
 function stateKey(state) {
     const hosts = expandDomains(state?.domains || []).sort().join(",");
     const friction = normalizeFriction(state?.friction);
-    return `${state?.active ? "1" : "0"}:${hosts}:${state?.endsAt || 0}:${state?.mode || "breathing"}:${JSON.stringify(friction)}`;
+    return `${state?.active ? "1" : "0"}:${hosts}:${state?.endsAt || 0}:${state?.mode || "breathing"}:${state?.blockGroupId || ""}:${state?.blockGroupName || ""}:${JSON.stringify(friction)}`;
 }
 
 async function getAllowedUntil() {
@@ -134,6 +134,12 @@ async function clearRules(connected) {
         connected,
         blocking: false,
         domains: [],
+        hosts: [],
+        rules: [],
+        endsAt: null,
+        mode: "breathing",
+        blockGroupId: null,
+        blockGroupName: null,
         friction: normalizeFriction(),
         lastError: connected ? null : "Desktop app not reachable.",
     });
@@ -194,6 +200,8 @@ async function applyRules(state) {
             })),
             endsAt: state.endsAt,
             mode,
+            blockGroupId: state.blockGroupId || null,
+            blockGroupName: state.blockGroupName || null,
             friction,
             lastError: null,
         });
@@ -204,6 +212,9 @@ async function applyRules(state) {
             blocking: false,
             domains: state.domains,
             hosts,
+            mode,
+            blockGroupId: state.blockGroupId || null,
+            blockGroupName: state.blockGroupName || null,
             friction,
             lastError: error.message || "Could not apply browser blocking rules.",
         });

@@ -216,10 +216,14 @@
 }
 
 .groups-form-row button {
+    width: 5.75rem;
     min-height: var(--control-height-sm);
-    padding: 0 clamp(16px, 3vw, 20px);
+    padding: 0 clamp(12px, 2vw, 14px);
     white-space: nowrap;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .groups-form-row button:disabled {

@@ -145,6 +145,13 @@ const createSession = async (userId, expandedTargets, totalDurationSeconds, bloc
         .single();
 };
 
+const enrichSessionWithBlockGroupName = async (userId, session) => {
+    if (!session?.block_group_id) return session;
+    const group = await getBlockGroup(supabaseAdmin, userId, String(session.block_group_id));
+    if (!group?.name) return session;
+    return { ...session, block_group_name: group.name };
+};
+
 const validateStringArray = (value, fieldName) => {
     if (value == null) return [];
     if (!Array.isArray(value)) {
@@ -796,7 +803,8 @@ app.get("/api/session/current", requireSupabase, requireUser, async (req, res, n
             return;
         }
 
-        res.json({ session: data });
+        const session = data ? await enrichSessionWithBlockGroupName(req.user.id, data) : null;
+        res.json({ session });
     } catch (error) {
         next(error);
     }
@@ -855,7 +863,9 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
 
                 if (error) throw error;
 
-                res.status(201).json({ session: data });
+                res.status(201).json({
+                    session: { ...data, block_group_name: group.name }
+                });
                 return;
             }
 

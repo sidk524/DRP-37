@@ -1,5 +1,6 @@
 package com.drp37.blocker.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -49,6 +50,14 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -194,22 +203,13 @@ fun BlockerSetupScreen(
                 errorMessage = sessionState.errorMessage,
                 durationLabel = formatDurationPill(sessionState.hours, sessionState.minutes),
                 onDraftSelect = { group -> pickerDraftGroupId = group.id },
-                onManageGroups = { screen = BlockerFlowScreen.GroupManager },
+                onEdit = { group -> openGroupEditor(group) },
+                onDelete = { group -> sessionViewModel.deleteBlockGroup(group.id) },
+                onCreate = { openGroupEditor(null) },
                 onBack = {
                     pickerDraftGroupId?.let { sessionViewModel.selectBlockGroup(it) }
                     screen = BlockerFlowScreen.Duration
                 }
-            )
-        }
-        BlockerFlowScreen.GroupManager -> {
-            BlockGroupManagerScreen(
-                groups = sessionState.blockGroups,
-                loading = sessionState.blockGroupsLoading,
-                errorMessage = sessionState.errorMessage,
-                onEdit = { group -> openGroupEditor(group) },
-                onDelete = { group -> sessionViewModel.deleteBlockGroup(group.id) },
-                onCreate = { openGroupEditor(null) },
-                onBack = { screen = BlockerFlowScreen.GroupPicker }
             )
         }
         BlockerFlowScreen.GroupEditor -> {
@@ -238,10 +238,10 @@ fun BlockerSetupScreen(
                         packages = editorPackages.toList(),
                         domains = emptyList(),
                         targets = editorEntries,
-                        onSaved = { screen = BlockerFlowScreen.GroupManager }
+                        onSaved = { screen = BlockerFlowScreen.GroupPicker }
                     )
                 },
-                onBack = { screen = BlockerFlowScreen.GroupManager }
+                onBack = { screen = BlockerFlowScreen.GroupPicker }
             )
         }
         BlockerFlowScreen.Groups -> {
@@ -793,10 +793,58 @@ private fun DurationPicker(
     onMinutesChange: (Int) -> Unit,
     onSecondsChange: (Int) -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth(),
-        contentAlignment = Alignment.Center
+    var editing by remember { mutableStateOf(false) }
+    var typedDuration by remember { mutableStateOf("") }
+    var typedError by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+
+    fun formatDurationValue(h: Int, m: Int, s: Int): String {
+        return "${h.twoDigits()}:${m.twoDigits()}:${s.twoDigits()}"
+    }
+
+    fun startEditing() {
+        if (locked) return
+        typedError = ""
+        editing = true
+    }
+
+    fun applyTypedDuration() {
+        val parsed = parseTypedDuration(typedDuration)
+        if (parsed == null) {
+            typedError = "Use HH:MM:SS, MM:SS, or 1h 30m"
+            return
+        }
+        typedError = ""
+        onHoursChange(parsed.hours)
+        onMinutesChange(parsed.minutes)
+        onSecondsChange(parsed.seconds)
+        editing = false
+    }
+
+    fun cancelTypedDuration() {
+        typedError = ""
+        editing = false
+    }
+
+    LaunchedEffect(editing, hours, minutes, seconds) {
+        if (!editing) {
+            typedDuration = formatDurationValue(hours, minutes, seconds)
+        }
+    }
+
+    LaunchedEffect(editing) {
+        if (editing) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    BackHandler(enabled = editing) {
+        cancelTypedDuration()
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
@@ -812,59 +860,227 @@ private fun DurationPicker(
                     .fillMaxWidth()
                     .padding(horizontal = layout.pickerHorizontalPadding)
             ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .fillMaxWidth()
-                        .height(layout.pickerSelectedRowHeight)
-                        .clip(RoundedCornerShape(layout.pickerSelectedRadius))
-                        .background(Color(0xFF48484F))
-                )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(layout.pickerWheelHeight),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                DurationWheel(
-                    value = hours,
-                    values = 0..23,
-                    locked = locked,
-                    layout = layout,
-                    onValueChange = onHoursChange
-                )
-                DurationWheel(
-                    value = minutes,
-                    values = 0..59,
-                    locked = locked,
-                    layout = layout,
-                    onValueChange = onMinutesChange
-                )
-                DurationWheel(
-                    value = seconds,
-                    values = 0..59,
-                    locked = locked,
-                    layout = layout,
-                    onValueChange = onSecondsChange
+                if (editing) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(layout.pickerWheelHeight),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        BasicTextField(
+                            value = typedDuration,
+                            onValueChange = {
+                                typedDuration = it
+                                if (typedError.isNotEmpty()) typedError = ""
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { state ->
+                                    if (!state.isFocused && editing) {
+                                        applyTypedDuration()
+                                    }
+                                },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = Color.White,
+                                fontSize = layout.pickerValueTextSize.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { applyTypedDuration() }),
+                            decorationBox = { innerTextField ->
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (typedDuration.isEmpty()) {
+                                        Text(
+                                            text = "e.g. 00:25:00 or 25m",
+                                            color = Color(0xFF8E8E96),
+                                            fontSize = layout.pickerMutedTextSize.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "HH:MM:SS, MM:SS, or 1h 30m",
+                            color = Color(0xFF8E8E96),
+                            fontSize = layout.errorTextSize.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        if (typedError.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = typedError,
+                                color = Color(0xFFFF453A),
+                                fontSize = layout.errorTextSize.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth()
+                            .height(layout.pickerSelectedRowHeight)
+                            .clip(RoundedCornerShape(layout.pickerSelectedRadius))
+                            .background(Color(0xFF48484F))
                     )
-                }
 
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .fillMaxWidth()
-                        .height(layout.pickerSelectedRowHeight),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FixedUnitLabel("hours", layout)
-                    FixedUnitLabel("min", layout)
-                    FixedUnitLabel("sec", layout)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(layout.pickerWheelHeight),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        DurationWheel(
+                            value = hours,
+                            values = 0..23,
+                            locked = locked,
+                            layout = layout,
+                            onValueChange = onHoursChange
+                        )
+                        DurationWheel(
+                            value = minutes,
+                            values = 0..59,
+                            locked = locked,
+                            layout = layout,
+                            onValueChange = onMinutesChange
+                        )
+                        DurationWheel(
+                            value = seconds,
+                            values = 0..59,
+                            locked = locked,
+                            layout = layout,
+                            onValueChange = onSecondsChange
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth()
+                            .height(layout.pickerSelectedRowHeight),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FixedUnitLabel("hours", layout)
+                        FixedUnitLabel("min", layout)
+                        FixedUnitLabel("sec", layout)
+                    }
+
+                    if (!locked) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .fillMaxWidth()
+                                .height(layout.pickerSelectedRowHeight)
+                                .zIndex(1f)
+                                .clickable(onClick = ::startEditing)
+                        )
+                    }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        val showTypeHint = !locked && !editing
+        Text(
+            text = "Tap to type a time",
+            color = Color(0xFF8E8E96),
+            fontSize = layout.errorTextSize.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .alpha(if (showTypeHint) 1f else 0f)
+                .then(
+                    if (showTypeHint) {
+                        Modifier.clickable(onClick = ::startEditing)
+                    } else {
+                        Modifier
+                    }
+                )
+        )
     }
+}
+
+private data class ParsedDuration(
+    val hours: Int,
+    val minutes: Int,
+    val seconds: Int
+)
+
+private fun normalizeDurationUnits(hours: Int, minutes: Int, seconds: Int): ParsedDuration {
+    val totalSeconds = seconds
+    val totalMinutes = minutes + totalSeconds / 60
+    val normalizedSeconds = totalSeconds % 60
+    val normalizedHours = hours + totalMinutes / 60
+    val normalizedMinutes = totalMinutes % 60
+    return ParsedDuration(normalizedHours, normalizedMinutes, normalizedSeconds)
+}
+
+private fun isDurationInRange(duration: ParsedDuration): Boolean {
+    return duration.hours in 0..23 &&
+        duration.minutes in 0..59 &&
+        duration.seconds in 0..59
+}
+
+private fun parseUnitBasedDuration(value: String): ParsedDuration? {
+    if (!Regex("^[\\dhms\\s]+$", RegexOption.IGNORE_CASE).containsMatchIn(value)) return null
+    if (!Regex("[hms]", RegexOption.IGNORE_CASE).containsMatchIn(value)) return null
+
+    var hours = 0
+    var minutes = 0
+    var seconds = 0
+    Regex("(\\d+)\\s*([hms])", RegexOption.IGNORE_CASE).findAll(value).forEach { match ->
+        val amount = match.groupValues[1].toInt()
+        when (match.groupValues[2].lowercase()) {
+            "h" -> hours += amount
+            "m" -> minutes += amount
+            "s" -> seconds += amount
+        }
+    }
+
+    val normalized = normalizeDurationUnits(hours, minutes, seconds)
+    return if (isDurationInRange(normalized)) normalized else null
+}
+
+private fun parseColonDuration(value: String): ParsedDuration? {
+    val segments = value.split(":").map { it.trim() }
+    if (segments.isEmpty() || segments.size > 3) return null
+    if (segments.any { !Regex("^\\d+$").matches(it) }) return null
+
+    val segmentValues = segments.map { it.toInt() }
+    var hours = 0
+    var minutes = 0
+    var seconds = 0
+
+    when (segmentValues.size) {
+        3 -> {
+            hours = segmentValues[0]
+            minutes = segmentValues[1]
+            seconds = segmentValues[2]
+        }
+        2 -> {
+            minutes = segmentValues[0]
+            seconds = segmentValues[1]
+        }
+        1 -> minutes = segmentValues[0]
+    }
+
+    val normalized = normalizeDurationUnits(hours, minutes, seconds)
+    return if (isDurationInRange(normalized)) normalized else null
+}
+
+private fun parseTypedDuration(value: String): ParsedDuration? {
+    val normalized = value.trim()
+    if (normalized.isEmpty()) return null
+    return parseUnitBasedDuration(normalized) ?: parseColonDuration(normalized)
 }
 
 @Composable
@@ -875,17 +1091,21 @@ private fun DurationWheel(
     layout: DurationLockLayoutMetrics,
     onValueChange: (Int) -> Unit
 ) {
-    val items = remember(values) { values.toList() }
-    val initialIndex = items.indexOf(value).coerceAtLeast(0)
+    val cycleItems = remember(values) { values.toList() }
+    val cycleSize = cycleItems.size
+    val repeatCount = 51
+    val middleCycle = repeatCount / 2
+    val totalItems = cycleSize * repeatCount
+    val initialIndex = middleCycle * cycleSize + cycleItems.indexOf(value).coerceAtLeast(0)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     val rowHeightPx = with(LocalDensity.current) { layout.pickerSelectedRowHeight.toPx() }
     val selectedIndex by remember {
         derivedStateOf {
-            (listState.firstVisibleItemIndex + if (listState.firstVisibleItemScrollOffset > rowHeightPx * 0.5f) 1 else 0)
-                .coerceIn(0, items.lastIndex)
+            listState.firstVisibleItemIndex +
+                if (listState.firstVisibleItemScrollOffset > rowHeightPx * 0.5f) 1 else 0
         }
     }
-    val selectedValue = items[selectedIndex]
+    val selectedValue = cycleItems[((selectedIndex % cycleSize) + cycleSize) % cycleSize]
 
     LaunchedEffect(selectedValue) {
         if (!locked) {
@@ -893,10 +1113,23 @@ private fun DurationWheel(
         }
     }
 
+    LaunchedEffect(listState.isScrollInProgress, selectedIndex) {
+        if (locked || listState.isScrollInProgress) return@LaunchedEffect
+        val lowerBound = cycleSize
+        val upperBound = cycleSize * (repeatCount - 1)
+        if (selectedIndex < lowerBound || selectedIndex >= upperBound) {
+            val normalized = ((selectedIndex % cycleSize) + cycleSize) % cycleSize
+            listState.scrollToItem(middleCycle * cycleSize + normalized)
+        }
+    }
+
     LaunchedEffect(value, locked) {
+        val targetInCycle = cycleItems.indexOf(value).coerceAtLeast(0)
+        val targetIndex = middleCycle * cycleSize + targetInCycle
         if (locked) {
-            val targetIndex = items.indexOf(value).coerceAtLeast(0)
             listState.animateScrollToItem(targetIndex)
+        } else if (selectedValue != value) {
+            listState.scrollToItem(targetIndex)
         }
     }
 
@@ -910,7 +1143,8 @@ private fun DurationWheel(
         contentPadding = PaddingValues(vertical = layout.pickerWheelVerticalPadding),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        items(items) { item ->
+        items(totalItems) { index ->
+            val item = cycleItems[index % cycleSize]
             val selected = item == selectedValue
             Box(
                 modifier = Modifier
@@ -1381,7 +1615,6 @@ private data class DurationLockLayoutMetrics(
 private enum class BlockerFlowScreen {
     AppSelection,
     GroupPicker,
-    GroupManager,
     GroupEditor,
     Groups,
     Settings,

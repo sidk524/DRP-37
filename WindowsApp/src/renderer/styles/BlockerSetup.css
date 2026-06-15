@@ -538,35 +538,47 @@
     gap: clamp(8px, 1.5vh, 10px);
 }
 
-.tether-group-item {
+.tether-group-picker-row {
     display: flex;
     align-items: center;
-    gap: clamp(10px, 2vw, 12px);
+    justify-content: space-between;
+    gap: clamp(4px, 1vw, 8px);
     width: 100%;
     min-height: var(--control-height-sm);
-    padding: clamp(12px, 2vh, 14px) clamp(14px, 3vw, 16px);
+    padding: clamp(4px, 0.8vh, 6px) clamp(4px, 1vw, 6px) clamp(4px, 0.8vh, 6px) clamp(14px, 3vw, 16px);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: rgba(255, 255, 255, 0.04);
-    color: var(--text-primary);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
     transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
 }
 
-.tether-group-item:hover:not(:disabled) {
-    background: var(--surface-raised);
-    border-color: var(--border-strong);
-}
-
-.tether-group-item.selected {
+.tether-group-picker-row.selected {
     border-color: var(--accent);
     background: var(--accent-soft);
     box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.3);
 }
 
-.tether-group-item:disabled {
+.tether-group-picker-select {
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 2vw, 12px);
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: var(--control-height-sm);
+    padding: clamp(8px, 1.4vh, 10px) 0;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tether-group-picker-select:hover:not(:disabled) {
+    filter: brightness(1.05);
+}
+
+.tether-group-picker-select:disabled {
     opacity: 0.5;
     cursor: default;
 }
@@ -606,19 +618,6 @@
     font-weight: 500;
 }
 
-.tether-group-manage-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: clamp(10px, 2vw, 16px);
-    width: 100%;
-    min-height: var(--control-height-sm);
-    padding: clamp(10px, 2vh, 12px) clamp(14px, 3vw, 16px);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.04);
-}
-
 .tether-group-actions {
     display: flex;
     align-items: center;
@@ -644,27 +643,6 @@
 
 .tether-group-action.danger {
     color: var(--danger);
-}
-
-.tether-group-secondary {
-    width: 100%;
-    min-height: var(--control-height);
-    margin-top: auto;
-    flex-shrink: 0;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    color: var(--text-primary);
-    font-size: clamp(1rem, 2.5vw, 1.08rem);
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    font-family: inherit;
-    cursor: pointer;
-}
-
-.tether-group-secondary:hover {
-    background: var(--surface-raised);
-    border-color: var(--border-strong);
 }
 
 .tether-groups .tether-done {

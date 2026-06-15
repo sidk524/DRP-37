@@ -133,18 +133,47 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         };
     }
 
-    async function startLocalSession(serverSession) {
+    function resolveBlockGroupName(serverSession, groups = blockGroups) {
+        const fromServer = String(serverSession?.block_group_name || "").trim();
+        if (fromServer) return fromServer;
+
+        const groupId = serverSession?.block_group_id || selectedBlockGroupId;
+        if (!groupId) return null;
+
+        const normalizedId = String(groupId);
+        const matched = groups.find((group) => String(group.id) === normalizedId);
+        if (matched?.name) return matched.name;
+
+        if (
+            selectedBlockGroup
+            && String(selectedBlockGroup.id) === normalizedId
+            && selectedBlockGroup.name
+        ) {
+            return selectedBlockGroup.name;
+        }
+
+        return null;
+    }
+
+    async function startLocalSession(serverSession, groups = blockGroups) {
         const endsAt = sessionEndsAt(serverSession);
         if (endsAt <= Date.now()) return null;
 
-        if (serverSession.block_group_id) {
-            setSelectedBlockGroupId(serverSession.block_group_id);
+        const blockGroupId = serverSession.block_group_id || selectedBlockGroupId || null;
+        if (blockGroupId) {
+            setSelectedBlockGroupId(blockGroupId);
         }
         setRemoteSessionId(serverSession.id);
         const friction = await loadFrictionContext();
+        const blockGroupName = resolveBlockGroupName(serverSession, groups)
+            || (selectedBlockGroup?.name && String(selectedBlockGroup.id) === String(blockGroupId)
+                ? selectedBlockGroup.name
+                : null);
 
         const res = await startTetherSession({
             sessionId: serverSession.id,
+            blockGroupId,
+            blockGroupName,
             appLabels: sessionLabels(serverSession),
             domains: serverSession.domains_blocked || [],
             mode,
@@ -163,13 +192,13 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
     }, [userId]);
 
     useEffect(() => {
-        if (restoredSessionRef.current) return;
+        if (restoredSessionRef.current || blockGroupsLoading) return;
         restoredSessionRef.current = true;
 
         loadActiveSession()
             .then(async (serverSession) => {
                 if (!serverSession) return;
-                const restored = await startLocalSession(serverSession);
+                const restored = await startLocalSession(serverSession, blockGroups);
                 if (restored) {
                     setCurrentActiveSession(restored);
                     wasActiveRef.current = true;
@@ -178,7 +207,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             .catch((error) => {
                 setSessionError(error.message || "Could not restore active session.");
             });
-    }, [userId, mode]);
+    }, [userId, mode, blockGroupsLoading, blockGroups]);
 
     useEffect(() => {
         if (!isTetherBridgeAvailable()) {
@@ -242,6 +271,19 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             setCurrentActiveSession(isActive ? s : null);
         });
     }, [remoteSessionId, userId]);
+
+    useEffect(() => {
+        if (!active?.active || !active.blockGroupId || active.blockGroupName) return;
+        const name = resolveBlockGroupName({ block_group_id: active.blockGroupId }, blockGroups);
+        if (!name) return;
+
+        updateTetherSession({
+            blockGroupId: active.blockGroupId,
+            blockGroupName: name,
+        }).catch((error) => {
+            console.error("Failed to backfill block group name:", error);
+        });
+    }, [active?.active, active?.blockGroupId, active?.blockGroupName, blockGroups]);
 
     useEffect(() => {
         if (!active?.endsAt) return;
