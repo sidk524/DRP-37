@@ -40,14 +40,6 @@ contextBridge.exposeInMainWorld("tether", {
     joinGroup: (payload) => invoke(CHANNELS.WEBSERVER_JOIN_GROUP, payload),
     getGroupLeaderboard: (groupId) =>
         invoke(CHANNELS.WEBSERVER_GET_GROUP_LEADERBOARD, groupId),
-    getGroupPresence: (groupId) => invoke(CHANNELS.WEBSERVER_GET_GROUP_PRESENCE, groupId),
-    getAccountabilityPreferences: () => invoke(CHANNELS.ACCOUNTABILITY_GET_PREFERENCES),
-    updateAccountabilityPreferences: (payload) => invoke(CHANNELS.ACCOUNTABILITY_UPDATE_PREFERENCES, payload),
-    reportAccountabilityAttempt: (payload) => invoke(CHANNELS.ACCOUNTABILITY_REPORT_ATTEMPT, payload),
-    getAccountabilityInbox: () => invoke(CHANNELS.ACCOUNTABILITY_GET_INBOX),
-    markAccountabilityNotificationRead: (id) => invoke(CHANNELS.ACCOUNTABILITY_MARK_READ, id),
-    sendAccountabilityMessage: (attemptId, payload) =>
-        invoke(CHANNELS.ACCOUNTABILITY_SEND_MESSAGE, { attemptId, payload }),
     syncDefaultGroups: (payload) =>
         invoke(CHANNELS.WEBSERVER_SYNC_DEFAULT_GROUPS, payload),
     listBlockGroups: () => invoke(CHANNELS.WEBSERVER_LIST_BLOCK_GROUPS),
@@ -76,10 +68,5 @@ contextBridge.exposeInMainWorld("tether", {
         const listener = (_event, data) => callback(data);
         ipcRenderer.on(CHANNELS.SESSION_REMOTE_SYNC, listener);
         return () => ipcRenderer.removeListener(CHANNELS.SESSION_REMOTE_SYNC, listener);
-    },
-    onAccountabilityEvent: (callback) => {
-        const listener = (_event, data) => callback(data);
-        ipcRenderer.on(CHANNELS.ACCOUNTABILITY_EVENT, listener);
-        return () => ipcRenderer.removeListener(CHANNELS.ACCOUNTABILITY_EVENT, listener);
     },
 });

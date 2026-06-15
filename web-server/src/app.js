@@ -5,7 +5,6 @@ const { createClient } = require("@supabase/supabase-js");
 const ws = require("ws");
 const { expandBlockTargets } = require("./expandBlockTargets");
 const { createSessionSyncHub } = require("./sessionSyncHub");
-const { registerAccountabilityRoutes } = require("./accountability");
 const {
     publicBlockGroup,
     ensureBlockGroups,
@@ -259,8 +258,7 @@ const publicGroup = (group, memberCount = 1) => ({
     inviteCode: group.invite_code,
     createdBy: group.created_by,
     createdAt: group.created_at,
-    memberCount,
-    isDefault: group.default_group_key != null
+    memberCount
 });
 
 const createGroupWithInvite = async (userId, name) => {
@@ -345,7 +343,7 @@ const listUserGroups = async (userId) => {
 
     const { data: groups, error: groupsError } = await supabaseAdmin
         .from("leaderboard_groups")
-        .select(DEFAULT_GROUP_FIELDS)
+        .select(GROUP_FIELDS)
         .in("id", groupIds);
 
     if (groupsError) throw groupsError;
@@ -695,7 +693,7 @@ app.post("/api/groups/join", requireSupabase, requireUser, async (req, res, next
 
         const { data: group, error } = await supabaseAdmin
             .from("leaderboard_groups")
-            .select(DEFAULT_GROUP_FIELDS)
+            .select(GROUP_FIELDS)
             .eq("invite_code", inviteCode)
             .maybeSingle();
 
@@ -1088,14 +1086,6 @@ app.patch("/api/session/current", requireSupabase, requireUser, async (req, res,
     } catch (error) {
         next(error);
     }
-});
-
-registerAccountabilityRoutes(app, {
-    supabaseAdmin,
-    requireSupabase,
-    requireUser,
-    hub: sessionSyncHub,
-    displayNameForUser
 });
 
 app.use((_req, res) => {

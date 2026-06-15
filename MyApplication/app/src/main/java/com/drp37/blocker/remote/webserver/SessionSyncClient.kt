@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import com.drp37.blocker.accountability.AccountabilityNotifier
 
 /**
  * Event pushed by the web server when a block session changes on any device.
@@ -101,27 +100,7 @@ object SessionSyncClient {
 
     private suspend fun handleFrame(text: String) {
         val json = runCatching { JSONObject(text) }.getOrNull() ?: return
-        when (json.optString("type")) {
-            "accountability.attempt" -> {
-                val notification = json.optJSONObject("notification") ?: return
-                val attempt = notification.optJSONObject("attempt")
-                AccountabilityNotifier.show(
-                    "${notification.optString("actorDisplayName", "A friend")} needs accountability",
-                    "${attempt?.optString("target_label", "Blocked app")} · ${attempt?.optString("mode", "focus")}"
-                )
-                return
-            }
-            "accountability.message" -> {
-                val message = json.optJSONObject("message") ?: return
-                AccountabilityNotifier.show(
-                    "${message.optString("senderDisplayName", "A friend")} sent encouragement",
-                    message.optString("body", "Stay focused")
-                )
-                return
-            }
-            "session.sync" -> Unit
-            else -> return
-        }
+        if (json.optString("type") != "session.sync") return
         val sessionJson = json.optJSONObject("session")
         val session = sessionJson?.let { runCatching { it.toBlockSessionRecord() }.getOrNull() }
         val completedJson = json.optJSONObject("completed")

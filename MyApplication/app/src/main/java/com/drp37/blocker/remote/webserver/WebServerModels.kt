@@ -52,31 +52,7 @@ data class GroupSummary(
     val inviteCode: String,
     val createdBy: String?,
     val createdAt: String,
-    val memberCount: Int,
-    val isDefault: Boolean = false
-)
-
-data class AccountabilityPreferences(
-    val shareActivity: Boolean = true,
-    val receiveFriendAlerts: Boolean = true
-)
-
-data class GroupPresence(
-    val userId: String,
-    val displayName: String,
-    val active: Boolean,
-    val mode: String?,
-    val startedAt: String?,
-    val endsAt: String?
-)
-
-data class AccountabilityInboxItem(
-    val id: String,
-    val kind: String,
-    val attemptId: String,
-    val title: String,
-    val detail: String,
-    val unread: Boolean
+    val memberCount: Int
 )
 
 data class LeaderboardEntry(

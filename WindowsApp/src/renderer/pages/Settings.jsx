@@ -6,7 +6,6 @@ import {
 } from "./Onboarding";
 import { syncDefaultGroups } from "../services/GroupRepository";
 import { loadOnboarding, saveOnboarding } from "../services/SupabaseClient";
-import { getAccountabilityPreferences, updateAccountabilityPreferences } from "../services/AccountabilityRepository";
 import "../styles/Onboarding.css";
 import "../styles/Settings.css";
 
@@ -23,29 +22,24 @@ function Settings({ session, onBack, onSaved }) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [saved, setSaved] = useState(false);
-    const [accountability, setAccountability] = useState({ shareActivity: true, receiveFriendAlerts: true });
-    const [initialAccountability, setInitialAccountability] = useState(accountability);
 
     const choiceSteps = useMemo(() => STEPS.filter((step) => step.multiKey), []);
     const selectedStrictness = STRICTNESS_LEVELS.find((level) => level.value === responses.strictness);
     const [initialResponses, setInitialResponses] = useState(DEFAULT_RESPONSES);
     const isDirty = useMemo(() => {
         if (loading) return false;
-        return JSON.stringify(responses) !== JSON.stringify(initialResponses)
-            || JSON.stringify(accountability) !== JSON.stringify(initialAccountability);
-    }, [responses, initialResponses, accountability, initialAccountability, loading]);
+        return JSON.stringify(responses) !== JSON.stringify(initialResponses);
+    }, [responses, initialResponses, loading]);
 
     useEffect(() => {
         let active = true;
         setLoading(true);
-        Promise.all([loadOnboarding(session.user.id), getAccountabilityPreferences()])
-            .then(([data, preferences]) => {
+        loadOnboarding(session.user.id)
+            .then((data) => {
                 if (!active) return;
                 const nextResponses = data || DEFAULT_RESPONSES;
                 setResponses(nextResponses);
                 setInitialResponses(nextResponses);
-                setAccountability(preferences);
-                setInitialAccountability(preferences);
             })
             .catch((err) => {
                 if (!active) return;
@@ -99,11 +93,8 @@ function Settings({ session, onBack, onSaved }) {
             };
             await saveOnboarding(session.user.id, nextResponses);
             await syncDefaultGroups({ scrollingWorst: nextResponses.scrollingWorst });
-            const nextAccountability = await updateAccountabilityPreferences(accountability);
             setResponses(nextResponses);
             setInitialResponses(nextResponses);
-            setAccountability(nextAccountability);
-            setInitialAccountability(nextAccountability);
             await onSaved?.(nextResponses);
             setSaved(true);
         } catch (err) {
@@ -161,21 +152,6 @@ function Settings({ session, onBack, onSaved }) {
                                 </div>
                             </section>
                         ))}
-
-                        <section className="settings-card">
-                            <p className="onboarding-section">Accountability</p>
-                            <h2 className="settings-card-title">Friend accountability</h2>
-                            <label>
-                                <input type="checkbox" checked={accountability.shareActivity}
-                                    onChange={(event) => setAccountability((value) => ({ ...value, shareActivity: event.target.checked }))} />
-                                {" "}Share my focus activity and notify friends when I open blocked apps
-                            </label>
-                            <label>
-                                <input type="checkbox" checked={accountability.receiveFriendAlerts}
-                                    onChange={(event) => setAccountability((value) => ({ ...value, receiveFriendAlerts: event.target.checked }))} />
-                                {" "}Notify me about friends' blocked-app attempts
-                            </label>
-                        </section>
 
                         <section className="settings-card">
                             <p className="onboarding-section">Letter to self</p>

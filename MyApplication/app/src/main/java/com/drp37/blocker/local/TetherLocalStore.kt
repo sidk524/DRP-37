@@ -14,8 +14,6 @@ object TetherLocalStore {
     private const val KEY_DURATION_SECONDS = "duration_seconds"
     private const val KEY_MODE = "mode"
     private const val KEY_MIGRATED = "migrated"
-    private const val KEY_SHARE_ACTIVITY = "share_activity"
-    private const val KEY_RECEIVE_FRIEND_ALERTS = "receive_friend_alerts"
     private const val LEGACY_SESSION_PREFS = "active_block_session"
     private const val LEGACY_ALLOW_PREFS = "blocked_package_allow_windows"
     private const val ALLOW_PREFIX = "allow_"
@@ -37,19 +35,6 @@ object TetherLocalStore {
         prefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
         return deviceId
     }
-
-    fun setAccountabilityPreferences(shareActivity: Boolean, receiveFriendAlerts: Boolean) {
-        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_SHARE_ACTIVITY, shareActivity)
-            .putBoolean(KEY_RECEIVE_FRIEND_ALERTS, receiveFriendAlerts)
-            .apply()
-    }
-
-    fun sharesAccountabilityActivity(): Boolean =
-        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SHARE_ACTIVITY, true)
-
-    fun receivesFriendAlerts(): Boolean =
-        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_RECEIVE_FRIEND_ALERTS, true)
 
     fun getActiveSession(): ActiveBlockSession? {
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

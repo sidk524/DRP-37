@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
     createGroup,
     getGroupLeaderboard,
-    getGroupPresence,
     joinGroup,
     listGroups,
 } from "../services/GroupRepository";
@@ -65,7 +64,6 @@ function Groups({ onBack }) {
     const [copied, setCopied] = useState(false);
     const [leaderboardMetric, setLeaderboardMetric] = useState(METRIC_TIME);
     const [focusPointsAvailable, setFocusPointsAvailable] = useState(true);
-    const [presence, setPresence] = useState([]);
 
     const selectedGroup = useMemo(
         () => groups.find((group) => group.id === selectedGroupId) || null,
@@ -121,16 +119,7 @@ function Groups({ onBack }) {
 
     useEffect(() => {
         refreshLeaderboard(selectedGroupId);
-        const group = groups.find((item) => item.id === selectedGroupId);
-        if (!selectedGroupId || group?.isDefault) {
-            setPresence([]);
-            return;
-        }
-        const refreshPresence = () => getGroupPresence(selectedGroupId).then(setPresence).catch(() => setPresence([]));
-        refreshPresence();
-        const timer = window.setInterval(refreshPresence, 15000);
-        return () => window.clearInterval(timer);
-    }, [selectedGroupId, groups]);
+    }, [selectedGroupId]);
 
     async function handleCreateGroup() {
         const name = groupName.trim();
@@ -306,18 +295,6 @@ function Groups({ onBack }) {
                             </div>
                         </div>
                         <div className="groups-leaderboard-scroll">
-                            {selectedGroup && !selectedGroup.isDefault && presence.length > 0 && (
-                                <div className="groups-panel-section">
-                                    <p className="groups-panel-label">Live sessions</p>
-                                    {presence.map((member) => (
-                                        <p key={member.userId} className="groups-muted">
-                                            {member.displayName}: {member.active
-                                                ? `${member.mode} until ${new Date(member.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                                                : "not in a session"}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
                             {!focusPointsAvailable && (
                                 <p className="groups-muted groups-points-unavailable">
                                     Points ranking is unavailable until the focus_session_points database table is set up.
