@@ -114,6 +114,21 @@ async function getGroupLeaderboard(groupId) {
     };
 }
 
+let accountabilityPreferences = { shareActivity: true, receiveFriendAlerts: true };
+
+function rememberAccountabilityPreferences(preferences) {
+    if (!preferences || typeof preferences !== "object") return accountabilityPreferences;
+    accountabilityPreferences = {
+        shareActivity: preferences.shareActivity !== false,
+        receiveFriendAlerts: preferences.receiveFriendAlerts !== false
+    };
+    return accountabilityPreferences;
+}
+
+function getCachedAccountabilityPreferences() {
+    return accountabilityPreferences;
+}
+
 async function getGroupPresence(groupId) {
     const data = await request(`/api/groups/${encodeURIComponent(groupId)}/presence`);
     return data.presence || [];
@@ -121,12 +136,12 @@ async function getGroupPresence(groupId) {
 
 async function getAccountabilityPreferences() {
     const data = await request("/api/accountability/preferences");
-    return data.preferences;
+    return rememberAccountabilityPreferences(data.preferences);
 }
 
 async function updateAccountabilityPreferences(preferences) {
     const data = await request("/api/accountability/preferences", { method: "PUT", body: preferences });
-    return data.preferences;
+    return rememberAccountabilityPreferences(data.preferences);
 }
 
 async function reportAccountabilityAttempt(payload) {
@@ -278,6 +293,7 @@ module.exports = {
     getGroupPresence,
     getAccountabilityPreferences,
     updateAccountabilityPreferences,
+    getCachedAccountabilityPreferences,
     reportAccountabilityAttempt,
     getAccountabilityInbox,
     markAccountabilityNotificationRead,

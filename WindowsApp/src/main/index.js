@@ -47,10 +47,9 @@ function broadcastToAllWindows(channel, payload) {
 
 function broadcastAuthSession(session) {
     broadcastToAllWindows(CHANNELS.AUTH_SESSION_UPDATE, session);
-    // Drive the real-time sync socket with the auth lifecycle: connect while a
-    // session exists, disconnect on sign-out.
     if (session) {
         sessionSyncService.start();
+        webServerService.getAccountabilityPreferences().catch(() => {});
     } else {
         sessionSyncService.stop();
     }
@@ -220,6 +219,10 @@ if (gotSingleInstanceLock) {
                     broadcastToAllWindows(CHANNELS.SESSION_REMOTE_SYNC, message);
                     return;
                 }
+                const prefs = webServerService.getCachedAccountabilityPreferences();
+                if (message?.type === "accountability.attempt" && !prefs.receiveFriendAlerts) {
+                    return;
+                }
                 broadcastToAllWindows(CHANNELS.ACCOUNTABILITY_EVENT, message);
                 extensionBridge.notifyAccountability(message);
                 if (!["accountability.attempt", "accountability.message"].includes(message?.type)) return;
@@ -243,7 +246,12 @@ if (gotSingleInstanceLock) {
             onSessionChange: broadcastBlockerSession,
             extensionBridge,
         });
-        extensionBridge.setAttemptReporter((payload) => webServerService.reportAccountabilityAttempt(payload));
+        extensionBridge.setAttemptReporter(async (payload) => {
+            if (!webServerService.getCachedAccountabilityPreferences().shareActivity) {
+                return { ignored: true, reason: "sharing_disabled" };
+            }
+            return webServerService.reportAccountabilityAttempt(payload);
+        });
         extensionBridge.setMessageSender(async (attemptId, payload) => {
             const result = await webServerService.sendAccountabilityMessage(attemptId, payload);
             extensionBridge.notifyAccountability({ type: "accountability.attempt.dismiss", attemptId });

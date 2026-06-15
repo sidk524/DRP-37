@@ -99,19 +99,21 @@ function registerAccountabilityRoutes(app, deps) {
             const active = new Map((sessions.data || [])
                 .filter((row) => new Date(row.started_at).getTime() + row.total_duration_seconds * 1000 > now)
                 .map((row) => [row.user_id, row]));
-            const presence = await Promise.all(visible.map(async (userId) => {
-                const session = active.get(userId);
-                return {
-                    userId,
-                    displayName: await displayNameForUser(userId),
-                    active: !!session,
-                    mode: session?.mode || null,
-                    startedAt: session?.started_at || null,
-                    endsAt: session
-                        ? new Date(new Date(session.started_at).getTime() + session.total_duration_seconds * 1000).toISOString()
-                        : null
-                };
-            }));
+            const presence = await Promise.all(
+                visible
+                    .filter((userId) => active.has(userId))
+                    .map(async (userId) => {
+                        const session = active.get(userId);
+                        return {
+                            userId,
+                            displayName: await displayNameForUser(userId),
+                            active: true,
+                            mode: session?.mode || null,
+                            startedAt: session?.started_at || null,
+                            endsAt: new Date(new Date(session.started_at).getTime() + session.total_duration_seconds * 1000).toISOString()
+                        };
+                    })
+            );
             res.json({ presence });
         } catch (error) { next(error); }
     });

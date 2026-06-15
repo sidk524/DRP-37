@@ -106,6 +106,7 @@ object SessionSyncClient {
         val json = runCatching { JSONObject(text) }.getOrNull() ?: return
         when (json.optString("type")) {
             "accountability.attempt" -> {
+                if (!TetherLocalStore.receivesFriendAlerts()) return
                 val notification = json.optJSONObject("notification") ?: return
                 val attempt = notification.optJSONObject("attempt")
                 AccountabilityNotifier.showAttemptNotification(
