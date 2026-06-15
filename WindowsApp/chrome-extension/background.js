@@ -1,5 +1,7 @@
 const BRIDGE_URL = "http://127.0.0.1:17894/api/block-state";
 const STREAM_URL = "http://127.0.0.1:17894/api/block-state/stream";
+const ACCOUNTABILITY_URL = "http://127.0.0.1:17894/api/accountability/attempts";
+const ACCOUNTABILITY_STREAM_URL = "http://127.0.0.1:17894/api/accountability/stream";
 const RULE_ID_BASE = 1000;
 const CONTINUE_GRACE_MS = 2500;
 const BLOCKED_PAGE = "blocked.html";
@@ -15,9 +17,11 @@ const DOMAIN_GROUPS = [
 ];
 
 let stream = null;
+let accountabilityStream = null;
 let pollTimer = null;
 let lastStateKey = "";
 let currentState = { active: false, domains: [], mode: "breathing", friction: {} };
+const notificationAttempts = new Map();
 
 function normalizeHost(value) {
     return String(value || "")
@@ -263,6 +267,57 @@ async function maybeRedirectTab(tabId, url) {
     });
 }
 
+async function reportBlockedHost(host) {
+    const normalized = normalizeHost(host);
+    if (!normalized) return;
+    await fetch(ACCOUNTABILITY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            targetType: "domain",
+            targetKey: normalized,
+            targetLabel: normalized,
+            idempotencyKey: `chrome:${Date.now()}:${crypto.randomUUID()}`,
+        }),
+    }).catch(() => {});
+}
+
+function connectAccountabilityStream() {
+    if (typeof EventSource === "undefined") return;
+    if (accountabilityStream) accountabilityStream.close();
+    accountabilityStream = new EventSource(ACCOUNTABILITY_STREAM_URL);
+    accountabilityStream.onmessage = (event) => {
+        let message;
+        try { message = JSON.parse(event.data); } catch { return; }
+        const isReply = message?.type === "accountability.message";
+        const notificationId = `accountability-${Date.now()}-${Math.random()}`;
+        chrome.notifications.create(notificationId, {
+            type: "basic",
+            iconUrl: "icon.svg",
+            title: isReply
+                ? `${message.message?.senderDisplayName || "A friend"} sent encouragement`
+                : `${message.notification?.actorDisplayName || "A friend"} needs accountability`,
+            message: isReply
+                ? message.message?.body || "Stay focused"
+                : `${message.notification?.attempt?.target_label || "Blocked site"} · ${message.notification?.attempt?.mode || "focus"}`,
+            buttons: isReply ? [] : [{ title: "Lock in" }, { title: "Stay focused" }],
+        }).catch(() => {});
+        if (!isReply && message.notification?.attempt_id) {
+            notificationAttempts.set(notificationId, message.notification.attempt_id);
+        }
+    };
+}
+
+chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
+    const attemptId = notificationAttempts.get(notificationId);
+    if (!attemptId) return;
+    fetch(`http://127.0.0.1:17894/api/accountability/attempts/${encodeURIComponent(attemptId)}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ presetKey: buttonIndex === 0 ? "lock_in" : "stay_focused" }),
+    }).catch(() => {});
+});
+
 async function syncFromDesktop() {
     try {
         const state = await fetchState();
@@ -319,6 +374,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.webNavigation.onCommitted.addListener((details) => {
     if (details.frameId !== 0) return;
+    if (isBlockedPageUrl(details.url)) {
+        try { reportBlockedHost(new URL(details.url).searchParams.get("host")); } catch { /* ignore */ }
+        return;
+    }
     maybeRedirectTab(details.tabId, details.url);
 });
 
@@ -334,5 +393,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 connectStream();
+connectAccountabilityStream();
 startPolling();
 syncFromDesktop();

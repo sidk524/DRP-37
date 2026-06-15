@@ -5,8 +5,14 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import com.drp37.blocker.MainActivity
 import com.drp37.blocker.local.TetherLocalStore
+import com.drp37.blocker.remote.webserver.WebServerService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class AppBlockingAccessibilityService : AccessibilityService() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var lastBlockedPackage: String? = null
     private var lastBlockedAtMillis: Long = 0L
 
@@ -23,6 +29,12 @@ class AppBlockingAccessibilityService : AccessibilityService() {
 
         lastBlockedPackage = packageName
         lastBlockedAtMillis = now
+        if (TetherLocalStore.sharesAccountabilityActivity()) {
+            val label = runCatching {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString()
+            }.getOrDefault(packageName)
+            scope.launch { runCatching { WebServerService.reportAccountabilityAttempt(packageName, label) } }
+        }
         val intent = Intent(this, MainActivity::class.java)
             .setAction(FrictionIntentContract.ACTION_SHOW_FRICTION)
             .putExtra(FrictionIntentContract.EXTRA_BLOCKED_PACKAGE, packageName)

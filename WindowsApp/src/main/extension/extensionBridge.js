@@ -11,14 +11,25 @@ let getState = () => ({
 });
 
 const sseClients = new Set();
+const accountabilityClients = new Set();
 let server = null;
 let serverReady = false;
+let reportAttempt = null;
+let sendMessage = null;
 
 function setStateProvider(fn) {
     if (typeof fn !== "function") {
         throw new TypeError("State provider must be a function.");
     }
     getState = fn;
+}
+
+function setAttemptReporter(fn) {
+    reportAttempt = typeof fn === "function" ? fn : null;
+}
+
+function setMessageSender(fn) {
+    sendMessage = typeof fn === "function" ? fn : null;
 }
 
 function status() {
@@ -55,7 +66,7 @@ function broadcast() {
 
 function setCors(res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
@@ -84,6 +95,52 @@ function handleRequest(req, res) {
         res.write(`data: ${JSON.stringify(statePayload())}\n\n`);
         sseClients.add(res);
         req.on("close", () => sseClients.delete(res));
+        return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/accountability/stream") {
+        res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+        });
+        accountabilityClients.add(res);
+        req.on("close", () => accountabilityClients.delete(res));
+        return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/accountability/attempts") {
+        let raw = "";
+        req.on("data", (chunk) => { raw += chunk; });
+        req.on("end", async () => {
+            try {
+                if (!reportAttempt) throw new Error("Attempt reporter unavailable");
+                const result = await reportAttempt(JSON.parse(raw || "{}"));
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(result || {}));
+            } catch (error) {
+                res.writeHead(400, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: error?.message || "Attempt report failed" }));
+            }
+        });
+        return;
+    }
+
+    const messageMatch = url.pathname.match(/^\/api\/accountability\/attempts\/([^/]+)\/messages$/);
+    if (req.method === "POST" && messageMatch) {
+        let raw = "";
+        req.on("data", (chunk) => { raw += chunk; });
+        req.on("end", async () => {
+            try {
+                if (!sendMessage) throw new Error("Message sender unavailable");
+                const result = await sendMessage(decodeURIComponent(messageMatch[1]), JSON.parse(raw || "{}"));
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(result || {}));
+            } catch (error) {
+                res.writeHead(400, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: error?.message || "Message failed" }));
+            }
+        });
         return;
     }
 
@@ -122,6 +179,7 @@ function stop() {
         }
     }
     sseClients.clear();
+    accountabilityClients.clear();
     if (server) {
         server.close((err) => {
             if (err) {
@@ -137,11 +195,21 @@ function notifyStateChange() {
     broadcast();
 }
 
+function notifyAccountability(event) {
+    const payload = `data: ${JSON.stringify(event)}\n\n`;
+    for (const res of accountabilityClients) {
+        try { res.write(payload); } catch { accountabilityClients.delete(res); }
+    }
+}
+
 module.exports = {
     start,
     stop,
     setStateProvider,
+    setAttemptReporter,
+    setMessageSender,
     notifyStateChange,
+    notifyAccountability,
     status,
     PORT,
     HOST,

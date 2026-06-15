@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drp37.blocker.remote.webserver.OnboardingSettings
+import com.drp37.blocker.remote.webserver.AccountabilityPreferences
 import com.drp37.blocker.remote.webserver.WebServerService
 import kotlinx.coroutines.launch
 
@@ -71,15 +73,17 @@ fun OnboardingSettingsScreen(
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var saved by remember { mutableStateOf(false) }
+    var accountability by remember { mutableStateOf(AccountabilityPreferences()) }
 
     LaunchedEffect(Unit) {
         loading = true
-        runCatching { WebServerService.loadOnboarding() }
-            .onSuccess { loaded ->
+        runCatching { WebServerService.loadOnboarding() to WebServerService.getAccountabilityPreferences() }
+            .onSuccess { (loaded, loadedAccountability) ->
                 settings = loaded ?: OnboardingSettings(
                     futureMessage = "",
                     strictness = "moderate"
                 )
+                accountability = loadedAccountability
             }
             .onFailure { throwable ->
                 error = throwable.message ?: "Could not load settings."
@@ -157,6 +161,35 @@ fun OnboardingSettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    SettingsSection(
+                        section = "Accountability",
+                        title = "Friend accountability"
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Share my session activity and notify friends about blocked-app attempts",
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = accountability.shareActivity,
+                                onCheckedChange = { accountability = accountability.copy(shareActivity = it); saved = false }
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Notify me about friends' blocked-app attempts",
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = accountability.receiveFriendAlerts,
+                                onCheckedChange = { accountability = accountability.copy(receiveFriendAlerts = it); saved = false }
+                            )
+                        }
+                    }
+
                     SettingsSection(
                         section = "Goals",
                         title = "What do you wish you did more of?"
@@ -257,6 +290,7 @@ fun OnboardingSettingsScreen(
                             val normalized = settings.copy(futureMessage = settings.futureMessage.trim())
                             WebServerService.saveOnboarding(normalized)
                             WebServerService.syncDefaultGroups(normalized.scrollingWorst)
+                            accountability = WebServerService.updateAccountabilityPreferences(accountability)
                             settings = normalized
                         }.onSuccess {
                             saved = true

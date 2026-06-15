@@ -40,8 +40,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.drp37.blocker.remote.webserver.GroupSummary
 import com.drp37.blocker.remote.webserver.LeaderboardEntry
+import com.drp37.blocker.remote.webserver.GroupPresence
+import com.drp37.blocker.remote.webserver.AccountabilityInboxItem
 import com.drp37.blocker.remote.webserver.WebServerService
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 private enum class LeaderboardMetric {
     Time,
@@ -61,6 +64,11 @@ fun GroupsScreen(onBack: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var leaderboardMetric by remember { mutableStateOf(LeaderboardMetric.Time) }
     var focusPointsAvailable by remember { mutableStateOf(true) }
+    var presence by remember { mutableStateOf<List<GroupPresence>>(emptyList()) }
+    var inbox by remember { mutableStateOf<List<AccountabilityInboxItem>>(emptyList()) }
+    var unreadCount by remember { mutableStateOf(0) }
+    var showInbox by remember { mutableStateOf(false) }
+    var messageDrafts by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     val rankedLeaderboard = remember(leaderboard, leaderboardMetric) {
         rankLeaderboard(leaderboard, leaderboardMetric)
@@ -106,10 +114,23 @@ fun GroupsScreen(onBack: () -> Unit) {
 
     LaunchedEffect(Unit) {
         refreshGroups(null)
+        runCatching { WebServerService.getAccountabilityInbox() }.onSuccess {
+            inbox = it.first
+            unreadCount = it.second
+        }
     }
 
     LaunchedEffect(selectedGroupId) {
         refreshLeaderboard(selectedGroupId)
+        val group = groups.firstOrNull { it.id == selectedGroupId }
+        if (group == null || group.isDefault) {
+            presence = emptyList()
+        } else {
+            while (true) {
+                presence = runCatching { WebServerService.getGroupPresence(group.id) }.getOrDefault(emptyList())
+                delay(15_000)
+            }
+        }
     }
 
     val selectedGroup = groups.firstOrNull { it.id == selectedGroupId }
@@ -130,7 +151,9 @@ fun GroupsScreen(onBack: () -> Unit) {
                 Spacer(modifier = Modifier.weight(1f))
                 Text(text = "Social", color = Color(0xFF8E8E96), fontSize = 16.sp)
                 Spacer(modifier = Modifier.weight(1f))
-                Box(modifier = Modifier)
+                TextButton(onClick = { showInbox = !showInbox }) {
+                    Text(text = "Bell${if (unreadCount > 0) " ($unreadCount)" else ""}", color = Color(0xFF0A84FF))
+                }
             }
             Spacer(modifier = Modifier.height(18.dp))
             Text(text = "Leaderboards", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
@@ -186,6 +209,55 @@ fun GroupsScreen(onBack: () -> Unit) {
                 }
             )
             Spacer(modifier = Modifier.height(16.dp))
+            if (showInbox) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+                    if (inbox.isEmpty()) item { Text(text = "No accountability notifications yet.", color = Color(0xFF8E8E96)) }
+                    items(inbox, key = { "${it.kind}-${it.id}" }) { item ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFF1F1F22))
+                                .clickable {
+                                    if (item.kind == "attempt" && item.unread) {
+                                        coroutineScope.launch {
+                                            runCatching { WebServerService.markAccountabilityNotificationRead(item.id) }
+                                            inbox = inbox.map { if (it.id == item.id) it.copy(unread = false) else it }
+                                            unreadCount = (unreadCount - 1).coerceAtLeast(0)
+                                        }
+                                    }
+                                }
+                                .padding(14.dp)
+                        ) {
+                            Text(text = item.title, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(text = item.detail, color = Color(0xFF8E8E96))
+                            if (item.kind == "attempt") {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf("lock_in" to "Lock in", "stay_focused" to "Stay focused").forEach { (key, label) ->
+                                        TextButton(onClick = { coroutineScope.launch { runCatching { WebServerService.sendAccountabilityPreset(item.attemptId, key) } } }) {
+                                            Text(label)
+                                        }
+                                    }
+                                }
+                                OutlinedTextField(
+                                    value = messageDrafts[item.attemptId].orEmpty(),
+                                    onValueChange = { value -> messageDrafts = messageDrafts + (item.attemptId to value.take(280)) },
+                                    label = { Text("Private message") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                TextButton(onClick = {
+                                    val body = messageDrafts[item.attemptId].orEmpty().trim()
+                                    if (body.isNotEmpty()) coroutineScope.launch {
+                                        runCatching { WebServerService.sendAccountabilityMessage(item.attemptId, body) }
+                                        messageDrafts = messageDrafts - item.attemptId
+                                    }
+                                }) { Text("Send") }
+                            }
+                        }
+                    }
+                }
+                return@Column
+            }
             if (loading) {
                 Text(text = "Loading social...", color = Color(0xFF8E8E96))
             } else {
@@ -207,6 +279,20 @@ fun GroupsScreen(onBack: () -> Unit) {
                                 group = selectedGroup,
                                 onCopy = { clipboard.setText(AnnotatedString(selectedGroup.inviteCode)) }
                             )
+                        }
+                    }
+                    if (selectedGroup != null && !selectedGroup.isDefault && presence.isNotEmpty()) {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(text = "Live sessions", color = Color.White, fontWeight = FontWeight.Bold)
+                                presence.forEach { member ->
+                                    Text(
+                                        text = "${member.displayName}: ${if (member.active) member.mode ?: "active" else "not in a session"}",
+                                        color = Color(0xFF8E8E96),
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
                         }
                     }
                     item {

@@ -161,6 +161,15 @@ function createSessionSyncHub({ verifyToken, getSnapshot, path = SYNC_PATH }) {
         }
     }
 
+    function broadcastEvent(userId, payload, { excludeDeviceId = null } = {}) {
+        const set = connectionsByUser.get(userId);
+        if (!set) return;
+        for (const conn of set) {
+            if (excludeDeviceId && conn.deviceId && conn.deviceId === excludeDeviceId) continue;
+            sendTo(conn, payload);
+        }
+    }
+
     function getConnectedCount(userId) {
         return connectionsByUser.get(userId)?.size || 0;
     }
@@ -234,6 +243,7 @@ function createSessionSyncHub({ verifyToken, getSnapshot, path = SYNC_PATH }) {
         attach,
         close,
         broadcastSession,
+        broadcastEvent,
         getConnectedCount,
         // Exposed for tests.
         handleConnection,

@@ -175,6 +175,86 @@ object WebServerService {
         return GroupLeaderboard(entries = entries, focusPointsAvailable = focusPointsAvailable)
     }
 
+    suspend fun getGroupPresence(groupId: String): List<GroupPresence> {
+        val encodedId = URLEncoder.encode(groupId, StandardCharsets.UTF_8.name())
+        val response = request(method = "GET", path = "/api/groups/$encodedId/presence")
+        return response.optJSONArray("presence")?.toObjectList { toGroupPresence() }.orEmpty()
+    }
+
+    suspend fun getAccountabilityPreferences(): AccountabilityPreferences {
+        val value = request(method = "GET", path = "/api/accountability/preferences").getJSONObject("preferences")
+        return AccountabilityPreferences(
+            shareActivity = value.optBoolean("shareActivity", true),
+            receiveFriendAlerts = value.optBoolean("receiveFriendAlerts", true)
+        )
+    }
+
+    suspend fun updateAccountabilityPreferences(value: AccountabilityPreferences): AccountabilityPreferences {
+        val response = request(
+            method = "PUT",
+            path = "/api/accountability/preferences",
+            body = JSONObject()
+                .put("shareActivity", value.shareActivity)
+                .put("receiveFriendAlerts", value.receiveFriendAlerts)
+        ).getJSONObject("preferences")
+        val saved = AccountabilityPreferences(
+            shareActivity = response.optBoolean("shareActivity", true),
+            receiveFriendAlerts = response.optBoolean("receiveFriendAlerts", true)
+        )
+        com.drp37.blocker.local.TetherLocalStore.setAccountabilityPreferences(saved.shareActivity, saved.receiveFriendAlerts)
+        return saved
+    }
+
+    suspend fun reportAccountabilityAttempt(packageName: String, label: String) {
+        request(
+            method = "POST",
+            path = "/api/accountability/attempts",
+            body = JSONObject()
+                .put("targetType", "app")
+                .put("targetKey", packageName)
+                .put("targetLabel", label.take(120))
+                .put("idempotencyKey", "android:${System.currentTimeMillis()}:${java.util.UUID.randomUUID()}")
+        )
+    }
+
+    suspend fun getAccountabilityInbox(): Pair<List<AccountabilityInboxItem>, Int> {
+        val response = request(method = "GET", path = "/api/accountability/inbox")
+        val items = response.optJSONArray("items")?.toObjectList {
+            val kind = optString("kind")
+            val attempt = optJSONObject("attempt")
+            AccountabilityInboxItem(
+                id = optString("id"),
+                kind = kind,
+                attemptId = optString("attempt_id"),
+                title = if (kind == "message") "Encouragement" else "${optString("actorDisplayName", "Friend")} opened ${attempt?.optString("target_label", "a blocked app")}",
+                detail = if (kind == "message") optString("body") else attempt?.optString("mode", "focus").orEmpty(),
+                unread = optString("read_at").isBlank() || optString("read_at") == "null"
+            )
+        }.orEmpty()
+        return items to response.optInt("unreadCount", 0)
+    }
+
+    suspend fun markAccountabilityNotificationRead(id: String) {
+        request(method = "POST", path = "/api/accountability/notifications/${URLEncoder.encode(id, StandardCharsets.UTF_8.name())}/read")
+    }
+
+    suspend fun sendAccountabilityPreset(attemptId: String, presetKey: String) {
+        request(
+            method = "POST",
+            path = "/api/accountability/attempts/${URLEncoder.encode(attemptId, StandardCharsets.UTF_8.name())}/messages",
+            body = JSONObject().put("presetKey", presetKey)
+        )
+    }
+
+    suspend fun sendAccountabilityMessage(attemptId: String, body: String) {
+        request(
+            method = "POST",
+            path = "/api/accountability/attempts/${URLEncoder.encode(attemptId, StandardCharsets.UTF_8.name())}/messages",
+            body = JSONObject().put("body", body.trim())
+        )
+    }
+
+
     suspend fun syncDefaultGroups(scrollingWorst: List<String>): List<GroupSummary> {
         val body = JSONObject().put("scrollingWorst", JSONArray(scrollingWorst))
         val response = request(method = "POST", path = "/api/groups/defaults/sync", body = body)
@@ -327,7 +407,19 @@ private fun JSONObject.toGroupSummary(): GroupSummary {
         inviteCode = optString("inviteCode").orEmpty(),
         createdBy = optString("createdBy").takeUnless { it.isBlank() || it == "null" },
         createdAt = optString("createdAt").orEmpty(),
-        memberCount = optInt("memberCount", 0)
+        memberCount = optInt("memberCount", 0),
+        isDefault = optBoolean("isDefault", false)
+    )
+}
+
+private fun JSONObject.toGroupPresence(): GroupPresence {
+    return GroupPresence(
+        userId = optString("userId"),
+        displayName = optString("displayName").ifBlank { "Friend" },
+        active = optBoolean("active", false),
+        mode = optString("mode").takeUnless { it.isBlank() || it == "null" },
+        startedAt = optString("startedAt").takeUnless { it.isBlank() || it == "null" },
+        endsAt = optString("endsAt").takeUnless { it.isBlank() || it == "null" }
     )
 }
 

@@ -100,6 +100,27 @@ describe("session sync hub", () => {
         expect(windows.messages()).toHaveLength(0);
     });
 
+    it("broadcasts authorized social events to every device for a recipient", async () => {
+        const hub = makeHub();
+        const android = new FakeSocket();
+        const windows = new FakeSocket();
+        await connect(hub, android, { deviceId: "android-1" });
+        await connect(hub, windows, { deviceId: "windows-1" });
+        android.sent.length = 0;
+        windows.sent.length = 0;
+
+        hub.broadcastEvent("user-1", {
+            type: "accountability.attempt",
+            notification: { id: "notification-1" }
+        });
+
+        expect(android.messages()).toEqual([{
+            type: "accountability.attempt",
+            notification: { id: "notification-1" }
+        }]);
+        expect(windows.messages()).toEqual(android.messages());
+    });
+
     it("drops a connection when its socket closes", async () => {
         const hub = makeHub();
         const socket = new FakeSocket();

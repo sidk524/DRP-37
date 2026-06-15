@@ -90,7 +90,7 @@ async function connect() {
         } catch {
             return;
         }
-        if (message?.type === "session.sync" && typeof onSync === "function") {
+        if (typeof message?.type === "string" && typeof onSync === "function") {
             try {
                 onSync(message);
             } catch (err) {
