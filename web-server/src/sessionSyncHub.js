@@ -165,6 +165,15 @@ function createSessionSyncHub({ verifyToken, getSnapshot, path = SYNC_PATH }) {
         return connectionsByUser.get(userId)?.size || 0;
     }
 
+    function broadcastEvent(userId, payload, { excludeDeviceId = null } = {}) {
+        const set = connectionsByUser.get(userId);
+        if (!set) return;
+        for (const conn of set) {
+            if (excludeDeviceId && conn.deviceId && conn.deviceId === excludeDeviceId) continue;
+            sendTo(conn, payload);
+        }
+    }
+
     function startHeartbeat() {
         stopHeartbeat();
         heartbeatTimer = setInterval(() => {
@@ -234,8 +243,8 @@ function createSessionSyncHub({ verifyToken, getSnapshot, path = SYNC_PATH }) {
         attach,
         close,
         broadcastSession,
+        broadcastEvent,
         getConnectedCount,
-        // Exposed for tests.
         handleConnection,
         SYNC_PATH: path,
     };

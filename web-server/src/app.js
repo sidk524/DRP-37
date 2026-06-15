@@ -5,6 +5,7 @@ const { createClient } = require("@supabase/supabase-js");
 const ws = require("ws");
 const { expandBlockTargets } = require("./expandBlockTargets");
 const { createSessionSyncHub } = require("./sessionSyncHub");
+const { registerAccountabilityRoutes } = require("./accountability");
 const {
     publicBlockGroup,
     ensureBlockGroups,
@@ -40,8 +41,8 @@ const app = express();
 const SESSION_FIELDS = "id,user_id,block_group_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at,mode,updated_at";
 const SESSION_MODES = ["breathing", "reflect", "hard"];
 const normalizeSessionModeForSession = (mode) => (SESSION_MODES.includes(mode) ? mode : "reflect");
-const GROUP_FIELDS = "id,name,invite_code,created_by,created_at";
-const DEFAULT_GROUP_FIELDS = `${GROUP_FIELDS},default_group_key`;
+const GROUP_FIELDS = "id,name,invite_code,created_by,created_at,default_group_key";
+const DEFAULT_GROUP_FIELDS = GROUP_FIELDS;
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const DEFAULT_GROUPS = [
     { key: "late_night", label: "Late night", name: "Late night", inviteCode: "LATENITE" },
@@ -238,6 +239,9 @@ const missingSchemaError = (error) => {
     if (/block_groups/i.test(message)) {
         return makeHttpError(503, "Block group tables are not available. Run Supabase migration 006_block_groups.sql.");
     }
+    if (/accountability_/i.test(message)) {
+        return makeHttpError(503, "Accountability tables are not available. Run Supabase migration 010_accountability.sql.");
+    }
     if (!/(leaderboard_groups|group_members)/i.test(message)) return null;
     return makeHttpError(503, "Group tables are not available. Run Supabase migration 003_leaderboard_groups.sql.");
 };
@@ -258,7 +262,8 @@ const publicGroup = (group, memberCount = 1) => ({
     inviteCode: group.invite_code,
     createdBy: group.created_by,
     createdAt: group.created_at,
-    memberCount
+    memberCount,
+    isDefault: group.default_group_key != null
 });
 
 const createGroupWithInvite = async (userId, name) => {
@@ -1086,6 +1091,14 @@ app.patch("/api/session/current", requireSupabase, requireUser, async (req, res,
     } catch (error) {
         next(error);
     }
+});
+
+registerAccountabilityRoutes(app, {
+    supabaseAdmin,
+    requireSupabase,
+    requireUser,
+    hub: sessionSyncHub,
+    displayNameForUser
 });
 
 app.use((_req, res) => {

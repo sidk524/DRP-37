@@ -13,6 +13,8 @@ object TetherLocalStore {
     private const val KEY_STARTED_AT_EPOCH_MILLIS = "started_at_epoch_millis"
     private const val KEY_DURATION_SECONDS = "duration_seconds"
     private const val KEY_MODE = "mode"
+    private const val KEY_SHARE_ACTIVITY = "share_activity"
+    private const val KEY_RECEIVE_FRIEND_ALERTS = "receive_friend_alerts"
     private const val KEY_MIGRATED = "migrated"
     private const val LEGACY_SESSION_PREFS = "active_block_session"
     private const val LEGACY_ALLOW_PREFS = "blocked_package_allow_windows"
@@ -26,8 +28,19 @@ object TetherLocalStore {
         migrateLegacyPrefsIfNeeded()
     }
 
-    // Stable per-install id so the web server can suppress echoing this device's
-    // own session changes back to it over the sync WebSocket.
+    fun setAccountabilityPreferences(shareActivity: Boolean, receiveFriendAlerts: Boolean) {
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_SHARE_ACTIVITY, shareActivity)
+            .putBoolean(KEY_RECEIVE_FRIEND_ALERTS, receiveFriendAlerts)
+            .apply()
+    }
+
+    fun sharesAccountabilityActivity(): Boolean =
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_SHARE_ACTIVITY, true)
+
+    fun receivesFriendAlerts(): Boolean =
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_RECEIVE_FRIEND_ALERTS, true)
+
     fun getOrCreateDeviceId(): String {
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.getString(KEY_DEVICE_ID, null)?.takeIf { it.isNotBlank() }?.let { return it }

@@ -1,7 +1,7 @@
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "../../.env") });
 
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, Notification } = require("electron");
 const CHANNELS = require("./ipc/channels");
 const authService = require("./auth/authService");
 const webServerService = require("./webServer/webServerService");
@@ -97,6 +97,16 @@ function registerAllIpcHandlers() {
     ipcMain.handle(CHANNELS.WEBSERVER_GET_GROUP_LEADERBOARD, (_e, groupId) =>
         webServerService.getGroupLeaderboard(groupId)
     );
+    ipcMain.handle(CHANNELS.WEBSERVER_GET_GROUP_PRESENCE, (_e, groupId) =>
+        webServerService.getGroupPresence(groupId)
+    );
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_GET_PREFERENCES, () => webServerService.getAccountabilityPreferences());
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_UPDATE_PREFERENCES, (_e, payload) => webServerService.updateAccountabilityPreferences(payload));
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_REPORT_ATTEMPT, (_e, payload) => webServerService.reportAccountabilityAttempt(payload));
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_GET_INBOX, () => webServerService.getAccountabilityInbox());
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_MARK_READ, (_e, id) => webServerService.markAccountabilityNotificationRead(id));
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_MARK_MESSAGE_READ, (_e, id) => webServerService.markAccountabilityMessageRead(id));
+    ipcMain.handle(CHANNELS.ACCOUNTABILITY_SEND_MESSAGE, (_e, data) => webServerService.sendAccountabilityMessage(data?.attemptId, data?.payload));
     ipcMain.handle(CHANNELS.WEBSERVER_SYNC_DEFAULT_GROUPS, (_e, payload) =>
         webServerService.syncDefaultGroups(payload)
     );
@@ -197,13 +207,30 @@ function createWindow() {
 if (gotSingleInstanceLock) {
     app.whenReady().then(async () => {
         sessionSyncService.initialize({
-            onSync: (message) => broadcastToAllWindows(CHANNELS.SESSION_REMOTE_SYNC, message),
+            onSync: (message) => {
+                if (message?.type === "session.sync") {
+                    broadcastToAllWindows(CHANNELS.SESSION_REMOTE_SYNC, message);
+                    return;
+                }
+                broadcastToAllWindows(CHANNELS.ACCOUNTABILITY_EVENT, message);
+                extensionBridge.notifyAccountability(message);
+                if (!["accountability.attempt", "accountability.message"].includes(message?.type)) return;
+                const title = message?.type === "accountability.message"
+                    ? `${message.message?.senderDisplayName || "A friend"} sent encouragement`
+                    : `${message.notification?.actorDisplayName || "A friend"} needs accountability`;
+                const body = message?.type === "accountability.message"
+                    ? message.message?.body
+                    : `${message.notification?.attempt?.target_label || "Blocked app"} · ${message.notification?.attempt?.mode || "focus"}`;
+                if (Notification.isSupported()) new Notification({ title, body }).show();
+            },
         });
         authService.initialize({ onSessionChange: broadcastAuthSession });
         blockerService.initialize({
             onSessionChange: broadcastBlockerSession,
             extensionBridge,
         });
+        extensionBridge.setAttemptReporter((payload) => webServerService.reportAccountabilityAttempt(payload));
+        extensionBridge.setMessageSender((attemptId, payload) => webServerService.sendAccountabilityMessage(attemptId, payload));
         registerAllIpcHandlers();
         createWindow();
     });

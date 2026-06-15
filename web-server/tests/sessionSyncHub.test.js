@@ -119,4 +119,15 @@ describe("session sync hub", () => {
         socket.emit("message", JSON.stringify({ type: "ping" }));
         expect(socket.messages()).toEqual([{ type: "pong" }]);
     });
+
+    it("broadcasts arbitrary accountability events to connected clients", async () => {
+        const hub = makeHub();
+        const socket = new FakeSocket();
+        await connect(hub, socket, { deviceId: "android-1" });
+        socket.sent.length = 0;
+
+        hub.broadcastEvent("user-1", { type: "accountability.unread", unreadCount: 3 });
+
+        expect(socket.messages()).toEqual([{ type: "accountability.unread", unreadCount: 3 }]);
+    });
 });

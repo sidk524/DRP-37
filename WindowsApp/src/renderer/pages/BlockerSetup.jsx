@@ -4,6 +4,7 @@ import DurationScrollPicker from "../components/DurationScrollPicker";
 import LockGraphic from "../components/LockGraphic";
 import Groups from "./Groups";
 import Settings from "./Settings";
+import AccountabilityInbox, { useAccountabilityUnread } from "./AccountabilityInbox";
 import SessionComplete from "./SessionComplete";
 import { useBlockerSessionController, normalizeWebsite } from "../hooks/useBlockerSessionController";
 import { createBlockGroup, deleteBlockGroup, updateBlockGroup } from "../services/BlockGroupRepository";
@@ -48,6 +49,7 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
     const [managerError, setManagerError] = useState("");
     const [editorReturnView, setEditorReturnView] = useState("groupPicker");
     const [pickerDraftGroupId, setPickerDraftGroupId] = useState(null);
+    const [accountabilityUnread, setAccountabilityUnread] = useAccountabilityUnread();
 
     const {
         blockGroups,
@@ -185,6 +187,10 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
 
     if (view === "groups") {
         return <Groups onBack={() => setView("duration")} />;
+    }
+
+    if (view === "inbox") {
+        return <AccountabilityInbox onBack={() => setView("duration")} onUnreadChange={setAccountabilityUnread} />;
     }
 
     if (lastCompletedSession) {
@@ -417,6 +423,9 @@ function BlockerSetup({ session, defaultMode = "breathing", onStrictnessChange }
                         onClick={() => setView("groups")}
                     >
                         Social
+                    </button>
+                    <button type="button" className="tether-header-action" onClick={() => setView("inbox")}>
+                        Notifications{accountabilityUnread ? ` (${accountabilityUnread})` : ""}
                     </button>
                     <button
                         type="button"

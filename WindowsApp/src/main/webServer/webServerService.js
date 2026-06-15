@@ -114,6 +114,41 @@ async function getGroupLeaderboard(groupId) {
     };
 }
 
+async function getGroupPresence(groupId) {
+    const data = await request(`/api/groups/${encodeURIComponent(groupId)}/presence`);
+    return data.presence || [];
+}
+
+async function getAccountabilityPreferences() {
+    const data = await request("/api/accountability/preferences");
+    return data.preferences;
+}
+
+async function updateAccountabilityPreferences(preferences) {
+    const data = await request("/api/accountability/preferences", { method: "PUT", body: preferences });
+    return data.preferences;
+}
+
+async function reportAccountabilityAttempt(payload) {
+    return request("/api/accountability/attempts", { method: "POST", body: payload });
+}
+
+async function getAccountabilityInbox() {
+    return request("/api/accountability/inbox");
+}
+
+async function markAccountabilityNotificationRead(notificationId) {
+    return request(`/api/accountability/notifications/${encodeURIComponent(notificationId)}/read`, { method: "POST" });
+}
+
+async function markAccountabilityMessageRead(messageId) {
+    return request(`/api/accountability/messages/${encodeURIComponent(messageId)}/read`, { method: "POST" });
+}
+
+async function sendAccountabilityMessage(attemptId, payload) {
+    return request(`/api/accountability/attempts/${encodeURIComponent(attemptId)}/messages`, { method: "POST", body: payload });
+}
+
 async function syncDefaultGroups({ scrollingWorst } = {}) {
     const normalizedScrollingWorst = normalizeNonEmptyStringArray(scrollingWorst);
     const data = await request("/api/groups/defaults/sync", {
@@ -236,6 +271,14 @@ module.exports = {
     createGroup,
     joinGroup,
     getGroupLeaderboard,
+    getGroupPresence,
+    getAccountabilityPreferences,
+    updateAccountabilityPreferences,
+    reportAccountabilityAttempt,
+    getAccountabilityInbox,
+    markAccountabilityNotificationRead,
+    markAccountabilityMessageRead,
+    sendAccountabilityMessage,
     syncDefaultGroups,
     listBlockGroups,
     createBlockGroup,

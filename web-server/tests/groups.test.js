@@ -97,7 +97,8 @@ describe("group leaderboard API", () => {
                 inviteCode: "ABCDEFGH",
                 createdBy: "user-1",
                 createdAt: "2026-06-05T09:00:00.000Z",
-                memberCount: 1
+                memberCount: 1,
+                isDefault: false
             }
         });
         expect(createQuery.insert).toHaveBeenCalledWith({

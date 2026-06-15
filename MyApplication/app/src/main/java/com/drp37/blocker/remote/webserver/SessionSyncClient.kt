@@ -1,6 +1,7 @@
 package com.drp37.blocker.remote.webserver
 
 import com.drp37.blocker.BuildConfig
+import com.drp37.blocker.accountability.AccountabilityNotifier
 import com.drp37.blocker.auth.AuthService
 import com.drp37.blocker.local.TetherLocalStore
 import io.ktor.client.HttpClient
@@ -53,6 +54,9 @@ object SessionSyncClient {
     private val _events = MutableSharedFlow<RemoteSessionSync>(extraBufferCapacity = 16)
     val events: SharedFlow<RemoteSessionSync> = _events.asSharedFlow()
 
+    private val _unreadCount = MutableSharedFlow<Int>(extraBufferCapacity = 8)
+    val unreadCount: SharedFlow<Int> = _unreadCount.asSharedFlow()
+
     @Synchronized
     fun start() {
         if (connectionJob?.isActive == true) return
@@ -100,21 +104,42 @@ object SessionSyncClient {
 
     private suspend fun handleFrame(text: String) {
         val json = runCatching { JSONObject(text) }.getOrNull() ?: return
-        if (json.optString("type") != "session.sync") return
-        val sessionJson = json.optJSONObject("session")
-        val session = sessionJson?.let { runCatching { it.toBlockSessionRecord() }.getOrNull() }
-        val completedJson = json.optJSONObject("completed")
-        val completed = completedJson?.let { runCatching { it.toFocusPointsRecord() }.getOrNull() }
-        val originDeviceId = json.optString("originDeviceId").takeUnless { it.isBlank() || it == "null" }
-        val revision = json.optLong("revision", 0L)
-        _events.emit(
-            RemoteSessionSync(
-                session = session,
-                completed = completed,
-                originDeviceId = originDeviceId,
-                revision = revision
-            )
-        )
+        when (json.optString("type")) {
+            "accountability.attempt" -> {
+                val notification = json.optJSONObject("notification") ?: return
+                val attempt = notification.optJSONObject("attempt")
+                AccountabilityNotifier.show(
+                    "${notification.optString("actorDisplayName", "A friend")} needs accountability",
+                    "${attempt?.optString("target_label", "Blocked app")} · ${attempt?.optString("mode", "focus")}"
+                )
+            }
+            "accountability.message" -> {
+                val message = json.optJSONObject("message") ?: return
+                AccountabilityNotifier.show(
+                    "${message.optString("senderDisplayName", "A friend")} sent encouragement",
+                    message.optString("body", "Stay focused")
+                )
+            }
+            "accountability.unread" -> {
+                _unreadCount.emit(json.optInt("unreadCount", 0))
+            }
+            "session.sync" -> {
+                val sessionJson = json.optJSONObject("session")
+                val session = sessionJson?.let { runCatching { it.toBlockSessionRecord() }.getOrNull() }
+                val completedJson = json.optJSONObject("completed")
+                val completed = completedJson?.let { runCatching { it.toFocusPointsRecord() }.getOrNull() }
+                val originDeviceId = json.optString("originDeviceId").takeUnless { it.isBlank() || it == "null" }
+                val revision = json.optLong("revision", 0L)
+                _events.emit(
+                    RemoteSessionSync(
+                        session = session,
+                        completed = completed,
+                        originDeviceId = originDeviceId,
+                        revision = revision
+                    )
+                )
+            }
+        }
     }
 
     private fun helloMessage(): String {

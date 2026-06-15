@@ -21,6 +21,10 @@ export async function getGroupLeaderboard(groupId) {
     return requireTether().getGroupLeaderboard(groupId);
 }
 
+export async function getGroupPresence(groupId) {
+    return requireTether().getGroupPresence(groupId);
+}
+
 export async function syncDefaultGroups({ scrollingWorst }) {
     return requireTether().syncDefaultGroups({ scrollingWorst });
 }

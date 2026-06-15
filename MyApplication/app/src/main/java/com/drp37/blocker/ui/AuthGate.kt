@@ -97,6 +97,10 @@ fun AuthGate(
                         syncedDefaultGroups = true
                     }
                 }
+                runCatching { WebServerService.getAccountabilityPreferences() }
+                    .onSuccess { prefs ->
+                        TetherLocalStore.setAccountabilityPreferences(prefs.shareActivity, prefs.receiveFriendAlerts)
+                    }
             }
             .onFailure { error ->
                 errorMessage = error.message ?: "Could not load friction settings."
