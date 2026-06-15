@@ -15,14 +15,10 @@ const strictnessCardEl = document.getElementById("strictness-card");
 const strictnessIconEl = document.getElementById("strictness-icon");
 const strictnessLabelEl = document.getElementById("strictness-label");
 const sessionMetaEl = document.getElementById("session-meta");
-const domainsPanelEl = document.getElementById("domains-panel");
-const domainsEl = document.getElementById("domains");
 
 const STORAGE_KEYS = [
     "connected",
     "blocking",
-    "domains",
-    "hosts",
     "endsAt",
     "mode",
     "blockGroupId",
@@ -34,20 +30,6 @@ function hideAllPanels() {
     errorPanelEl.classList.add("hidden");
     idlePanelEl.classList.add("hidden");
     activePanelEl.classList.add("hidden");
-}
-
-function renderDomains(items = []) {
-    domainsEl.textContent = "";
-    if (!items.length) {
-        domainsPanelEl.classList.add("hidden");
-        return;
-    }
-    for (const item of items) {
-        const li = document.createElement("li");
-        li.textContent = item;
-        domainsEl.appendChild(li);
-    }
-    domainsPanelEl.classList.remove("hidden");
 }
 
 function renderStrictness(mode) {
@@ -76,7 +58,6 @@ function renderPopup(data) {
     if (data.lastError) {
         errorPanelEl.textContent = data.lastError;
         errorPanelEl.classList.remove("hidden");
-        renderDomains(data.hosts?.length ? data.hosts : data.domains);
         return;
     }
 
@@ -92,7 +73,6 @@ function renderPopup(data) {
     const remaining = formatRemainingTime(data.endsAt);
     const endLabel = formatSessionEndTime(data.endsAt);
     sessionMetaEl.textContent = remaining ? `${remaining} · ${endLabel}` : endLabel;
-    renderDomains(data.hosts?.length ? data.hosts : data.domains);
 }
 
 function loadPopupState() {
