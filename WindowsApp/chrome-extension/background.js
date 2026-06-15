@@ -302,7 +302,7 @@ function connectAccountabilityStream() {
             message: isReply
                 ? message.message?.body || "Stay focused"
                 : `${message.notification?.attempt?.target_label || "Blocked site"} · ${message.notification?.attempt?.mode || "focus"}`,
-            buttons: isReply ? [] : [{ title: "Lock in" }, { title: "Stay focused" }],
+            buttons: isReply ? [] : [{ title: "Lock in" }, { title: "Stay focused" }, { title: "You've got this" }],
         }).catch(() => {});
         if (!isReply && message.notification?.attempt_id) {
             notificationAttempts.set(notificationId, message.notification.attempt_id);
@@ -313,10 +313,13 @@ function connectAccountabilityStream() {
 chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
     const attemptId = notificationAttempts.get(notificationId);
     if (!attemptId) return;
+    const presets = ["lock_in", "stay_focused", "youve_got_this"];
+    const presetKey = presets[buttonIndex];
+    if (!presetKey) return;
     fetch(`http://127.0.0.1:17894/api/accountability/attempts/${encodeURIComponent(attemptId)}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ presetKey: buttonIndex === 0 ? "lock_in" : "stay_focused" }),
+        body: JSON.stringify({ presetKey }),
     }).catch(() => {});
 });
 

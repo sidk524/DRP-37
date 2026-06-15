@@ -177,12 +177,13 @@ fun GroupsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = "Notifications", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    if (unreadCount > 0) {
+                    if (inbox.isNotEmpty()) {
                         TextButton(onClick = {
                             coroutineScope.launch {
                                 runCatching { WebServerService.clearAccountabilityInbox() }
                                     .onSuccess {
-                                        inbox = inbox.map { it.copy(unread = false) }
+                                        inbox = emptyList()
+                                        messageDrafts = emptyMap()
                                         unreadCount = 0
                                     }
                             }
@@ -273,6 +274,12 @@ fun GroupsScreen(onBack: () -> Unit) {
                                 }
                                 .padding(14.dp)
                         ) {
+                            if (item.unread) {
+                                Text(text = "New", color = Color(0xFF0A84FF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            if (item.kind == "message") {
+                                Text(text = "Encouragement", color = Color(0xFF8E8E96), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                             Text(text = item.title, color = Color.White, fontWeight = FontWeight.Bold)
                             Text(text = item.detail, color = Color(0xFF8E8E96))
                             if (item.kind == "attempt") {

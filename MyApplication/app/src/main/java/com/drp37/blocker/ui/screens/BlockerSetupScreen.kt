@@ -104,6 +104,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun BlockerSetupScreen(
     onboardingSettings: OnboardingSettings? = null,
+    pendingOpenInbox: Boolean = false,
+    onOpenInboxHandled: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -126,6 +128,13 @@ fun BlockerSetupScreen(
         runCatching { WebServerService.getAccountabilityInbox() }
             .onSuccess { accountabilityUnread = it.second }
         SessionSyncClient.unreadCount.collect { accountabilityUnread = it }
+    }
+
+    LaunchedEffect(pendingOpenInbox) {
+        if (pendingOpenInbox) {
+            screen = BlockerFlowScreen.Inbox
+            onOpenInboxHandled()
+        }
     }
 
     LaunchedEffect(installedPackages) {

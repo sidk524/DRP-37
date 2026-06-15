@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var pendingFrictionPackage by mutableStateOf<String?>(null)
+    private var pendingOpenInbox by mutableStateOf(false)
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -31,13 +32,16 @@ class MainActivity : ComponentActivity() {
         }
         enableEdgeToEdge()
         pendingFrictionPackage = frictionPackageFromIntent(intent)
+        pendingOpenInbox = intent?.getBooleanExtra(com.drp37.blocker.accountability.AccountabilityNotifier.OPEN_INBOX, false) == true
         handleAuthDeepLink(intent)
 
         setContent {
             MyApplicationTheme {
                 AuthGate(
                     pendingFrictionPackage = pendingFrictionPackage,
-                    onClearFriction = { pendingFrictionPackage = null }
+                    onClearFriction = { pendingFrictionPackage = null },
+                    pendingOpenInbox = pendingOpenInbox,
+                    onClearOpenInbox = { pendingOpenInbox = false }
                 )
             }
         }
@@ -49,6 +53,9 @@ class MainActivity : ComponentActivity() {
         handleAuthDeepLink(intent)
         frictionPackageFromIntent(intent)?.let { packageName ->
             pendingFrictionPackage = packageName
+        }
+        if (intent?.getBooleanExtra(com.drp37.blocker.accountability.AccountabilityNotifier.OPEN_INBOX, false) == true) {
+            pendingOpenInbox = true
         }
     }
 

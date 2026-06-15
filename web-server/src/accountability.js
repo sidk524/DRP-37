@@ -257,12 +257,11 @@ function registerAccountabilityRoutes(app, deps) {
 
     app.post("/api/accountability/inbox/clear", requireSupabase, requireUser, async (req, res, next) => {
         try {
-            const readAt = new Date().toISOString();
             const notifications = await supabaseAdmin.from("accountability_notifications")
-                .update({ read_at: readAt }).eq("recipient_user_id", req.user.id).is("read_at", null).select("id");
+                .delete().eq("recipient_user_id", req.user.id).select("id");
             if (notifications.error) throw notifications.error;
             const messages = await supabaseAdmin.from("accountability_messages")
-                .update({ read_at: readAt }).eq("recipient_user_id", req.user.id).is("read_at", null).select("id");
+                .delete().eq("recipient_user_id", req.user.id).select("id");
             if (messages.error) throw messages.error;
             const clearedCount = (notifications.data || []).length + (messages.data || []).length;
             res.json({ unreadCount: 0, clearedCount });
@@ -292,7 +291,12 @@ function registerAccountabilityRoutes(app, deps) {
             if (result.error) throw result.error;
             hub.broadcastEvent(attemptResult.data.actor_user_id, {
                 type: "accountability.message",
-                message: { ...result.data, attempt: attemptResult.data, senderDisplayName: await displayNameForUser(req.user.id) }
+                message: {
+                    id: result.data.id,
+                    ...result.data,
+                    attempt: attemptResult.data,
+                    senderDisplayName: await displayNameForUser(req.user.id)
+                }
             });
             broadcastUnread(attemptResult.data.actor_user_id).catch(() => {});
             res.status(201).json({ message: result.data });

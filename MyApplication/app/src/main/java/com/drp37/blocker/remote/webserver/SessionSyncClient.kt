@@ -108,16 +108,19 @@ object SessionSyncClient {
             "accountability.attempt" -> {
                 val notification = json.optJSONObject("notification") ?: return
                 val attempt = notification.optJSONObject("attempt")
-                AccountabilityNotifier.show(
-                    "${notification.optString("actorDisplayName", "A friend")} needs accountability",
-                    "${attempt?.optString("target_label", "Blocked app")} · ${attempt?.optString("mode", "focus")}"
+                AccountabilityNotifier.showAttemptNotification(
+                    attemptId = notification.optString("attempt_id"),
+                    actorDisplayName = notification.optString("actorDisplayName", "A friend"),
+                    targetLabel = attempt?.optString("target_label", "Blocked app") ?: "Blocked app",
+                    mode = attempt?.optString("mode", "focus") ?: "focus"
                 )
             }
             "accountability.message" -> {
                 val message = json.optJSONObject("message") ?: return
-                AccountabilityNotifier.show(
-                    "${message.optString("senderDisplayName", "A friend")} sent encouragement",
-                    message.optString("body", "Stay focused")
+                AccountabilityNotifier.showEncouragementNotification(
+                    messageId = message.optString("id"),
+                    senderDisplayName = message.optString("senderDisplayName", "A friend"),
+                    body = message.optString("body", "Stay focused")
                 )
             }
             "accountability.unread" -> {

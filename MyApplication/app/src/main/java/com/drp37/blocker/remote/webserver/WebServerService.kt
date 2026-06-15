@@ -224,17 +224,27 @@ object WebServerService {
         val items = response.optJSONArray("items")?.toObjectList {
             val kind = optString("kind")
             val attempt = optJSONObject("attempt")
+            val senderName = optString("senderDisplayName").takeUnless { it.isBlank() || it == "null" }
+            val actorName = optString("actorDisplayName").takeUnless { it.isBlank() || it == "null" }
+            val targetLabel = attempt?.optString("target_label")?.takeUnless { it.isBlank() || it == "null" }
             AccountabilityInboxItem(
                 id = optString("id"),
                 kind = kind,
                 attemptId = optString("attempt_id"),
                 title = if (kind == "message") {
-                    "${optString("senderDisplayName", "A friend")} sent encouragement"
+                    optString("body")
                 } else {
-                    "${optString("actorDisplayName", "Friend")} opened ${attempt?.optString("target_label", "a blocked app")}"
+                    "${actorName ?: "Friend"} opened ${targetLabel ?: "a blocked app"}"
                 },
-                detail = if (kind == "message") optString("body") else attempt?.optString("mode", "focus").orEmpty(),
-                unread = optString("read_at").isBlank() || optString("read_at") == "null"
+                detail = if (kind == "message") {
+                    "From ${senderName ?: "a friend"}"
+                } else {
+                    attempt?.optString("mode", "focus").orEmpty()
+                },
+                unread = optString("read_at").isBlank() || optString("read_at") == "null",
+                senderDisplayName = senderName,
+                actorDisplayName = actorName,
+                targetLabel = targetLabel
             )
         }.orEmpty()
         return items to response.optInt("unreadCount", 0)

@@ -37,7 +37,9 @@ private enum class OnboardingGate {
 @Composable
 fun AuthGate(
     pendingFrictionPackage: String?,
-    onClearFriction: () -> Unit
+    onClearFriction: () -> Unit,
+    pendingOpenInbox: Boolean = false,
+    onClearOpenInbox: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -150,6 +152,8 @@ fun AuthGate(
             )
             OnboardingGate.Complete -> BlockerSetupScreen(
                 onboardingSettings = onboardingSettings,
+                pendingOpenInbox = pendingOpenInbox,
+                onOpenInboxHandled = onClearOpenInbox,
                 onLogout = {
                     coroutineScope.launch {
                         runCatching {

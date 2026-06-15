@@ -76,7 +76,10 @@ data class AccountabilityInboxItem(
     val attemptId: String,
     val title: String,
     val detail: String,
-    val unread: Boolean
+    val unread: Boolean,
+    val senderDisplayName: String? = null,
+    val actorDisplayName: String? = null,
+    val targetLabel: String? = null
 )
 
 data class LeaderboardEntry(

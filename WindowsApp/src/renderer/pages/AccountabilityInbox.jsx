@@ -66,9 +66,10 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
     async function clearAll() {
         try {
             await clearAccountabilityInbox();
+            setItems([]);
+            setDrafts({});
             setUnread(0);
             onUnreadChange?.(0);
-            await refresh();
         } catch (err) {
             setError(err.message || "Could not clear notifications.");
         }
@@ -90,7 +91,7 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
                         <NotificationBellIcon className="tether-bell-icon" />
                         Notifications
                     </span>
-                    {unread > 0 ? (
+                    {items.length > 0 ? (
                         <button type="button" className="tether-clear-notifications" onClick={clearAll}>
                             Clear all
                         </button>
@@ -108,6 +109,7 @@ export default function AccountabilityInbox({ onBack, onUnreadChange }) {
                                 <>
                                     <p className="onboarding-section">Encouragement</p>
                                     <h2 className="settings-card-title">{item.body}</h2>
+                                    <p className="settings-subtitle">From {item.senderDisplayName || "a friend"}</p>
                                 </>
                             ) : (
                                 <>

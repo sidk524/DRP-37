@@ -59,6 +59,10 @@
                     android:scheme="drp37" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".accountability.AccountabilityReplyReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

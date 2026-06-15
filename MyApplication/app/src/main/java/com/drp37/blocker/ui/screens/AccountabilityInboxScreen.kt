@@ -85,7 +85,8 @@ fun AccountabilityInboxScreen(onBack: () -> Unit) {
         coroutineScope.launch {
             runCatching { WebServerService.clearAccountabilityInbox() }
                 .onSuccess {
-                    inbox = inbox.map { it.copy(unread = false) }
+                    inbox = emptyList()
+                    messageDrafts = emptyMap()
                     unreadCount = 0
                 }
                 .onFailure { throwable ->
@@ -108,7 +109,7 @@ fun AccountabilityInboxScreen(onBack: () -> Unit) {
                     Text(text = "Back", color = Color(0xFF0A84FF))
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                if (unreadCount > 0) {
+                if (inbox.isNotEmpty()) {
                     TextButton(onClick = ::clearAll) {
                         Text(text = "Clear all", color = Color(0xFF0A84FF))
                     }
@@ -171,6 +172,10 @@ private fun AccountabilityInboxCard(
     ) {
         if (item.unread) {
             Text(text = "New", color = Color(0xFF0A84FF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        if (item.kind == "message") {
+            Text(text = "Encouragement", color = Color(0xFF8E8E96), fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
         }
         Text(text = item.title, color = Color.White, fontWeight = FontWeight.Bold)

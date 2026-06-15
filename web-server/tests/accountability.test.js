@@ -9,7 +9,8 @@ const makeQuery = (result) => {
         "insert",
         "select",
         "update",
-        "upsert"
+        "upsert",
+        "delete"
     ].forEach((method) => {
         query[method] = jest.fn(() => query);
     });
@@ -192,7 +193,7 @@ describe("accountability inbox clear", () => {
         delete process.env.SUPABASE_SECRET_KEY;
     });
 
-    it("marks all inbox items as read", async () => {
+    it("removes all inbox items for the user", async () => {
         const notifUpdate = makeQuery({ data: [{ id: "n-1" }, { id: "n-2" }], error: null });
         const msgUpdate = makeQuery({ data: [{ id: "m-1" }], error: null });
         const app = loadApp([notifUpdate, msgUpdate]);
