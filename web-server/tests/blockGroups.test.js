@@ -329,7 +329,9 @@ describe("session start with blockGroupId", () => {
             .send({ active: true, blockGroupId: "group-1", totalDurationSeconds: 600 });
 
         expect(response.status).toBe(201);
-        expect(response.body).toEqual({ session: createdSession });
+        expect(response.body).toEqual({
+            session: { ...createdSession, block_group_name: group.name }
+        });
         expect(insertQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
             user_id: "user-1",
             block_group_id: "group-1",
