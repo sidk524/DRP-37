@@ -1,4 +1,5 @@
 const authService = require("../auth/authService");
+const { getDeviceId } = require("./deviceIdentity");
 
 function getBaseUrl() {
     return (process.env.VITE_WEB_SERVER_URL || "").trim().replace(/\/$/, "");
@@ -28,6 +29,7 @@ async function request(path, { method = "GET", body } = {}) {
             headers: {
                 Authorization: `Bearer ${token}`,
                 Accept: "application/json",
+                "X-Tether-Device-Id": getDeviceId(),
                 ...(body ? { "Content-Type": "application/json" } : {}),
             },
             body: body ? JSON.stringify(body) : undefined,
@@ -50,16 +52,25 @@ async function getCurrentSession() {
     return data.session || null;
 }
 
-async function createSession({ blockGroupId, domainsBlocked, totalDurationSeconds }) {
+async function createSession({ blockGroupId, domainsBlocked, totalDurationSeconds, mode }) {
     const data = await request("/api/session/current", {
         method: "PUT",
         body: {
             active: true,
             ...(blockGroupId ? { blockGroupId } : { domainsBlocked }),
             totalDurationSeconds,
+            ...(mode ? { mode } : {}),
         },
     });
     return data.session;
+}
+
+async function patchSessionMode(mode) {
+    const data = await request("/api/session/current", {
+        method: "PATCH",
+        body: { mode },
+    });
+    return data.session || null;
 }
 
 async function endSession(sessionId) {
@@ -218,6 +229,7 @@ async function getUserTotalPoints() {
 module.exports = {
     getCurrentSession,
     createSession,
+    patchSessionMode,
     endSession,
     listGroups,
     createGroup,

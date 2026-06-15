@@ -37,16 +37,25 @@ object WebServerService {
 
     suspend fun createSession(
         blockGroupId: String,
-        totalDurationSeconds: Int
+        totalDurationSeconds: Int,
+        mode: String = "reflect"
     ): BlockSessionRecord {
         val body = JSONObject()
             .put("active", true)
             .put("blockGroupId", blockGroupId)
             .put("totalDurationSeconds", totalDurationSeconds)
+            .put("mode", normalizeMode(mode))
 
         val response = request(method = "PUT", path = "/api/session/current", body = body)
         val session = response.optJSONObject("session")
             ?: throw IOException("Server did not return a block session.")
+        return session.toBlockSessionRecord()
+    }
+
+    suspend fun patchSessionMode(mode: String): BlockSessionRecord? {
+        val body = JSONObject().put("mode", normalizeMode(mode))
+        val response = request(method = "PATCH", path = "/api/session/current", body = body)
+        val session = response.optJSONObject("session") ?: return null
         return session.toBlockSessionRecord()
     }
 
@@ -210,6 +219,7 @@ object WebServerService {
                 this.method = httpMethod
                 header("Authorization", "Bearer $accessToken")
                 header("Accept", "application/json")
+                header("X-Tether-Device-Id", com.drp37.blocker.local.TetherLocalStore.getOrCreateDeviceId())
                 if (body != null) {
                     contentType(ContentType.Application.Json)
                     setBody(body.toString())
@@ -272,7 +282,7 @@ private fun normalizeMode(mode: String): String {
     }
 }
 
-private fun JSONObject.toBlockSessionRecord(): BlockSessionRecord {
+internal fun JSONObject.toBlockSessionRecord(): BlockSessionRecord {
     return BlockSessionRecord(
         id = getString("id"),
         userId = getString("user_id"),
@@ -283,7 +293,8 @@ private fun JSONObject.toBlockSessionRecord(): BlockSessionRecord {
         processTokens = optJSONArray("process_tokens")?.toStringList().orEmpty(),
         totalDurationSeconds = getInt("total_duration_seconds"),
         startedAt = getString("started_at"),
-        endedAt = optString("ended_at").takeUnless { it.isBlank() || it == "null" }
+        endedAt = optString("ended_at").takeUnless { it.isBlank() || it == "null" },
+        mode = normalizeMode(optString("mode"))
     )
 }
 

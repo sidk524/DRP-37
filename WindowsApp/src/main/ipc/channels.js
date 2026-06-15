@@ -23,12 +23,14 @@ module.exports = {
     WEBSERVER_CREATE_BLOCK_GROUP: "webserver:createBlockGroup",
     WEBSERVER_UPDATE_BLOCK_GROUP: "webserver:updateBlockGroup",
     WEBSERVER_DELETE_BLOCK_GROUP: "webserver:deleteBlockGroup",
+    WEBSERVER_PATCH_SESSION_MODE: "webserver:patchSessionMode",
 
     SESSION_START: "session:start",
     SESSION_UPDATE: "session:update",
     SESSION_STOP: "session:stop",
     SESSION_GET: "session:get",
     SESSION_UPDATE_EVENT: "session:update",
+    SESSION_REMOTE_SYNC: "session:remote-sync",
 
     EXTENSION_STATUS: "extension:status",
 };

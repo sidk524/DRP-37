@@ -45,10 +45,11 @@ contextBridge.exposeInMainWorld("tether", {
     createBlockGroup: (payload) => invoke(CHANNELS.WEBSERVER_CREATE_BLOCK_GROUP, payload),
     updateBlockGroup: (payload) => invoke(CHANNELS.WEBSERVER_UPDATE_BLOCK_GROUP, payload),
     deleteBlockGroup: (groupId) => invoke(CHANNELS.WEBSERVER_DELETE_BLOCK_GROUP, groupId),
+    patchSessionMode: (mode) => invoke(CHANNELS.WEBSERVER_PATCH_SESSION_MODE, mode),
 
     startSession: (config) => invoke(CHANNELS.SESSION_START, config),
     updateSession: (config) => invoke(CHANNELS.SESSION_UPDATE, config),
-    stopSession: () => invoke(CHANNELS.SESSION_STOP),
+    stopSession: (config) => invoke(CHANNELS.SESSION_STOP, config),
     getBlockerSession: () => invoke(CHANNELS.SESSION_GET),
     getExtensionStatus: () => invoke(CHANNELS.EXTENSION_STATUS),
     onSessionUpdate: (callback) => {
@@ -58,5 +59,13 @@ contextBridge.exposeInMainWorld("tether", {
         const listener = (_event, data) => callback(data);
         ipcRenderer.on(CHANNELS.SESSION_UPDATE_EVENT, listener);
         return () => ipcRenderer.removeListener(CHANNELS.SESSION_UPDATE_EVENT, listener);
+    },
+    onRemoteSessionSync: (callback) => {
+        if (typeof callback !== "function") {
+            throw new TypeError("onRemoteSessionSync callback must be a function.");
+        }
+        const listener = (_event, data) => callback(data);
+        ipcRenderer.on(CHANNELS.SESSION_REMOTE_SYNC, listener);
+        return () => ipcRenderer.removeListener(CHANNELS.SESSION_REMOTE_SYNC, listener);
     },
 });

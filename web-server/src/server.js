@@ -9,8 +9,13 @@ const server = app.listen(port, host, () => {
   console.log(`Server listening on http://${host}:${port}`);
 });
 
+// Attach the real-time session sync WebSocket hub to the same HTTP server so it
+// shares the listening port (and any reverse-proxy WebSocket upgrade config).
+app.sessionSyncHub.attach(server);
+
 const shutdown = (signal) => {
   console.log(`${signal} received, shutting down`);
+  app.sessionSyncHub.close();
   server.close(() => {
     process.exit(0);
   });

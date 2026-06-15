@@ -6,6 +6,8 @@ import com.drp37.blocker.local.TetherLocalStore
 import com.drp37.blocker.remote.webserver.BlockGroup
 import com.drp37.blocker.remote.webserver.BlockSessionRecord
 import com.drp37.blocker.remote.webserver.FocusPointsRecord
+import com.drp37.blocker.remote.webserver.RemoteSessionSync
+import com.drp37.blocker.remote.webserver.SessionSyncClient
 import com.drp37.blocker.remote.webserver.WebServerService
 import com.drp37.blocker.util.filterAppsForDevice
 import kotlinx.coroutines.Job
@@ -61,6 +63,7 @@ class BlockerSessionViewModel : ViewModel() {
         if (restored) return
         restored = true
         _state.update { it.copy(mode = normalizeMode(defaultMode)) }
+        observeRemoteSync()
         refreshBlockGroups()
         viewModelScope.launch {
             refreshTotalPoints()
@@ -219,6 +222,10 @@ class BlockerSessionViewModel : ViewModel() {
         _state.update { it.copy(mode = normalized) }
         if (_state.value.sessionRunning) {
             TetherLocalStore.updateActiveSessionMode(normalized)
+            // Propagate to the server so other devices sync the mode change.
+            viewModelScope.launch {
+                runCatching { WebServerService.patchSessionMode(normalized) }
+            }
         }
     }
 
@@ -247,7 +254,8 @@ class BlockerSessionViewModel : ViewModel() {
             runCatching {
                 WebServerService.createSession(
                     blockGroupId = blockGroupId,
-                    totalDurationSeconds = totalDurationSeconds
+                    totalDurationSeconds = totalDurationSeconds,
+                    mode = current.mode
                 )
             }.onSuccess { session ->
                 val startedAt = Instant.parse(session.startedAt)
@@ -387,5 +395,65 @@ class BlockerSessionViewModel : ViewModel() {
             "hard" -> "hard"
             else -> "reflect"
         }
+    }
+
+    // Listen for session changes pushed from other devices. The server already
+    // excludes this device's own changes, and we guard again by device id.
+    private fun observeRemoteSync() {
+        viewModelScope.launch {
+            SessionSyncClient.events.collect { event -> applyRemoteSync(event) }
+        }
+    }
+
+    private fun applyRemoteSync(event: RemoteSessionSync) {
+        val localDeviceId = TetherLocalStore.getOrCreateDeviceId()
+        if (event.originDeviceId != null && event.originDeviceId == localDeviceId) return
+
+        val current = _state.value
+        val session = event.session
+
+        if (session == null) {
+            // Remote stop / expiry. Clear local blocking even for hard mode — the
+            // hard-mode rule only blocks *local manual* stops.
+            if (!current.sessionRunning && current.activeSessionId == null) return
+            timerJob?.cancel()
+            clearActiveSessionState()
+            return
+        }
+
+        val serverMode = normalizeMode(session.mode)
+
+        if (current.activeSessionId == session.id) {
+            if (serverMode != current.mode) {
+                TetherLocalStore.updateActiveSessionMode(serverMode)
+                _state.update { it.copy(mode = serverMode) }
+            }
+            return
+        }
+
+        // Remote start (or replacement) of a session this device is not running.
+        val startedAt = runCatching { Instant.parse(session.startedAt) }.getOrNull() ?: return
+        val elapsedSeconds = Duration.between(startedAt, Instant.now()).seconds.toInt()
+        val remainingSeconds = session.totalDurationSeconds - elapsedSeconds
+        if (remainingSeconds <= 0) return
+
+        val localApps = deviceAppsForSession(session)
+        TetherLocalStore.setActiveSession(session.copy(appsBlocked = localApps), serverMode)
+        timerJob?.cancel()
+        _state.update {
+            it.copy(
+                selectedBlockGroupId = session.blockGroupId ?: it.selectedBlockGroupId,
+                sessionRunning = true,
+                activeSessionId = session.id,
+                activeStartedAtEpochMillis = startedAt.toEpochMilli(),
+                activeDurationSeconds = session.totalDurationSeconds,
+                activeBlockedAppsCount = localApps.size,
+                remainingSeconds = max(1, remainingSeconds),
+                mode = serverMode,
+                isStartingSession = false,
+                errorMessage = null
+            )
+        }
+        startTimer()
     }
 }

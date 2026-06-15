@@ -25,8 +25,8 @@ export async function updateTetherSession(config) {
     return getRequiredTetherMethod("updateSession")(config);
 }
 
-export async function stopTetherSession() {
-    return getRequiredTetherMethod("stopSession")();
+export async function stopTetherSession(config) {
+    return getRequiredTetherMethod("stopSession")(config);
 }
 
 export async function getTetherSession() {
@@ -42,4 +42,15 @@ export function onTetherSessionUpdate(callback) {
         return () => {};
     }
     return getRequiredTetherMethod("onSessionUpdate")(callback);
+}
+
+export function onRemoteSessionSync(callback) {
+    if (typeof callback !== "function") {
+        throw new TypeError("Remote session sync callback must be a function.");
+    }
+    const api = tetherApi();
+    if (typeof api?.onRemoteSessionSync !== "function") {
+        return () => {};
+    }
+    return api.onRemoteSessionSync(callback);
 }

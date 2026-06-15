@@ -4,6 +4,7 @@ const { randomInt } = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 const ws = require("ws");
 const { expandBlockTargets } = require("./expandBlockTargets");
+const { createSessionSyncHub } = require("./sessionSyncHub");
 const {
     publicBlockGroup,
     ensureBlockGroups,
@@ -36,7 +37,9 @@ const supabaseAdmin = supabaseUrl && supabaseSecretKey
     : null;
 
 const app = express();
-const SESSION_FIELDS = "id,user_id,block_group_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
+const SESSION_FIELDS = "id,user_id,block_group_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at,mode,updated_at";
+const SESSION_MODES = ["breathing", "reflect", "hard"];
+const normalizeSessionModeForSession = (mode) => (SESSION_MODES.includes(mode) ? mode : "reflect");
 const GROUP_FIELDS = "id,name,invite_code,created_by,created_at";
 const DEFAULT_GROUP_FIELDS = `${GROUP_FIELDS},default_group_key`;
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -56,8 +59,8 @@ app.use((req, res, next) => {
         res.setHeader("Access-Control-Allow-Origin", origin);
         res.setHeader("Vary", "Origin");
     }
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,Accept");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,Accept,X-Tether-Device-Id");
     if (req.method === "OPTIONS") {
         res.sendStatus(204);
         return;
@@ -128,7 +131,7 @@ const closeSession = async (userId, sessionId = null) => {
     return query.select(SESSION_FIELDS);
 };
 
-const createSession = async (userId, expandedTargets, totalDurationSeconds, blockGroupId = null) => {
+const createSession = async (userId, expandedTargets, totalDurationSeconds, blockGroupId = null, mode = "reflect") => {
     return supabaseAdmin
         .from("block_sessions")
         .insert({
@@ -139,7 +142,8 @@ const createSession = async (userId, expandedTargets, totalDurationSeconds, bloc
             domains_blocked: expandedTargets.domainsBlocked,
             process_tokens: expandedTargets.processTokens,
             total_duration_seconds: totalDurationSeconds,
-            started_at: new Date().toISOString()
+            started_at: new Date().toISOString(),
+            mode: normalizeSessionModeForSession(mode)
         })
         .select(SESSION_FIELDS)
         .single();
@@ -150,6 +154,57 @@ const enrichSessionWithBlockGroupName = async (userId, session) => {
     const group = await getBlockGroup(supabaseAdmin, userId, String(session.block_group_id));
     if (!group?.name) return session;
     return { ...session, block_group_name: group.name };
+};
+
+// Shared snapshot used by both GET /api/session/current and the sync hub so the
+// session shape stays identical across the pull and push paths.
+const getCurrentSessionForUser = async (userId) => {
+    const { data, error } = await supabaseAdmin
+        .from("block_sessions")
+        .select(SESSION_FIELDS)
+        .eq("user_id", userId)
+        .is("ended_at", null)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error) throw error;
+
+    if (data && isExpired(data)) {
+        const { error: closeExpiredError } = await closeSession(userId, data.id);
+        if (closeExpiredError) throw closeExpiredError;
+        return null;
+    }
+
+    return data ? await enrichSessionWithBlockGroupName(userId, data) : null;
+};
+
+// Resolve a Supabase bearer token to a user id (used by the WebSocket hub).
+const verifyAccessToken = async (token) => {
+    if (!supabaseAuth) return null;
+    const { data, error } = await supabaseAuth.auth.getUser(token);
+    if (error || !data?.user) return null;
+    return data.user.id;
+};
+
+const sessionSyncHub = createSessionSyncHub({
+    verifyToken: verifyAccessToken,
+    getSnapshot: getCurrentSessionForUser
+});
+
+const deviceIdFromRequest = (req) => {
+    const raw = req.get("x-tether-device-id");
+    const trimmed = raw ? raw.trim() : "";
+    return trimmed || null;
+};
+
+// Fire-and-forget push to every other connected device for this user. Skips the
+// snapshot read entirely when nobody is listening so REST stays cheap.
+const broadcastSessionUpdate = (userId, excludeDeviceId = null) => {
+    if (sessionSyncHub.getConnectedCount(userId) === 0) return;
+    getCurrentSessionForUser(userId)
+        .then((session) => sessionSyncHub.broadcastSession(userId, session, { excludeDeviceId }))
+        .catch((err) => console.error(`[session-sync] broadcast failed: ${err?.message || err}`));
 };
 
 const validateStringArray = (value, fieldName) => {
@@ -785,25 +840,7 @@ app.delete("/api/block-groups/:groupId", requireSupabase, requireUser, async (re
 
 app.get("/api/session/current", requireSupabase, requireUser, async (req, res, next) => {
     try {
-        const { data, error } = await supabaseAdmin
-            .from("block_sessions")
-            .select(SESSION_FIELDS)
-            .eq("user_id", req.user.id)
-            .is("ended_at", null)
-            .order("started_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-        if (error) throw error;
-
-        if (data && isExpired(data)) {
-            const { error: closeExpiredError } = await closeSession(req.user.id, data.id);
-            if (closeExpiredError) throw closeExpiredError;
-            res.json({ session: null });
-            return;
-        }
-
-        const session = data ? await enrichSessionWithBlockGroupName(req.user.id, data) : null;
+        const session = await getCurrentSessionForUser(req.user.id);
         res.json({ session });
     } catch (error) {
         next(error);
@@ -819,8 +856,11 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
             targets,
             blockGroupId,
             totalDurationSeconds,
-            sessionId
+            sessionId,
+            mode
         } = req.body || {};
+        const sessionMode = normalizeSessionModeForSession(mode);
+        const originDeviceId = deviceIdFromRequest(req);
 
         if (active === true) {
             if (!Number.isInteger(totalDurationSeconds) || totalDurationSeconds <= 0) {
@@ -854,11 +894,11 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
                 const { error: closeExistingError } = await closeSession(req.user.id);
                 if (closeExistingError) throw closeExistingError;
 
-                let { data, error } = await createSession(req.user.id, groupTargets, totalDurationSeconds, group.id);
+                let { data, error } = await createSession(req.user.id, groupTargets, totalDurationSeconds, group.id, sessionMode);
                 if (error && error.code === "23505") {
                     const { error: retryCloseError } = await closeSession(req.user.id);
                     if (retryCloseError) throw retryCloseError;
-                    ({ data, error } = await createSession(req.user.id, groupTargets, totalDurationSeconds, group.id));
+                    ({ data, error } = await createSession(req.user.id, groupTargets, totalDurationSeconds, group.id, sessionMode));
                 }
 
                 if (error) throw error;
@@ -866,6 +906,7 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
                 res.status(201).json({
                     session: { ...data, block_group_name: group.name }
                 });
+                broadcastSessionUpdate(req.user.id, originDeviceId);
                 return;
             }
 
@@ -906,16 +947,17 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
 
             if (closeExistingError) throw closeExistingError;
 
-            let { data, error } = await createSession(req.user.id, expandedTargets, totalDurationSeconds);
+            let { data, error } = await createSession(req.user.id, expandedTargets, totalDurationSeconds, null, sessionMode);
             if (error && error.code === "23505") {
                 const { error: retryCloseError } = await closeSession(req.user.id);
                 if (retryCloseError) throw retryCloseError;
-                ({ data, error } = await createSession(req.user.id, expandedTargets, totalDurationSeconds));
+                ({ data, error } = await createSession(req.user.id, expandedTargets, totalDurationSeconds, null, sessionMode));
             }
 
             if (error) throw error;
 
             res.status(201).json({ session: data });
+            broadcastSessionUpdate(req.user.id, originDeviceId);
             return;
         }
 
@@ -925,10 +967,41 @@ app.put("/api/session/current", requireSupabase, requireUser, async (req, res, n
             if (error) throw error;
 
             res.json({ sessions: data });
+            broadcastSessionUpdate(req.user.id, originDeviceId);
             return;
         }
 
         res.status(400).json({ error: "active must be true or false" });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.patch("/api/session/current", requireSupabase, requireUser, async (req, res, next) => {
+    try {
+        const mode = req.body?.mode;
+        if (!SESSION_MODES.includes(mode)) {
+            res.status(400).json({ error: `mode must be one of ${SESSION_MODES.join(", ")}` });
+            return;
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from("block_sessions")
+            .update({ mode, updated_at: new Date().toISOString() })
+            .eq("user_id", req.user.id)
+            .is("ended_at", null)
+            .select(SESSION_FIELDS)
+            .maybeSingle();
+
+        if (error) throw error;
+        if (!data) {
+            res.status(404).json({ error: "No active session" });
+            return;
+        }
+
+        const session = await enrichSessionWithBlockGroupName(req.user.id, data);
+        res.json({ session });
+        broadcastSessionUpdate(req.user.id, deviceIdFromRequest(req));
     } catch (error) {
         next(error);
     }
@@ -950,5 +1023,7 @@ app.use((err, _req, res, _next) => {
         : 500;
     res.status(status).json({ error: status === 500 ? "Internal server error" : err.message });
 });
+
+app.sessionSyncHub = sessionSyncHub;
 
 module.exports = app;

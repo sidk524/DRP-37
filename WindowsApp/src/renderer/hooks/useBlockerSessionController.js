@@ -3,6 +3,7 @@ import {
     createSession,
     endSession,
     loadActiveSession,
+    patchSessionMode,
 } from "../services/BlockSessionRepository";
 import {
     listBlockGroups,
@@ -13,11 +14,18 @@ import { getUserTotalPoints, loadOnboarding, saveSessionPoints, signOut } from "
 import {
     getTetherSession,
     isTetherBridgeAvailable,
+    onRemoteSessionSync,
     onTetherSessionUpdate,
     startTetherSession,
     stopTetherSession,
     updateTetherSession,
 } from "../services/TetherClient";
+
+const SESSION_MODES = ["breathing", "reflect", "hard"];
+
+function normalizeMode(mode, fallback = "reflect") {
+    return SESSION_MODES.includes(mode) ? mode : fallback;
+}
 
 function normalizeWebsite(input) {
     let value = input.trim().toLowerCase();
@@ -155,7 +163,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         return null;
     }
 
-    async function startLocalSession(serverSession, groups = blockGroups) {
+    async function startLocalSession(serverSession, groups = blockGroups, modeOverride = null) {
         const endsAt = sessionEndsAt(serverSession);
         if (endsAt <= Date.now()) return null;
 
@@ -169,6 +177,10 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             || (selectedBlockGroup?.name && String(selectedBlockGroup.id) === String(blockGroupId)
                 ? selectedBlockGroup.name
                 : null);
+        // The server row carries the authoritative mode once it is set; fall back
+        // to the local UI mode for older payloads.
+        const sessionMode = normalizeMode(modeOverride || serverSession.mode, mode);
+        if (sessionMode !== mode) setMode(sessionMode);
 
         const res = await startTetherSession({
             sessionId: serverSession.id,
@@ -176,7 +188,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             blockGroupName,
             appLabels: sessionLabels(serverSession),
             domains: serverSession.domains_blocked || [],
-            mode,
+            mode: sessionMode,
             friction,
             durationMinutes: sessionDurationMinutes(serverSession),
             startedAt: sessionStartedAt(serverSession),
@@ -272,6 +284,57 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
         });
     }, [remoteSessionId, userId]);
 
+    // Apply real-time updates pushed from the web server (other device started,
+    // stopped, or changed the mode). The server already excludes this device's
+    // own changes, so anything received here is a genuine remote event.
+    // We keep the handler in a ref so the subscription stays mounted once while
+    // always reading the latest session state.
+    const applyRemoteSyncRef = useRef(null);
+    applyRemoteSyncRef.current = async (message) => {
+        const serverSession = message?.session || null;
+
+        if (!serverSession) {
+            if (!sessionRunning && !active) return;
+            setRemoteSessionId(null);
+            const res = await stopTetherSession({ reason: "remote" });
+            if (res && !res.ok) {
+                console.error("Failed to apply remote stop:", res.error);
+            }
+            return;
+        }
+
+        const serverMode = normalizeMode(serverSession.mode, mode);
+        const isSameSession = active?.sessionId
+            && String(active.sessionId) === String(serverSession.id);
+
+        if (isSameSession) {
+            if (serverMode !== active.mode) {
+                setMode(serverMode);
+                const res = await updateTetherSession({ mode: serverMode });
+                if (res && !res.ok) {
+                    console.error("Failed to apply remote mode change:", res.error);
+                }
+            }
+            return;
+        }
+
+        try {
+            const localSession = await startLocalSession(serverSession, blockGroups, serverMode);
+            if (localSession) {
+                setCurrentActiveSession(localSession);
+                wasActiveRef.current = true;
+            }
+        } catch (error) {
+            setSessionError(error.message || "Could not apply remote session.");
+        }
+    };
+
+    useEffect(() => {
+        return onRemoteSessionSync((message) => {
+            applyRemoteSyncRef.current?.(message);
+        });
+    }, []);
+
     useEffect(() => {
         if (!active?.active || !active.blockGroupId || active.blockGroupName) return;
         const name = resolveBlockGroupName({ block_group_id: active.blockGroupId }, blockGroups);
@@ -311,6 +374,7 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             const serverSession = await createSession({
                 blockGroupId: selectedBlockGroupId,
                 totalDurationSeconds: totalSeconds,
+                mode,
             });
             saveLastBlockGroupId(selectedBlockGroupId);
             const localSession = await startLocalSession(serverSession);
@@ -357,6 +421,12 @@ export function useBlockerSessionController({ userId, defaultMode, onStrictnessC
             const res = await updateTetherSession({ mode: nextMode, friction });
             if (res && !res.ok) {
                 setSessionError(res.error || "Could not update active session.");
+            }
+            // Propagate the mode change to the server so other devices sync.
+            try {
+                await patchSessionMode(nextMode);
+            } catch (error) {
+                console.error("Failed to sync mode to server:", error);
             }
         }
     }

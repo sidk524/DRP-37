@@ -5,6 +5,7 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const CHANNELS = require("./ipc/channels");
 const authService = require("./auth/authService");
 const webServerService = require("./webServer/webServerService");
+const sessionSyncService = require("./webServer/sessionSyncService");
 const blockerService = require("./blocker/blockerService");
 const extensionBridge = require("./extension/extensionBridge");
 
@@ -46,6 +47,13 @@ function broadcastToAllWindows(channel, payload) {
 
 function broadcastAuthSession(session) {
     broadcastToAllWindows(CHANNELS.AUTH_SESSION_UPDATE, session);
+    // Drive the real-time sync socket with the auth lifecycle: connect while a
+    // session exists, disconnect on sign-out.
+    if (session) {
+        sessionSyncService.start();
+    } else {
+        sessionSyncService.stop();
+    }
 }
 
 function broadcastBlockerSession(view) {
@@ -104,11 +112,14 @@ function registerAllIpcHandlers() {
     ipcMain.handle(CHANNELS.WEBSERVER_DELETE_BLOCK_GROUP, (_e, groupId) =>
         webServerService.deleteBlockGroup(groupId)
     );
+    ipcMain.handle(CHANNELS.WEBSERVER_PATCH_SESSION_MODE, (_e, mode) =>
+        webServerService.patchSessionMode(mode)
+    );
 
     ipcMain.handle(CHANNELS.SESSION_START, (_e, cfg) => blockerService.startSession(cfg));
     ipcMain.handle(CHANNELS.SESSION_UPDATE, (_e, cfg) => blockerService.updateSession(cfg));
     ipcMain.handle(CHANNELS.SESSION_GET, () => blockerService.getSession());
-    ipcMain.handle(CHANNELS.SESSION_STOP, () => blockerService.stopSession("manual"));
+    ipcMain.handle(CHANNELS.SESSION_STOP, (_e, opts) => blockerService.stopSession(opts?.reason || "manual"));
     ipcMain.handle(CHANNELS.EXTENSION_STATUS, () => extensionBridge.status());
 }
 
@@ -185,6 +196,9 @@ function createWindow() {
 
 if (gotSingleInstanceLock) {
     app.whenReady().then(async () => {
+        sessionSyncService.initialize({
+            onSync: (message) => broadcastToAllWindows(CHANNELS.SESSION_REMOTE_SYNC, message),
+        });
         authService.initialize({ onSessionChange: broadcastAuthSession });
         blockerService.initialize({
             onSessionChange: broadcastBlockerSession,
@@ -195,6 +209,7 @@ if (gotSingleInstanceLock) {
     });
 
     app.on("will-quit", () => {
+        sessionSyncService.stop();
         blockerService.stop();
     });
 }

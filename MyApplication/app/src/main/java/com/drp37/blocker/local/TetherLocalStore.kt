@@ -3,10 +3,12 @@ package com.drp37.blocker.local
 import android.content.Context
 import com.drp37.blocker.remote.webserver.BlockSessionRecord
 import java.time.Instant
+import java.util.UUID
 
 object TetherLocalStore {
     private const val PREFS_NAME = "tether_local"
     private const val KEY_SESSION_ID = "session_id"
+    private const val KEY_DEVICE_ID = "device_id"
     private const val KEY_PACKAGES = "packages"
     private const val KEY_STARTED_AT_EPOCH_MILLIS = "started_at_epoch_millis"
     private const val KEY_DURATION_SECONDS = "duration_seconds"
@@ -22,6 +24,16 @@ object TetherLocalStore {
     fun init(context: Context) {
         appContext = context.applicationContext
         migrateLegacyPrefsIfNeeded()
+    }
+
+    // Stable per-install id so the web server can suppress echoing this device's
+    // own session changes back to it over the sync WebSocket.
+    fun getOrCreateDeviceId(): String {
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.getString(KEY_DEVICE_ID, null)?.takeIf { it.isNotBlank() }?.let { return it }
+        val deviceId = UUID.randomUUID().toString()
+        prefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
+        return deviceId
     }
 
     fun getActiveSession(): ActiveBlockSession? {

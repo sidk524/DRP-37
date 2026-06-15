@@ -1,6 +1,6 @@
 const request = require("supertest");
 
-const SESSION_FIELDS = "id,user_id,block_group_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at";
+const SESSION_FIELDS = "id,user_id,block_group_id,canonical_targets,apps_blocked,domains_blocked,process_tokens,total_duration_seconds,started_at,ended_at,mode,updated_at";
 
 const makeQuery = (terminalMethod, terminalResult) => {
     const query = {};
@@ -9,6 +9,7 @@ const makeQuery = (terminalMethod, terminalResult) => {
         "insert",
         "is",
         "limit",
+        "maybeSingle",
         "order",
         "select",
         "single",
@@ -96,7 +97,8 @@ describe("block session API", () => {
             domains_blocked: [],
             process_tokens: [],
             total_duration_seconds: 60,
-            started_at: "2026-06-03T12:00:00.000Z"
+            started_at: "2026-06-03T12:00:00.000Z",
+            mode: "reflect"
         });
     });
 
@@ -172,7 +174,8 @@ describe("block session API", () => {
             domains_blocked: ["instagram.com", "www.instagram.com"],
             process_tokens: ["instagram"],
             total_duration_seconds: 60,
-            started_at: expect.any(String)
+            started_at: expect.any(String),
+            mode: "reflect"
         });
     });
 
@@ -202,5 +205,63 @@ describe("block session API", () => {
 
         expect(closeQuery.select).toHaveBeenCalledWith(SESSION_FIELDS);
         expect(insertQuery.select).toHaveBeenCalledWith(SESSION_FIELDS);
+    });
+
+    it("patches the mode of the active session", async () => {
+        jest.useFakeTimers().setSystemTime(new Date("2026-06-03T12:00:00.000Z"));
+        const updatedSession = {
+            id: "session-1",
+            user_id: "user-1",
+            block_group_id: null,
+            canonical_targets: [],
+            apps_blocked: ["com.example.app"],
+            domains_blocked: [],
+            process_tokens: [],
+            total_duration_seconds: 60,
+            started_at: "2026-06-03T11:59:00.000Z",
+            ended_at: null,
+            mode: "hard",
+            updated_at: "2026-06-03T12:00:00.000Z"
+        };
+        const updateQuery = makeQuery("maybeSingle", { data: updatedSession, error: null });
+        const { app } = loadApp({ adminQueries: [updateQuery] });
+
+        const response = await request(app)
+            .patch("/api/session/current")
+            .set("Authorization", "Bearer token")
+            .send({ mode: "hard" });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ session: updatedSession });
+        expect(updateQuery.update).toHaveBeenCalledWith({
+            mode: "hard",
+            updated_at: "2026-06-03T12:00:00.000Z"
+        });
+        expect(updateQuery.is).toHaveBeenCalledWith("ended_at", null);
+    });
+
+    it("rejects an invalid mode", async () => {
+        const { app } = loadApp({ adminQueries: [] });
+
+        const response = await request(app)
+            .patch("/api/session/current")
+            .set("Authorization", "Bearer token")
+            .send({ mode: "nope" });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/mode must be one of/);
+    });
+
+    it("returns 404 when patching with no active session", async () => {
+        const updateQuery = makeQuery("maybeSingle", { data: null, error: null });
+        const { app } = loadApp({ adminQueries: [updateQuery] });
+
+        const response = await request(app)
+            .patch("/api/session/current")
+            .set("Authorization", "Bearer token")
+            .send({ mode: "breathing" });
+
+        expect(response.status).toBe(404);
+        expect(response.body).toEqual({ error: "No active session" });
     });
 });

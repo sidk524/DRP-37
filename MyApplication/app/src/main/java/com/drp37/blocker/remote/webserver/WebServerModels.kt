@@ -10,7 +10,8 @@ data class BlockSessionRecord(
     val processTokens: List<String>,
     val totalDurationSeconds: Int,
     val startedAt: String,
-    val endedAt: String? = null
+    val endedAt: String? = null,
+    val mode: String = "reflect"
 )
 
 data class BlockGroup(

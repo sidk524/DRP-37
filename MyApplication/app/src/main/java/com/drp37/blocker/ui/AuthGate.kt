@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.drp37.blocker.auth.AuthService
 import com.drp37.blocker.blocking.FrictionIntentContract
 import com.drp37.blocker.remote.webserver.OnboardingSettings
+import com.drp37.blocker.remote.webserver.SessionSyncClient
 import com.drp37.blocker.remote.webserver.WebServerService
 import com.drp37.blocker.local.TetherLocalStore
 import com.drp37.blocker.ui.screens.BlockerSetupScreen
@@ -57,6 +58,7 @@ fun AuthGate(
                         isAuthenticated = true
                         isLoading = false
                         errorMessage = null
+                        SessionSyncClient.start()
                     }
                     is SessionStatus.NotAuthenticated -> {
                         authLoading = false
@@ -65,6 +67,7 @@ fun AuthGate(
                         onboardingSettings = null
                         onboardingGate = OnboardingGate.Loading
                         syncedDefaultGroups = false
+                        SessionSyncClient.stop()
                     }
                     else -> {
                         authLoading = true
