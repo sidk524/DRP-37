@@ -132,8 +132,7 @@ function Groups({ onBack }) {
 
     useEffect(() => {
         refreshLeaderboard(selectedGroupId);
-        const group = groups.find((item) => item.id === selectedGroupId);
-        if (!selectedGroupId || group?.isDefault) {
+        if (!selectedGroupId) {
             setPresence([]);
             return;
         }

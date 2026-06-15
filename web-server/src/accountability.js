@@ -74,8 +74,8 @@ function registerAccountabilityRoutes(app, deps) {
             const groupResult = await supabaseAdmin.from("leaderboard_groups")
                 .select("id,default_group_key").eq("id", req.params.groupId).maybeSingle();
             if (groupResult.error) throw groupResult.error;
-            if (!groupResult.data || groupResult.data.default_group_key != null) {
-                return res.status(404).json({ error: "Custom group not found" });
+            if (!groupResult.data) {
+                return res.status(404).json({ error: "Group not found" });
             }
             const membership = await supabaseAdmin.from("group_members").select("id")
                 .eq("group_id", req.params.groupId).eq("user_id", req.user.id).maybeSingle();

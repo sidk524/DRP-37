@@ -141,7 +141,7 @@ fun GroupsScreen(onBack: () -> Unit) {
     LaunchedEffect(selectedGroupId, groups) {
         refreshLeaderboard(selectedGroupId)
         val group = groups.firstOrNull { it.id == selectedGroupId }
-        if (group == null || group.isDefault) {
+        if (group == null) {
             presence = emptyList()
         } else {
             while (true) {

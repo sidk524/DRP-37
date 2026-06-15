@@ -176,12 +176,29 @@ describe("accountability presence", () => {
         delete process.env.SUPABASE_SECRET_KEY;
     });
 
-    it("rejects presence for default groups", async () => {
+    it("returns presence for default groups", async () => {
+        const startedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         const app = loadApp([
-            makeQuery({ data: { id: "group-1", default_group_key: "late_night" }, error: null })
+            makeQuery({ data: { id: "group-1", default_group_key: "late_night" }, error: null }),
+            makeQuery({ data: { id: "membership-1" }, error: null }),
+            makeQuery({ data: [{ user_id: "user-1" }, { user_id: "user-2" }], error: null }),
+            makeQuery({ data: [], error: null }),
+            makeQuery({
+                data: [{
+                    user_id: "user-2",
+                    started_at: startedAt,
+                    total_duration_seconds: 3600,
+                    mode: "hard"
+                }],
+                error: null
+            })
         ]);
         const response = await authorized(app, "get", "/api/groups/group-1/presence");
-        expect(response.status).toBe(404);
+        expect(response.status).toBe(200);
+        expect(response.body.presence).toEqual(expect.arrayContaining([
+            expect.objectContaining({ userId: "user-1", active: false }),
+            expect.objectContaining({ userId: "user-2", active: true, mode: "hard" })
+        ]));
     });
 });
 
