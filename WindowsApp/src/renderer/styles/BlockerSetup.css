@@ -6,9 +6,7 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    background:
-        radial-gradient(ellipse 90% 55% at 50% -15%, rgba(10, 132, 255, 0.12), transparent 70%),
-        var(--bg);
+    background: transparent;
     color: var(--text-primary);
     font-family: var(--font);
     -webkit-font-smoothing: antialiased;
@@ -491,7 +489,7 @@
 }
 
 .tether-url-remove:hover {
-    background: rgba(255, 69, 58, 0.18);
+    background: var(--danger-soft);
     color: var(--danger);
 }
 
@@ -505,7 +503,7 @@
     padding: clamp(6px, 1.4vh, 8px) clamp(10px, 2.5vw, 14px);
     border: 1px solid rgba(255, 69, 58, 0.35);
     border-radius: 99px;
-    background: rgba(255, 69, 58, 0.1);
+    background: var(--danger-soft);
     color: var(--danger);
     font-family: inherit;
     font-size: clamp(0.8rem, 2.2vw, 0.86rem);
@@ -514,7 +512,7 @@
 }
 
 .tether-clear-all:hover:not(:disabled) {
-    background: rgba(255, 69, 58, 0.18);
+    background: var(--danger-soft);
     border-color: rgba(255, 69, 58, 0.55);
 }
 
@@ -609,7 +607,7 @@
     padding: clamp(4px, 0.8vh, 6px) clamp(4px, 1vw, 6px) clamp(4px, 0.8vh, 6px) clamp(14px, 3vw, 16px);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--surface-inset);
     transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
 }
 

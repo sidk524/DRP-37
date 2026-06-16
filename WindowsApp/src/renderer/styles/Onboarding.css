@@ -45,6 +45,7 @@
     padding: clamp(20px, 4vh, 28px) clamp(18px, 4vw, 24px) clamp(18px, 3vh, 24px);
     gap: clamp(14px, 2.5vh, 20px);
     background: var(--surface);
+    isolation: isolate;
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-card);
@@ -92,7 +93,7 @@
     width: 100%;
     min-height: var(--control-height-sm);
     padding: clamp(12px, 2vh, 14px) clamp(14px, 3vw, 16px);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--surface-inset);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text-primary);
@@ -155,7 +156,7 @@
 .onboarding-textarea {
     width: 100%;
     padding: clamp(12px, 2vh, 14px) clamp(14px, 3vw, 16px);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--surface-inset);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text-primary);
@@ -200,15 +201,15 @@
 }
 
 .strictness-gentle {
-    background: rgba(48, 209, 88, 0.1);
+    background: var(--success-soft);
 }
 
 .strictness-firm {
-    background: rgba(10, 132, 255, 0.1);
+    background: var(--accent-soft);
 }
 
 .strictness-hard {
-    background: rgba(255, 69, 58, 0.1);
+    background: var(--danger-soft);
 }
 
 .strictness-card:hover {

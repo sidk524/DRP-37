@@ -1,7 +1,12 @@
 import AuthGate from "./components/AuthGate";
+import AppChrome from "./components/AppChrome";
 
 function App() {
-    return <AuthGate />;
+    return (
+        <AppChrome>
+            <AuthGate />
+        </AppChrome>
+    );
 }
 
 export default App;

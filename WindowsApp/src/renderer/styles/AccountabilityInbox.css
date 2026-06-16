@@ -18,7 +18,7 @@
     padding: 0 clamp(12px, 2.5vw, 16px);
     border: 1px solid rgba(10, 132, 255, 0.35);
     border-radius: var(--radius);
-    background: rgba(10, 132, 255, 0.14);
+    background: var(--accent-soft);
     color: #ffffff;
     font: inherit;
     font-size: clamp(0.88rem, 2.2vw, 0.95rem);
@@ -31,7 +31,7 @@
 }
 
 .accountability-preset-btn:hover {
-    background: rgba(10, 132, 255, 0.24);
+    background: var(--surface-raised);
     border-color: rgba(10, 132, 255, 0.55);
     filter: brightness(1.05);
 }
@@ -50,7 +50,7 @@
     padding: 0 clamp(14px, 3vw, 16px);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--surface-inset);
     color: var(--text-primary);
     font: inherit;
     outline: none;

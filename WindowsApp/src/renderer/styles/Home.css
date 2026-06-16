@@ -9,9 +9,7 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    background:
-        radial-gradient(ellipse 90% 55% at 50% -15%, rgba(10, 132, 255, 0.13), transparent 70%),
-        var(--bg);
+    background: transparent;
     font-family: var(--font);
     -webkit-font-smoothing: antialiased;
     padding: var(--frame-padding-y) var(--frame-padding-x);

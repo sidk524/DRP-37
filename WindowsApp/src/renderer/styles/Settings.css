@@ -53,6 +53,7 @@
     width: 100%;
     padding: clamp(16px, 3vh, 20px);
     background: var(--surface);
+    isolation: isolate;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);

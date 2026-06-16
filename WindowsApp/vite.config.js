@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
     return {
         plugins: [react()],
         root: 'src/renderer',
+        publicDir: fileURLToPath(new URL('public', import.meta.url)),
         envDir: fileURLToPath(new URL('.', import.meta.url)),
         base: './',
         build: {

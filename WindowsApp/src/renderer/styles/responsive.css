@@ -25,9 +25,10 @@
 
     /* Color — iOS dark palette */
     --bg:             #000000;
-    --surface:        rgba(255, 255, 255, 0.07);
-    --surface-raised: rgba(255, 255, 255, 0.10);
-    --surface-btn:    rgba(255, 255, 255, 0.10);
+    --surface:        #1c1c1e;
+    --surface-raised: #2c2c2e;
+    --surface-btn:    #3a3a3c;
+    --surface-inset:  #161618;
     --border:         rgba(255, 255, 255, 0.08);
     --border-strong:  rgba(255, 255, 255, 0.14);
     --text-primary:   #ffffff;
@@ -35,7 +36,9 @@
     --text-subtle:    rgba(235, 235, 245, 0.62);
     --text-tertiary:  rgba(235, 235, 245, 0.32);
     --accent:         #0a84ff;
-    --accent-soft:    rgba(10, 132, 255, 0.14);
+    --accent-soft:    #1a2d44;
+    --success-soft:   #142818;
+    --danger-soft:    #2a1818;
     --accent-gradient: linear-gradient(180deg, #2f96ff 0%, #0a84ff 100%);
     --success:        #30d158;
     --danger:         #ff453a;
